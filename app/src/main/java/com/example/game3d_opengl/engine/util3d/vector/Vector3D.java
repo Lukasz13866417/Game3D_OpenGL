@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.engine.util.vector;
+package com.example.game3d_opengl.engine.util3d.vector;
 
 import static java.lang.Math.sqrt;
 

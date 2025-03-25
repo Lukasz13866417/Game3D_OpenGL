@@ -8,8 +8,8 @@ public class TerrainCurve extends TerrainStructure {
 
     private final float dAngHor;
 
-    public TerrainCurve(int tilesToMake, int nCols, Terrain terrain, float dAngHor) {
-        super(tilesToMake, nCols, terrain);
+    public TerrainCurve(int tilesToMake, Terrain terrain, float dAngHor) {
+        super(tilesToMake, terrain);
         this.dAngHor = dAngHor;
     }
 
@@ -19,15 +19,10 @@ public class TerrainCurve extends TerrainStructure {
     }
 
     @Override
-    protected void generateElements(TerrainGrid grid) {
-
-    }
-
-    @Override
     protected void generateTiles(Terrain.TerrainBrush brush) {
         float angHorPerTile = dAngHor / (float) (tilesToMake);
         for(int i=0;i<tilesToMake;++i){
-            brush.setHorizontalAng(brush.getHorizontalAng() + angHorPerTile);
+            brush.addHorizontalAng(angHorPerTile);
             brush.addSegment();
         }
     }

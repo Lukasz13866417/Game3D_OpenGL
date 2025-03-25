@@ -8,9 +8,9 @@ public class Terrain2DCurve extends TerrainStructure {
 
     private final float dAngHor, dAngVer;
 
-    public Terrain2DCurve(int tilesToMake, int nCols, Terrain terrain,
+    public Terrain2DCurve(int tilesToMake, Terrain terrain,
                           float dAngHor, float dAngVer) {
-        super(tilesToMake, nCols, terrain);
+        super(tilesToMake, terrain);
         this.dAngHor = dAngHor;
         this.dAngVer = dAngVer;
     }
@@ -23,17 +23,12 @@ public class Terrain2DCurve extends TerrainStructure {
     }
 
     @Override
-    protected void generateElements(TerrainGrid grid) {
-
-    }
-
-    @Override
     protected void generateTiles(Terrain.TerrainBrush brush) {
         float angHorPerTile = dAngHor / (float) (tilesToMake);
         float angVerPerTile = dAngVer / (float) (tilesToMake);
         for(int i=0;i<tilesToMake;++i){
-            brush.setHorizontalAng(brush.getHorizontalAng() + angHorPerTile);
-            brush.setVerticalAng(brush.getVerticalAng() + angVerPerTile);
+            brush.addHorizontalAng(angHorPerTile);
+            brush.addVerticalAng(angVerPerTile);
             brush.addSegment();
         }
     }

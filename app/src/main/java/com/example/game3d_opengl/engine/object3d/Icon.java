@@ -2,7 +2,7 @@ package com.example.game3d_opengl.engine.object3d;
 
 import android.opengl.Matrix;
 
-import com.example.game3d_opengl.engine.util.vector.Vector3D;
+import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
 
 
 /**

@@ -1,9 +1,9 @@
 package com.example.game3d_opengl.engine.object3d;
 
-import static com.example.game3d_opengl.engine.util.GLUtil.loadShader;
+import static com.example.game3d_opengl.engine.util3d.GLUtil.loadShader;
 
 import android.opengl.GLES20;
-import com.example.game3d_opengl.engine.util.FColor;
+import com.example.game3d_opengl.engine.util3d.FColor;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

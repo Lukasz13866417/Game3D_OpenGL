@@ -1,11 +1,11 @@
 
 package com.example.game3d_opengl.game.terrain;
 
-import static com.example.game3d_opengl.engine.util.FColor.CLR;
+import static com.example.game3d_opengl.engine.util3d.FColor.CLR;
 
 import com.example.game3d_opengl.engine.object3d.Polygon3D;
-import com.example.game3d_opengl.engine.util.FColor;
-import com.example.game3d_opengl.engine.util.vector.Vector3D;
+import com.example.game3d_opengl.engine.util3d.FColor;
+import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
 
 public class Tile {
 
@@ -58,7 +58,7 @@ public class Tile {
      */
     public void setTileColor(FColor colorTheme) {
 
-        double brightnessMul = 1.0 + slope;
+        double brightnessMul = 1.0 + 3.0f*slope*slope;
 
         float baseR = colorTheme.r();
         float baseG = colorTheme.g();

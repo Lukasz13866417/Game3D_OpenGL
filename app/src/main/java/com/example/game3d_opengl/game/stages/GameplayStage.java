@@ -1,9 +1,9 @@
 package com.example.game3d_opengl.game.stages;
 
 
-import static com.example.game3d_opengl.engine.util.FColor.CLR;
-import static com.example.game3d_opengl.engine.util.GameMath.PI;
-import static com.example.game3d_opengl.engine.util.vector.Vector3D.V3;
+import static com.example.game3d_opengl.engine.util3d.FColor.CLR;
+import static com.example.game3d_opengl.engine.util3d.GameMath.PI;
+import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3;
 import static java.lang.Math.abs;
 
 import android.content.Context;
@@ -11,8 +11,8 @@ import android.content.res.AssetManager;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.engine.object3d.Camera;
-import com.example.game3d_opengl.engine.util.FColor;
-import com.example.game3d_opengl.engine.util.vector.Vector3D;
+import com.example.game3d_opengl.engine.util3d.FColor;
+import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
 import com.example.game3d_opengl.game.terrain.Terrain;
 import com.example.game3d_opengl.game.terrain.Tile;
@@ -71,19 +71,20 @@ public class GameplayStage implements Stage {
         AssetManager assetManager = context.getAssets();
         Player.LOAD_PLAYER_ASSETS(assetManager);
         player = new Player();
-        float segWidth = 3.2f, segLength = 1.2f;
+        float segWidth = 3.2f, segLength = 1.4f;
         terrain = new Terrain(2000,
                 V3(player.objX,player.objY - 3f, player.objZ + 3f),
                 segWidth,
                 segLength
         );
-        new TerrainLine(200,6,terrain).generate();
-        new TerrainCurve(200,6,terrain, -PI/2).generate();
-        new Terrain2DCurve(200,6,terrain, 0, 0.5f * PI/4).generate();
-        new Terrain2DCurve(200,6,terrain, PI/12, -0.5f * PI/4).generate();
-        new TerrainLine(200,6,terrain).generate();
-        new TerrainLine(200,6,terrain).generate();
-        new TerrainCurve(200,6,terrain, -PI/2).generate();
+        terrain.enqueueStructure(new TerrainLine(100,terrain));
+        terrain.enqueueStructure(new TerrainCurve(100,terrain, -PI/2));
+        terrain.enqueueStructure(new Terrain2DCurve(50,terrain, 0, 0.5f * PI/4));
+        terrain.enqueueStructure(new Terrain2DCurve(50,terrain, PI/12, -0.5f * PI/4));
+        terrain.enqueueStructure(new TerrainLine(100,terrain));
+        terrain.enqueueStructure(new TerrainLine(100,terrain));
+        terrain.enqueueStructure(new TerrainCurve(100,terrain, -PI/2));
+        terrain.generateChunks(-1);
 
     }
 
@@ -110,7 +111,7 @@ public class GameplayStage implements Stage {
             Tile tile = terrain.getTile(i);
             Vector3D tc = tile.farLeft.add(tile.farRight).add(tile.nearLeft).add(tile.nearRight)
                     .div(4);
-            if(tc.sub(V3(player.objX,player.objY,player.objZ)).sqlen() < 20000) {
+            if(tc.sub(V3(player.objX,player.objY,player.objZ)).sqlen() < 250*250) {
                 tile.setTileColor(colorTheme);
                 tile.draw(camera.getViewProjectionMatrix());
             }

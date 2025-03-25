@@ -1,7 +1,7 @@
 package com.example.game3d_opengl.game.terrain.grid.symbolic.segments;
 
 
-import static com.example.game3d_opengl.engine.util.GameRandom.randInt;
+import static com.example.game3d_opengl.engine.util3d.GameRandom.randInt;
 
 import com.example.game3d_opengl.game.terrain.grid.symbolic.GridSegment;
 

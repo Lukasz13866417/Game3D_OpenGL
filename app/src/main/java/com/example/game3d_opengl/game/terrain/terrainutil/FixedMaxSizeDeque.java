@@ -1,4 +1,4 @@
-package com.example.game3d.engine3d;
+package com.example.game3d_opengl.game.terrain.terrainutil;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;

@@ -1,11 +1,11 @@
 package com.example.game3d_opengl.game;
 
-import static com.example.game3d_opengl.engine.util.FColor.CLR;
-import static com.example.game3d_opengl.engine.util.GameMath.PI;
-import static com.example.game3d_opengl.engine.util.GameMath.isPointInTriangle;
-import static com.example.game3d_opengl.engine.util.GameMath.pointAndPlanePosition;
-import static com.example.game3d_opengl.engine.util.GameMath.rotY;
-import static com.example.game3d_opengl.engine.util.vector.Vector3D.V3;
+import static com.example.game3d_opengl.engine.util3d.FColor.CLR;
+import static com.example.game3d_opengl.engine.util3d.GameMath.PI;
+import static com.example.game3d_opengl.engine.util3d.GameMath.isPointInTriangle;
+import static com.example.game3d_opengl.engine.util3d.GameMath.pointAndPlanePosition;
+import static com.example.game3d_opengl.engine.util3d.GameMath.rotY;
+import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3;
 
 import static java.lang.Float.max;
 import static java.lang.Math.abs;
@@ -15,7 +15,7 @@ import android.content.res.AssetManager;
 
 import com.example.game3d_opengl.engine.object3d.ModelCreator;
 import com.example.game3d_opengl.engine.object3d.Object3D;
-import com.example.game3d_opengl.engine.util.vector.Vector3D;
+import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.Tile;
 
 import java.io.IOException;

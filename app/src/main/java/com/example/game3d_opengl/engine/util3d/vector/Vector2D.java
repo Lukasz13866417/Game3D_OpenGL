@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.engine.util.vector;
+package com.example.game3d_opengl.engine.util3d.vector;
 
 public class Vector2D {
     public final float x, y;

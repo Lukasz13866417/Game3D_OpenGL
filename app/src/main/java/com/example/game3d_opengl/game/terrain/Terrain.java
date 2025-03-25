@@ -1,14 +1,16 @@
 package com.example.game3d_opengl.game.terrain;
 
-import static com.example.game3d_opengl.engine.util.GameMath.PI;
-import static com.example.game3d_opengl.engine.util.GameMath.rotateAroundAxis;
-import static com.example.game3d_opengl.engine.util.GameMath.rotateAroundTwoPoints;
-import static com.example.game3d_opengl.engine.util.vector.Vector3D.V3;
+import static com.example.game3d_opengl.engine.util3d.GameMath.PI;
+import static com.example.game3d_opengl.engine.util3d.GameMath.rotateAroundAxis;
+import static com.example.game3d_opengl.engine.util3d.GameMath.rotateAroundTwoPoints;
+import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3;
 import static java.lang.Math.abs;
 import static java.lang.Math.atan;
 
-import com.example.game3d.engine3d.FixedMaxSizeDeque;
-import com.example.game3d_opengl.engine.util.vector.Vector3D;
+import com.example.game3d_opengl.game.terrain.terrainutil.FixedMaxSizeDeque;
+import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
+import com.example.game3d_opengl.game.terrain.terrainutil.execbuffer.CommandExecutor;
+import com.example.game3d_opengl.game.terrain.terrainutil.execbuffer.PreallocatedCommandBuffer;
 
 /**
  * Terrain with a fixed-size deque of tiles. We keep a `lastTile` pointer
@@ -17,35 +19,32 @@ import com.example.game3d_opengl.engine.util.vector.Vector3D;
 public class Terrain {
 
     // API for terrain structures.
-    public class TerrainBrush{
-        public void setHorizontalAng(float ang){
-            setHorizontalAngle(ang);
+    public class TerrainBrush {
+        // Each command is stored as [commandCode, optionalArg].
+        // For commands with no arg (e.g. addSegment), we only store the code.
+        public void setHorizontalAng(float ang) {
+            commandBuffer.addCommand(CMD_SET_H_ANG, ang);
         }
-        public void setVerticalAng(float ang){
-            setVerticalAngle(ang);
+
+        public void setVerticalAng(float ang) {
+            commandBuffer.addCommand(CMD_SET_V_ANG, ang);
         }
-        public float getHorizontalAng(){
-            return getHorizontalAngle();
+
+        public void addVerticalAng(float ang) {
+            commandBuffer.addCommand(CMD_ADD_V_ANG, ang);
         }
-        public float getVerticalAng(){
-            return getVerticalAngle();
+
+        public void addHorizontalAng(float ang) {
+            commandBuffer.addCommand(CMD_ADD_H_ANG, ang);
         }
-        public void addSegment(){
-            Terrain.this.addSegment();
-        }
-        public int coutTiles() {
-            return getTileCount();
-        }
-        public int countRows(){
-            return 0;
+
+        public void addSegment() {
+            // Just store the command code, no arg
+            commandBuffer.addCommand(CMD_ADD_SEG);
         }
     }
 
     private final TerrainBrush brush = new TerrainBrush();
-
-    public TerrainBrush getBrush(){
-        return brush;
-    }
 
     private final float segWidth, segLength;
     private float dHorizontalAng, dVerticalAng;
@@ -88,6 +87,9 @@ public class Terrain {
         // Initialize angles and offsets.
         this.dHorizontalAng = 0.0f;
         this.dVerticalAng = 0.0f;
+
+        this.commandBuffer = new PreallocatedCommandBuffer();
+        this.commandExecutor = new TerrainBuildingCommandsExecutor();
     }
 
     /**
@@ -167,24 +169,24 @@ public class Terrain {
     }
 
     public void removeOldTiles(float playerZ){
-        while(!tiles.isEmpty() && tiles.getFirst().farLeft.z > playerZ + 1f){
+        while(!tiles.isEmpty() && tiles.getFirst().farLeft.z > playerZ + 10f){
             tiles.removeFirst();
-            System.out.println("REMOVED");
         }
     }
 
-    private float getHorizontalAngle() {
-        return currHorizontalAng;
+    private void addVerticalAngle(float angle){
+        this.dVerticalAng = angle;
+    }
+
+    private void addHorizontalAngle(float angle){
+        assert abs(angle) < PI / 5 : "Too drastic angle change";
+        this.dHorizontalAng = angle;
     }
 
     private void setHorizontalAngle(float angle) {
         assert abs(angle - currHorizontalAng) < PI / 5 : "Too drastic angle change";
         this.dHorizontalAng = angle - currHorizontalAng;
         currHorizontalAng += dHorizontalAng;
-    }
-
-    private float getVerticalAngle() {
-        return currVerticalAng;
     }
 
     private void setVerticalAngle(float angle) {
@@ -199,4 +201,58 @@ public class Terrain {
     public Tile getTile(int i) {
         return tiles.get(i);
     }
+
+    public void enqueueStructure(TerrainStructure what){
+        what.generateTiles(brush); // actually doesnt generate. (Because of how brush works)
+    }
+
+    private final PreallocatedCommandBuffer commandBuffer;
+
+    public void generateChunks(int nChunks){
+        while(nChunks != 0 && commandBuffer.hasAnyCommands()){
+            commandBuffer.executeFirstCommand(commandExecutor);
+            --nChunks;
+        }
+    }
+
+
+    private static final float CMD_SET_H_ANG = 0.00001f;
+    private static final float CMD_SET_V_ANG = 0.00011f;
+    private static final float CMD_ADD_H_ANG = 0.00005f;
+    private static final float CMD_ADD_V_ANG = 0.00051f;
+    private static final float CMD_ADD_SEG = 0.00511f;
+
+
+    private class TerrainBuildingCommandsExecutor implements CommandExecutor {
+        @Override
+        public void execute(float[] buffer, int offset, int length) {
+            float code = buffer[offset];
+
+            if (code == CMD_SET_H_ANG) {
+                float angle = buffer[offset + 1];
+                setHorizontalAngle(angle);
+
+            } else if (code == CMD_SET_V_ANG) {
+                float angle = buffer[offset + 1];
+                setVerticalAngle(angle);
+
+            } else if (code == CMD_ADD_V_ANG) {
+                float delta = buffer[offset + 1];
+                addVerticalAngle(delta);
+
+            } else if (code == CMD_ADD_H_ANG) {
+                float delta = buffer[offset + 1];
+                addHorizontalAngle(delta);
+
+            } else if (code == CMD_ADD_SEG) {
+                addSegment();
+
+            } else {
+                throw new IllegalArgumentException("Unknown command code: " + code);
+            }
+        }
+    }
+
+
+    private final TerrainBuildingCommandsExecutor commandExecutor;
 }

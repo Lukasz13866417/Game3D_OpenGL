@@ -2,12 +2,12 @@ package com.example.game3d_opengl.engine.object3d;
 
 
 
-import static com.example.game3d_opengl.engine.util.FColor.CLR;
+import static com.example.game3d_opengl.engine.util3d.FColor.CLR;
 
 import android.opengl.Matrix;
 
-import com.example.game3d_opengl.engine.util.FColor;
-import com.example.game3d_opengl.engine.util.vector.Vector3D;
+import com.example.game3d_opengl.engine.util3d.FColor;
+import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
 
 public class Object3D {
 

@@ -1,11 +1,11 @@
-package com.example.game3d_opengl.engine.util;
+package com.example.game3d_opengl.engine.util3d;
 
-import static com.example.game3d_opengl.engine.util.GameMath.INF;
+import static com.example.game3d_opengl.engine.util3d.GameMath.INF;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
-import com.example.game3d_opengl.engine.util.vector.Vector2D;
-import com.example.game3d_opengl.engine.util.vector.Vector3D;
+import com.example.game3d_opengl.engine.util3d.vector.Vector2D;
+import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
 
 
 public class GameMiscUtil {
