@@ -61,22 +61,10 @@ public class GridCreator {
         return res;
     }
 
-    public void printGrid() {
-        horizontal.printGrid(); // can also be vertical.printGrid(), since they represent the same grid
-    }
-
     public void destroy(){
-        vertical.flush();
-        horizontal.flush();
+        vertical.free();
+        horizontal.free();
     }
 
-
-    public static void main(String[] args) {
-        GridCreator creator = new GridCreator(9,9);
-        long t0 = System.nanoTime();
-
-        creator.printGrid();
-        System.out.println((System.nanoTime() - t0)/1000000);
-    }
 
 }

@@ -9,6 +9,7 @@ import android.opengl.GLSurfaceView;
 
 import com.example.game3d_opengl.game.stages.GameplayStage;
 import com.example.game3d_opengl.game.stages.Stage;
+import com.example.game3d_opengl.game.stages.TestStage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
@@ -17,7 +18,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private long lastFrameTime = System.nanoTime();
 
     private final StageManager stageManager = new StageManager();
-    private Stage currStage = new GameplayStage(stageManager);
+    private Stage currStage = new GameplayStage(stageManager);// new TestStage(stageManager);//
 
     public class StageManager {
         public void switchTo(Stage to) {

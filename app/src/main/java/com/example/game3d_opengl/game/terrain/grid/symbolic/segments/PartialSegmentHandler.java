@@ -48,15 +48,12 @@ public class PartialSegmentHandler {
         int total = segmentsByLength.countFittingSpaces(length);
         int k = randInt(1, total);
         GridSegment found = segmentsByLength.getKthFittingSpace(length,k);
+        System.out.println("Trying to reserve length: "+length);
         reserve(found.row, found.col, length);
         return found;
     }
 
-    public void printGrid(){
-        segmentsByEndPosition.printGrid();
-    }
-
-    public void flush(){
+    public void free(){
         while(!segmentsByEndPosition.tree.isEmpty()){
             GridSegment curr = segmentsByEndPosition.tree.pollFirst();
             segmentsByLength.delete(curr.row,curr.col,curr.length);

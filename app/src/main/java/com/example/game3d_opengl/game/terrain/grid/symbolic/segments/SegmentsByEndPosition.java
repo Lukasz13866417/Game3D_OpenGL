@@ -11,11 +11,8 @@ public class SegmentsByEndPosition {
 
     private final boolean vertical;
     final TreeSet<GridSegment> tree;
-    private int nRows, nCols;
 
     public SegmentsByEndPosition(int nRows, int nCols, boolean vertical) {
-        this.nRows = nRows;
-        this.nCols = nCols;
         this.vertical = vertical;
         if (vertical) {
             this.tree = new TreeSet<>((GridSegment a, GridSegment b) -> {
@@ -97,25 +94,4 @@ public class SegmentsByEndPosition {
         return null;
     }
 
-    void printGrid(){
-        char[][] grid = new char[nRows][nCols];
-        for(int r=0;r<nRows;r++){
-            for(int c=0;c<nCols;c++){
-                grid[r][c] = '#';
-            }
-        }
-        for(GridSegment seg : tree){
-            int row = seg.row-1, col = seg.col-1, len = seg.length;
-            for(int i=0;i<len;++i){
-                if(vertical){
-                    grid[row + i][col] = '.';
-                }else{
-                    grid[row][col+i] = '.';
-                }
-            }
-        }
-        for(int r=0;r<nRows;r++){
-            System.out.println(grid[r]);
-        }
-    }
 }

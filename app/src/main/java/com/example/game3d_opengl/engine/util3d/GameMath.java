@@ -69,7 +69,6 @@ public class GameMath {
         float normalZ = edge1.x * edge2.y - edge1.y * edge2.x;
         Vector3D norm = new Vector3D(normalX, normalY, normalZ);
         double d = norm.sqlen();
-        assert(d>EPSILON);
         return div(norm, (float) sqrt(d));
     }
 

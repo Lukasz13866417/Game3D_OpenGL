@@ -19,6 +19,7 @@ import com.example.game3d_opengl.game.terrain.Tile;
 import com.example.game3d_opengl.game.terrain.structures.Terrain2DCurve;
 import com.example.game3d_opengl.game.terrain.structures.TerrainCurve;
 import com.example.game3d_opengl.game.terrain.structures.TerrainLine;
+import com.example.game3d_opengl.game.track_elements.DeathSpike;
 
 /**
  * Demonstration of a gameplay stage that:
@@ -29,9 +30,7 @@ public class GameplayStage implements Stage {
 
     private final MyGLRenderer.StageManager stageManager;
     private Camera camera;
-
     private FColor colorTheme = CLR(0.7f,0,0,1);
-
     private Player player;
 
     public GameplayStage(MyGLRenderer.StageManager stageManager){
@@ -54,7 +53,6 @@ public class GameplayStage implements Stage {
         if(abs(dx) > abs(dy) && abs(dx) > 2) {
             player.rotDirOnTouch(dx);
         }
-        //playerMove = rotY(playerMove,dx * 0.01f);
     }
 
     Terrain terrain;
@@ -86,6 +84,7 @@ public class GameplayStage implements Stage {
         terrain.enqueueStructure(new TerrainCurve(100,terrain, -PI/2));
         terrain.generateChunks(-1);
 
+
     }
 
     @Override
@@ -106,6 +105,12 @@ public class GameplayStage implements Stage {
         camera.updateEyePos(camPos);
         camera.updateLookPos(camPos.add(player.getDir().setY(0.0f)));
 
+        for(int i=0;i<terrain.getAddonCount();++i){
+            terrain.getAddon(i).updateBeforeDraw(dt);
+            terrain.getAddon(i).draw(camera.getViewProjectionMatrix());
+            terrain.getAddon(i).updateAfterDraw(dt);
+        }
+
         player.draw(camera.getViewProjectionMatrix());
         for(int i=0;i<terrain.getTileCount();++i) {
             Tile tile = terrain.getTile(i);
@@ -118,5 +123,8 @@ public class GameplayStage implements Stage {
         }
 
         player.updateAfterDraw(dt);
+
+
+
     }
 }

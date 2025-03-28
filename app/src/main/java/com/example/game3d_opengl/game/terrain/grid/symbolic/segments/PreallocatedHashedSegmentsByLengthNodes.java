@@ -7,7 +7,7 @@ public class PreallocatedHashedSegmentsByLengthNodes extends HashedSegmentsByLen
     protected final int LEAF_CNT;
 
 
-    private static final int POOL_SIZE = 4;
+    private static final int POOL_SIZE = 5;
     private static final int MAX_STRUCTURE_SIZE = 2000 * 24 + 1;
     private static final boolean[] slotInUse = new boolean[POOL_SIZE];
 
@@ -147,7 +147,7 @@ public class PreallocatedHashedSegmentsByLengthNodes extends HashedSegmentsByLen
         --col;
         int hash = segHash(row, col, length);
 
-        deleteRec(root.id, hash, length);
+        deleteRec(root.id, hash);
     }
 
     @Override
@@ -259,7 +259,7 @@ public class PreallocatedHashedSegmentsByLengthNodes extends HashedSegmentsByLen
      *  1) If leaf, simply clear out the node (size=0, totalLen=0, max=0)
      *  2) Otherwise, descend left/right, then post-order update
      */
-    private void deleteRec(int nodeId, int hash, int length) {
+    private void deleteRec(int nodeId, int hash) {
         Node node = treeNodes[nodeId];
         if (node.isLeaf()) {
             // This leaf corresponds uniquely to 'hash'
@@ -273,10 +273,10 @@ public class PreallocatedHashedSegmentsByLengthNodes extends HashedSegmentsByLen
         // Descend into the correct child
         if (hash <= mid) {
             assert (node.left != 0);
-            deleteRec(node.left, hash, length);
+            deleteRec(node.left, hash);
         } else {
             assert (node.right != 0);
-            deleteRec(node.right, hash, length);
+            deleteRec(node.right, hash);
         }
 
         // Post-order update
