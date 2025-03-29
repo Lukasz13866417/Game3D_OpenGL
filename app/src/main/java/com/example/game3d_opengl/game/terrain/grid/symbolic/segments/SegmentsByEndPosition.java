@@ -1,18 +1,19 @@
 package com.example.game3d_opengl.game.terrain.grid.symbolic.segments;
 
 
-import static com.example.game3d_opengl.game.terrain.grid.symbolic.GridSegment.GS;
-
 import com.example.game3d_opengl.game.terrain.grid.symbolic.GridSegment;
 
 import java.util.TreeSet;
 
-class SegmentsByEndPosition {
+public class SegmentsByEndPosition {
 
     private final boolean vertical;
     final TreeSet<GridSegment> tree;
+    private int nRows, nCols;
 
     public SegmentsByEndPosition(int nRows, int nCols, boolean vertical) {
+        this.nRows = nRows;
+        this.nCols = nCols;
         this.vertical = vertical;
         if (vertical) {
             this.tree = new TreeSet<>((GridSegment a, GridSegment b) -> {
@@ -39,7 +40,6 @@ class SegmentsByEndPosition {
         int cStart = vertical ? candidate.row : candidate.col, start = vertical ? row : col;
         int cLength = candidate.length;
         int cOther = vertical ? candidate.col : candidate.row, other = vertical ? col : row;
-
         if (cStart > start || cOther != other || cStart + cLength - 1 < start + length - 1) {
             throw new IllegalArgumentException("No space available for this segment");
         }
@@ -49,7 +49,7 @@ class SegmentsByEndPosition {
             int newLength = cLength - length;
             if (newLength != 0) {
                 int newStart = cStart + length;
-                GridSegment replacement = vertical ? GS(newStart, other, newLength) : GS(other, newStart, newLength);
+                GridSegment replacement = vertical ? GridSegment.GS(newStart, other, newLength) : GridSegment.GS(other, newStart, newLength);
                 tree.add(replacement);
                 return new GridSegment[]{candidate, replacement, null};
             }
@@ -58,13 +58,13 @@ class SegmentsByEndPosition {
             int len1 = start - cStart;
             GridSegment replacement1 = null, replacement2 = null;
             if (len1 > 0) {
-                replacement1 = vertical ? GS(cStart, cOther, len1) : GS(cOther, cStart, len1);
+                replacement1 = vertical ? GridSegment.GS(cStart, cOther, len1) : GridSegment.GS(cOther, cStart, len1);
                 tree.add(replacement1);
             }
             int len2 = cStart + cLength - 1 - (start + length - 1);
             if (len2 > 0) {
                 int newStart = start + length;
-                replacement2 = vertical ? GS(newStart, cOther, len2) : GS(cOther, newStart, len2);
+                replacement2 = vertical ? GridSegment.GS(newStart, cOther, len2) : GridSegment.GS(cOther, newStart, len2);
                 tree.add(replacement2);
             }
             return new GridSegment[]{candidate, replacement1, replacement2};
@@ -92,6 +92,28 @@ class SegmentsByEndPosition {
             }
         }
         return null;
+    }
+
+    void printGrid(){
+        char[][] grid = new char[nRows][nCols];
+        for(int r=0;r<nRows;r++){
+            for(int c=0;c<nCols;c++){
+                grid[r][c] = '#';
+            }
+        }
+        for(GridSegment seg : tree){
+            int row = seg.row-1, col = seg.col-1, len = seg.length;
+            for(int i=0;i<len;++i){
+                if(vertical){
+                    grid[row + i][col] = '.';
+                }else{
+                    grid[row][col+i] = '.';
+                }
+            }
+        }
+        for(int r=0;r<nRows;r++){
+            System.out.println(grid[r]);
+        }
     }
 
 }

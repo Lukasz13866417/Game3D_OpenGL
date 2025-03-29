@@ -88,10 +88,7 @@ public class Terrain {
     public class GridBrush {
         public void reserveVertical(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            commandBuffer.addCommand(CMD_RESERVE_VERTICAL);
-            commandBuffer.addCommand(row);
-            commandBuffer.addCommand(col);
-            commandBuffer.addCommand(length);
+            commandBuffer.addCommand(CMD_RESERVE_VERTICAL,row,col,length);
             for (Addon addon : addons) {
                 addonStack.push(addon);
             }
@@ -99,10 +96,7 @@ public class Terrain {
 
         public void reserveHorizontal(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL);
-            commandBuffer.addCommand(row);
-            commandBuffer.addCommand(col);
-            commandBuffer.addCommand(length);
+            commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL,row,col,length);
             for (Addon addon : addons) {
                 addonStack.push(addon);
             }
@@ -110,8 +104,7 @@ public class Terrain {
 
         public void reserveRandomFittingHorizontal(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            commandBuffer.addCommand(CMD_RESERVE_RANDOM_HORIZONTAL);
-            commandBuffer.addCommand(length);
+            commandBuffer.addCommand(CMD_RESERVE_RANDOM_HORIZONTAL,length);
             for (Addon addon : addons) {
                 addonStack.push(addon);
             }
@@ -119,8 +112,7 @@ public class Terrain {
 
         public void reserveRandomFittingVertical(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            commandBuffer.addCommand(CMD_RESERVE_RANDOM_VERTICAL);
-            commandBuffer.addCommand(length);
+            commandBuffer.addCommand(CMD_RESERVE_RANDOM_VERTICAL,length);
             for (Addon addon : addons) {
                 addonStack.push(addon);
             }
@@ -226,8 +218,8 @@ public class Terrain {
     private class GeneralExecutor implements CommandExecutor {
         @Override
         public void execute(float[] buffer, int offset, int length) {
-            int code = (int) (buffer[offset]);
-            printCommand(buffer, offset, length);
+            //int code = (int) (buffer[offset]);
+            //printCommand(buffer, offset, length);
             if (landscapeCommandExecutor.canHandle(buffer[offset])) {
                 landscapeCommandExecutor.execute(buffer, offset, length);
             } else {

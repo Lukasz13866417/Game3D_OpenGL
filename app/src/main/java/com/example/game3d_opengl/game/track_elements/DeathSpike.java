@@ -25,8 +25,8 @@ public class DeathSpike extends Addon {
                 .add(fieldNearRight).add(fieldNearLeft).div(4);
         Vector3D out = getNormal(fieldNearLeft,fieldFarLeft,fieldFarRight);
         Vector3D[] verts = V3S(
-                fieldNearLeft.add(out.withLen(-0.01f)), fieldNearRight.add(out.withLen(-0.01f)),
-                fieldFarLeft.add(out.withLen(-0.01f)), fieldFarRight.add(out.withLen(-0.01f))
+                fieldNearLeft.add(out.withLen(-0.02f)), fieldNearRight.add(out.withLen(-0.02f)),
+                fieldFarLeft.add(out.withLen(-0.02f)), fieldFarRight.add(out.withLen(-0.02f))
                 ,fieldMid.add(out.withLen(-height))
         );
         object3D = new Object3D.Builder()

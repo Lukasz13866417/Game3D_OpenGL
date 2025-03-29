@@ -93,7 +93,6 @@ public class PreallocatedCommandBuffer implements CommandBuffer {
      *  - reading that many argument floats
      *  - calling executor.execute(...) with that entire chunk
      *  - removing the command from the buffer
-     *
      * If there are no complete commands, throws an exception.
      */
     @Override
@@ -102,9 +101,6 @@ public class PreallocatedCommandBuffer implements CommandBuffer {
             throw new IllegalStateException("No complete commands to execute.");
         }
 
-        // 1) Read the commandCode
-        float commandCode = myBuffer[readPos];
-        // 2) Read the argument count
         int countIndex = (readPos + 1) % MAX_SIZE;
         int argCount = (int) myBuffer[countIndex];
 
@@ -146,4 +142,5 @@ public class PreallocatedCommandBuffer implements CommandBuffer {
         int total = 2 + argCount;
         return (mySize >= total);
     }
+
 }

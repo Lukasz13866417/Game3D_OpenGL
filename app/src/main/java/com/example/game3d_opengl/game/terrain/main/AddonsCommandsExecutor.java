@@ -73,7 +73,6 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         int row = (int) buffer[offset + 2];
         int col = (int) buffer[offset + 3];
         int segLength = (int) buffer[offset + 4];
-        
         GridCreator latest = terrain.structureGridStack.peek();
         latest.reserveHorizontal(row, col, segLength);
         processAddons(row, col, segLength, latest, true);
@@ -96,11 +95,10 @@ public class AddonsCommandsExecutor implements CommandExecutor {
     private void handleStartStructureAddons(float[] buffer, int offset) {
         int nRowsAdded = (int) buffer[offset + 2];
         GridCreator parent = terrain.structureGridStack.peek();
-        terrain.structureGridStack.push(
-                new GridCreator(nRowsAdded, terrain.nCols,
-                                parent, terrain.lastStructureStartRowCount
-                )
+        GridCreator ng = new GridCreator(nRowsAdded, terrain.nCols,
+                parent, terrain.lastStructureStartRowCount
         );
+        terrain.structureGridStack.push(ng);
     }
 
     @Override

@@ -93,7 +93,7 @@ public class GameplayStage implements Stage {
         if(terrain.getTileCount() < 500){
             terrain.enqueueStructure(new TerrainLine(100));
         }
-        terrain.generateChunks(10);
+        terrain.generateChunks(5);
         for(int i=0;i<terrain.getTileCount();++i){
             Tile tile = terrain.getTile(i);
             if(player.collidesTile(tile)){

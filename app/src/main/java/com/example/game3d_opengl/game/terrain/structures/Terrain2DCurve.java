@@ -29,8 +29,12 @@ public class Terrain2DCurve extends TerrainStructure {
 
     @Override
     protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
-        for(int i=0;i<nCols;++i){
-            brush.reserveRandomFittingHorizontal(1,new Addon[]{new DeathSpike()});
+        for(int i=0;i<2;++i){
+            Addon[] addons = new Addon[5];
+            for(int j = 0; j <addons.length; ++j){
+                addons[j] = new DeathSpike();
+            }
+            brush.reserveRandomFittingVertical(addons.length,addons);
         }
     }
 }

@@ -1,9 +1,9 @@
 package com.example.game3d_opengl.game.terrain.grid.symbolic.segments;
 
 
-import static com.example.game3d_opengl.engine.util3d.GameRandom.randInt;
-
 import com.example.game3d_opengl.game.terrain.grid.symbolic.GridSegment;
+
+import java.util.Random;
 
 public class PartialSegmentHandler {
 
@@ -46,10 +46,14 @@ public class PartialSegmentHandler {
 
     public GridSegment reserveRandomFitting(int length) {
         int total = segmentsByLength.countFittingSpaces(length);
-        int k = randInt(1, total);
+        int k = new Random().nextInt(total)+1;
         GridSegment found = segmentsByLength.getKthFittingSpace(length,k);
         reserve(found.row, found.col, length);
         return found;
+    }
+
+    public void printGrid(){
+        segmentsByEndPosition.printGrid();
     }
 
     public void free(){

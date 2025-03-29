@@ -13,6 +13,7 @@ public class TerrainLine extends TerrainStructure {
 
     @Override
     protected void generateTiles(Terrain.TileBrush brush) {
+        System.out.println("### "+tilesToMake);
         for(int i=0;i<tilesToMake;++i){
             brush.addSegment();
         }
@@ -20,16 +21,16 @@ public class TerrainLine extends TerrainStructure {
 
     @Override
     protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols){
-        for(int i=0;i<3;++i){
+        /*for(int i=0;i<3;++i){
             brush.reserveRandomFittingHorizontal(2,new Addon[]{
                     new DeathSpike(), new DeathSpike()
             });
+        }*/
+        Addon[] addons = new Addon[1];
+        for(int j = 0; j <addons.length; ++j){
+            addons[j] = new DeathSpike();
         }
-        for(int i=0;i<3;++i){
-            brush.reserveRandomFittingVertical(4,new Addon[]{
-                    new DeathSpike(), new DeathSpike(), new DeathSpike(), new DeathSpike()
-            });
-        }
+        brush.reserveHorizontal(2,1,addons.length,addons);
 
     }
 }
