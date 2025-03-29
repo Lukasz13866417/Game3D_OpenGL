@@ -2,7 +2,7 @@ package com.example.game3d_opengl.game.terrain.grid.symbolic.segments;
 
 import com.example.game3d_opengl.game.terrain.grid.symbolic.GridSegment;
 
-public class PreallocatedHashedSegmentsByLengthNodes extends HashedSegmentsByLength {
+class PreallocatedHashedSegmentsByLengthNodes extends HashedSegmentsByLength {
 
     protected final int LEAF_CNT;
 

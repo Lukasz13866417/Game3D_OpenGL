@@ -48,7 +48,6 @@ public class PartialSegmentHandler {
         int total = segmentsByLength.countFittingSpaces(length);
         int k = randInt(1, total);
         GridSegment found = segmentsByLength.getKthFittingSpace(length,k);
-        System.out.println("Trying to reserve length: "+length);
         reserve(found.row, found.col, length);
         return found;
     }

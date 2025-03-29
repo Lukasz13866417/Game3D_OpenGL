@@ -1,5 +1,9 @@
 package com.example.game3d_opengl.engine.util3d.vector;
 
+import androidx.annotation.NonNull;
+
+import java.util.Locale;
+
 public class Vector2D {
     public final float x, y;
 
@@ -56,11 +60,11 @@ public class Vector2D {
         return v.x * v.x + v.y * v.y;
     }
 
+    @NonNull
     @Override
     public String toString() {
-        return "{" + x + "," + y + "}";
+        return String.format(Locale.ROOT,"{%.5f, %.5f}", x, y);
     }
-
     public Vector2D multX(float scaleX) {
         return V2(x * scaleX, y);
     }

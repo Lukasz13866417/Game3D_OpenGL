@@ -52,4 +52,15 @@ public class PreallocatedCoordinateBuffer {
     public void clear() {
         floatBuffer.clear();
     }
+
+    public float[] pop(){
+        if(size() == 0){
+            throw new IllegalStateException("Empty buffer");
+        }
+        return new float[]{
+                floatBuffer.pop(),
+                floatBuffer.pop(),
+                floatBuffer.pop()
+        };
+    }
 }

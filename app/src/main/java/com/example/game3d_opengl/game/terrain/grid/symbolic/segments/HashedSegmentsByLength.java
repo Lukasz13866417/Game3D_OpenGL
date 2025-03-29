@@ -3,7 +3,7 @@ package com.example.game3d_opengl.game.terrain.grid.symbolic.segments;
 
 import com.example.game3d_opengl.game.terrain.grid.symbolic.GridSegment;
 
-public abstract class HashedSegmentsByLength implements SegmentsByLength {
+abstract class HashedSegmentsByLength implements SegmentsByLength {
     
     protected final int totalRows, nCols;
     protected final boolean areSegmentsVertical;

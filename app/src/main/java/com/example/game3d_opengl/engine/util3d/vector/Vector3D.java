@@ -2,6 +2,10 @@ package com.example.game3d_opengl.engine.util3d.vector;
 
 import static java.lang.Math.sqrt;
 
+import androidx.annotation.NonNull;
+
+import java.util.Locale;
+
 public class Vector3D{
     public final float x, y, z;
 
@@ -124,7 +128,7 @@ public class Vector3D{
     }
 
     public Vector3D withLen(float len){
-        return mult(len / ((float)(sqrt(sqlen()))) );
+        return mult((float)((double)(len) / sqrt(sqlen())));
     }
 
     public static Vector3D normalized(Vector3D v) {
@@ -179,10 +183,12 @@ public class Vector3D{
         return V3(v.x, v.y * scaleY, v.z);
     }
 
+    @NonNull
     @Override
     public String toString() {
-        return "{" + x + "," + y + "," + z + "}";
+        return String.format(Locale.ROOT,"{%.5f, %.5f, %.5f}", x, y, z);
     }
+
 
     public Vector2D to2D() {
         return new Vector2D(x, y);

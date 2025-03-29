@@ -14,12 +14,11 @@ import com.example.game3d_opengl.engine.object3d.Camera;
 import com.example.game3d_opengl.engine.util3d.FColor;
 import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
-import com.example.game3d_opengl.game.terrain.Terrain;
+import com.example.game3d_opengl.game.terrain.main.Terrain;
 import com.example.game3d_opengl.game.terrain.Tile;
 import com.example.game3d_opengl.game.terrain.structures.Terrain2DCurve;
 import com.example.game3d_opengl.game.terrain.structures.TerrainCurve;
 import com.example.game3d_opengl.game.terrain.structures.TerrainLine;
-import com.example.game3d_opengl.game.track_elements.DeathSpike;
 
 /**
  * Demonstration of a gameplay stage that:
@@ -70,27 +69,31 @@ public class GameplayStage implements Stage {
         Player.LOAD_PLAYER_ASSETS(assetManager);
         player = new Player();
         float segWidth = 3.2f, segLength = 1.4f;
-        terrain = new Terrain(2000,
+        terrain = new Terrain(2000,6,
                 V3(player.objX,player.objY - 3f, player.objZ + 3f),
                 segWidth,
                 segLength
         );
-        terrain.enqueueStructure(new TerrainLine(100,terrain));
-        terrain.enqueueStructure(new TerrainCurve(100,terrain, -PI/2));
-        terrain.enqueueStructure(new Terrain2DCurve(50,terrain, 0, 0.5f * PI/4));
-        terrain.enqueueStructure(new Terrain2DCurve(50,terrain, PI/12, -0.5f * PI/4));
-        terrain.enqueueStructure(new TerrainLine(100,terrain));
-        terrain.enqueueStructure(new TerrainLine(100,terrain));
-        terrain.enqueueStructure(new TerrainCurve(100,terrain, -PI/2));
+        terrain.enqueueStructure(new TerrainLine(100));
+        terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
+        terrain.enqueueStructure(new Terrain2DCurve(50, 0, 0.5f * PI/4));
+        terrain.enqueueStructure(new Terrain2DCurve(50, PI/12, -0.5f * PI/4));
+        terrain.enqueueStructure(new TerrainLine(100));
+        terrain.enqueueStructure(new TerrainLine(100));
+        terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
         terrain.generateChunks(-1);
-
 
     }
 
     @Override
     public void updateThenDraw(float dt) {
 
+
         terrain.removeOldTiles(player.objZ);
+        if(terrain.getTileCount() < 500){
+            terrain.enqueueStructure(new TerrainLine(100));
+        }
+        terrain.generateChunks(10);
         for(int i=0;i<terrain.getTileCount();++i){
             Tile tile = terrain.getTile(i);
             if(player.collidesTile(tile)){

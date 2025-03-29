@@ -7,6 +7,8 @@ import com.example.game3d_opengl.engine.object3d.Polygon3D;
 import com.example.game3d_opengl.engine.util3d.FColor;
 import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
 
+import java.util.Locale;
+
 public class Tile {
 
     /**
@@ -86,11 +88,11 @@ public class Tile {
 
     @Override
     public String toString() {
-        return "TILE ["
-                + "NL=" + nearLeft + ", NR=" + nearRight
-                + ", FL=" + farLeft + ", FR=" + farRight
-                + ", slope=" + slope
-                + "]";
+        return "TILE [\n"
+                + "NEAR L=" + nearLeft + ", R=" + nearRight+"\n"
+                + "FAR  L=" + farLeft + ", R=" + farRight+"\n"
+                + ", slope=" + String.format(Locale.ROOT,"{%5f}",slope)
+                + "\n]";
     }
 
 }

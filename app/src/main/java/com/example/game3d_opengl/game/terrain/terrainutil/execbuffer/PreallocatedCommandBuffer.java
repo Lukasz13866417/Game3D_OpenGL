@@ -6,14 +6,6 @@ public class PreallocatedCommandBuffer implements CommandBuffer {
     private static final float[][] BUFFERS = new float[MAX_BUFFER_COUNT][MAX_SIZE];
     private static final boolean[] isTaken = new boolean[MAX_BUFFER_COUNT];
 
-    static{
-        for(int i = 0;i<MAX_BUFFER_COUNT;++i){
-            for(int j = 0;j<MAX_SIZE;++j){
-                BUFFERS[i][j] = 69;
-            }
-        }
-    }
-
     private static int findFreeSlot() {
         for (int i = 0; i < MAX_BUFFER_COUNT; i++) {
             if (!isTaken[i]) {

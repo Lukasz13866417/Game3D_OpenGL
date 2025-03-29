@@ -7,7 +7,7 @@ import com.example.game3d_opengl.game.terrain.grid.symbolic.GridSegment;
 
 import java.util.TreeSet;
 
-public class SegmentsByEndPosition {
+class SegmentsByEndPosition {
 
     private final boolean vertical;
     final TreeSet<GridSegment> tree;

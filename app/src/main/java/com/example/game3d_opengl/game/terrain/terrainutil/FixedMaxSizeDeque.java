@@ -33,6 +33,22 @@ public class FixedMaxSizeDeque<T> implements Iterable<T> {
         return ind < max_size ? elements[ind] : elements[ind - max_size];
     }
 
+    public T peekFirst() {
+        if (curr_size == 0) {
+            return null;
+        }
+        int ind = front + 1;
+        return ind < max_size ? elements[ind] : elements[ind - max_size];
+    }
+
+    public T peekLast() {
+        if (curr_size == 0) {
+            return null;
+        }
+        int ind = front + curr_size;
+        return ind < max_size ? elements[ind] : elements[ind - max_size];
+    }
+
     public void removeFirst() {
         if (curr_size == 0) {
             throw new IllegalStateException("Deque is empty");
@@ -48,13 +64,13 @@ public class FixedMaxSizeDeque<T> implements Iterable<T> {
         --curr_size;
     }
 
-    public T popFirst(){
+    public T popFirst() {
         T res = getFirst();
         removeFirst();
         return res;
     }
 
-    public T popLast(){
+    public T popLast() {
         T res = getLast();
         removeLast();
         return res;
@@ -64,19 +80,19 @@ public class FixedMaxSizeDeque<T> implements Iterable<T> {
         return curr_size;
     }
 
-    public boolean isEmpty(){
+    public boolean isEmpty() {
         return size() == 0;
     }
 
-    public void clear(){
-        while(size() > 0){
+    public void clear() {
+        while (size() > 0) {
             removeFirst();
         }
     }
 
     public void pushBack(T val) {
         if (curr_size == max_size) {
-            throw new IllegalStateException("Size exceeded "+curr_size+" out of "+max_size);
+            throw new IllegalStateException("Size exceeded " + curr_size + " out of " + max_size);
         }
         ++curr_size;
         int ind = front + curr_size;
@@ -88,7 +104,7 @@ public class FixedMaxSizeDeque<T> implements Iterable<T> {
 
     public T get(int ind) {
         if (ind < 0 || ind >= curr_size) {
-            throw new IllegalStateException("Index " + ind + " out of bounds (curr size "+curr_size+")");
+            throw new IllegalStateException("Index " + ind + " out of bounds (curr size " + curr_size + ")");
         }
         ind = front + ind + 1;
         if (ind >= max_size) {

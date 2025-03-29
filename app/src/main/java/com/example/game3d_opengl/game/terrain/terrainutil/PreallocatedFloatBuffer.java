@@ -1,7 +1,7 @@
 package com.example.game3d_opengl.game.terrain.terrainutil;
 
 public class PreallocatedFloatBuffer {
-    private static final int MAX_SIZE = 50_000;
+    private static final int MAX_SIZE = 100_000;
     private static final int MAX_BUFFER_COUNT = 2;
     private static final float[][] BUFFERS = new float[MAX_BUFFER_COUNT][MAX_SIZE];
     private static final boolean[] isTaken = new boolean[MAX_BUFFER_COUNT];
@@ -63,10 +63,24 @@ public class PreallocatedFloatBuffer {
         return mySize;
     }
 
+    /**
+     * Returns the float at the specified index.
+     */
     public float get(int i) {
-         if (i < 0 || i >= mySize) {
-             throw new IndexOutOfBoundsException("Index: " + i + ", Size: " + mySize);
-         }
-         return myBuffer[i];
+        if (i < 0 || i >= mySize) {
+            throw new IndexOutOfBoundsException("Index: " + i + ", Size: " + mySize);
+        }
+        return myBuffer[i];
+    }
+
+    /**
+     * Removes and returns the last float from the buffer, or throws an exception if empty.
+     */
+    public float pop() {
+        if (mySize == 0) {
+            throw new IllegalStateException("Cannot pop from an empty buffer.");
+        }
+        mySize--;
+        return myBuffer[mySize];
     }
 }

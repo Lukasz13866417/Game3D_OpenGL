@@ -16,17 +16,18 @@ public class DeathSpike extends Addon {
     private Object3D object3D;
     public DeathSpike(){
         super();
-        height = GameRandom.randFloat(0.075f,0.14f,5);
+        height = GameRandom.randFloat(0.2f,0.3f,5);
     }
     @Override
     protected void init(Vector3D fieldNearLeft, Vector3D fieldNearRight,
                         Vector3D fieldFarLeft, Vector3D fieldFarRight) {
         Vector3D fieldMid = fieldFarLeft.add(fieldFarRight)
                 .add(fieldNearRight).add(fieldNearLeft).div(4);
+        Vector3D out = getNormal(fieldNearLeft,fieldFarLeft,fieldFarRight);
         Vector3D[] verts = V3S(
-                fieldNearLeft, fieldNearRight,
-                fieldFarLeft, fieldFarRight
-                ,fieldMid.add(getNormal(fieldNearLeft,fieldFarLeft,fieldFarRight).withLen(-height))
+                fieldNearLeft.add(out.withLen(-0.01f)), fieldNearRight.add(out.withLen(-0.01f)),
+                fieldFarLeft.add(out.withLen(-0.01f)), fieldFarRight.add(out.withLen(-0.01f))
+                ,fieldMid.add(out.withLen(-height))
         );
         object3D = new Object3D.Builder()
                 .angles(0,0,0)

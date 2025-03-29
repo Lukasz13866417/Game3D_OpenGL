@@ -1,7 +1,7 @@
 package com.example.game3d_opengl.game.terrain.structures;
 
-import com.example.game3d_opengl.game.terrain.Terrain;
-import com.example.game3d_opengl.game.terrain.TerrainStructure;
+import com.example.game3d_opengl.game.terrain.main.Terrain;
+import com.example.game3d_opengl.game.terrain.main.TerrainStructure;
 import com.example.game3d_opengl.game.terrain.addon.Addon;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 
@@ -9,18 +9,11 @@ public class Terrain2DCurve extends TerrainStructure {
 
     private final float dAngHor, dAngVer;
 
-    public Terrain2DCurve(int tilesToMake, Terrain terrain,
+    public Terrain2DCurve(int tilesToMake,
                           float dAngHor, float dAngVer) {
-        super(tilesToMake, terrain);
+        super(tilesToMake);
         this.dAngHor = dAngHor;
         this.dAngVer = dAngVer;
-    }
-
-    public Terrain2DCurve(int tilesToMake, TerrainStructure parent,
-                          float dAngHor, float dAngVer) {
-        super(tilesToMake, parent);
-        this.dAngVer = dAngVer;
-        this.dAngHor = dAngHor;
     }
 
     @Override
