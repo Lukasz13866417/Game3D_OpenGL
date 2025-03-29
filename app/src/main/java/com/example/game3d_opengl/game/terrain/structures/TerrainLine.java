@@ -26,11 +26,12 @@ public class TerrainLine extends TerrainStructure {
                     new DeathSpike(), new DeathSpike()
             });
         }*/
-        Addon[] addons = new Addon[1];
-        for(int j = 0; j <addons.length; ++j){
-            addons[j] = new DeathSpike();
+        for(int i=0;i<1;++i) {
+            Addon[] addons = new Addon[10];
+            for (int j = 0; j < addons.length; ++j) {
+                addons[j] = new DeathSpike();
+            }
+            brush.reserveRandomFittingVertical(addons.length, addons);
         }
-        brush.reserveHorizontal(2,1,addons.length,addons);
-
     }
 }

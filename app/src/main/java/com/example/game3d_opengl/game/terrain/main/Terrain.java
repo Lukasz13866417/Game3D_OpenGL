@@ -191,7 +191,6 @@ public class Terrain {
 
     public void enqueueStructure(TerrainStructure what) {
         waitingStructuresQueue.enqueue(what);
-        commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE);
     }
 
     final PreallocatedCommandBuffer commandBuffer;
@@ -199,7 +198,14 @@ public class Terrain {
     public void generateChunks(int nChunks) {
         int d = 0;
         long t0 = System.nanoTime();
-        while (nChunks != 0 && commandBuffer.hasAnyCommands()) {
+        while (nChunks != 0) {
+            if(!commandBuffer.hasAnyCommands()){
+                if(!waitingStructuresQueue.isEmpty()) {
+                    commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE);
+                }else{
+                    break;
+                }
+            }
             commandBuffer.executeFirstCommand(generalExecutor);
             --nChunks;
             ++d;
@@ -207,7 +213,7 @@ public class Terrain {
         long t1 = System.nanoTime();
         long dt = (t1 - t0) / 1_000_000;
         System.out.println("Interpreted " + d + " commands. Took: " + dt + "ms");
-        if (!commandBuffer.hasAnyCommands()) {
+        if (!commandBuffer.hasAnyCommands() && waitingStructuresQueue.isEmpty()) {
             tileBuilder.resetBuffers();
         }
     }
@@ -219,8 +225,9 @@ public class Terrain {
         @Override
         public void execute(float[] buffer, int offset, int length) {
             //int code = (int) (buffer[offset]);
-            //printCommand(buffer, offset, length);
+            printCommand(buffer, offset, length);
             if (landscapeCommandExecutor.canHandle(buffer[offset])) {
+                assert structureGridStack.isEmpty();
                 landscapeCommandExecutor.execute(buffer, offset, length);
             } else {
                 addonsCommandExecutor.execute(buffer, offset, length);

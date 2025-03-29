@@ -50,7 +50,7 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
             case CMD_FINISH_STRUCTURE_LANDSCAPE:
                 TerrainStructure thatStructure = terrain.structureStack.pop();
                 int nRowsAdded = terrain.tileBuilder.currRowCount - terrain.lastStructureStartRowCount;
-                terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_START_STRUCTURE_ADDONS, nRowsAdded);
+                terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_START_STRUCTURE_ADDONS, nRowsAdded, terrain.lastStructureStartRowCount);
                 thatStructure.generateAddons(terrain.gridBrush, nRowsAdded, terrain.nCols);
                 terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS);
                 break;

@@ -4,6 +4,7 @@ import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.addon.Addon;
 import com.example.game3d_opengl.game.terrain.grid.symbolic.GridCreator;
 import com.example.game3d_opengl.game.terrain.grid.symbolic.GridSegment;
+import com.example.game3d_opengl.game.terrain.terrainutil.ArrayStack;
 import com.example.game3d_opengl.game.terrain.terrainutil.execbuffer.CommandExecutor;
 
 public class AddonsCommandsExecutor implements CommandExecutor {
@@ -15,6 +16,8 @@ public class AddonsCommandsExecutor implements CommandExecutor {
     public static final int CMD_START_STRUCTURE_ADDONS = 38;
 
     private final Terrain terrain;
+
+    private final ArrayStack<Integer> rowOffsetStack = new ArrayStack<>();
 
     public AddonsCommandsExecutor(Terrain terrain) {
         this.terrain = terrain;
@@ -38,6 +41,7 @@ public class AddonsCommandsExecutor implements CommandExecutor {
                 break;
             case CMD_FINISH_STRUCTURE_ADDONS:
                 terrain.structureGridStack.pop().destroy();
+                rowOffsetStack.pop();
                 break;
             case CMD_START_STRUCTURE_ADDONS:
                 handleStartStructureAddons(buffer, offset);
@@ -51,25 +55,30 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         int row = (int) buffer[offset + 2];
         int col = (int) buffer[offset + 3];
         int segLength = (int) buffer[offset + 4];
-        
+
+        assert terrain.structureGridStack.size() == 1;
         GridCreator latest = terrain.structureGridStack.peek();
         latest.reserveVertical(row, col, segLength);
         processAddons(row, col, segLength, latest, false);
     }
 
     private void processAddons(int baseRow, int baseCol, int length, GridCreator creator, boolean horizontal) {
+        assert terrain.structureGridStack.size() == 1;
+        int rOffset = rowOffsetStack.peek();
         for (int i = 0; i < length; ++i) {
             Addon addon = terrain.addonStack.pop();
-            Vector3D[] field = terrain.tileBuilder.getField(
-                horizontal ? baseRow : baseRow + i,
-                horizontal ? baseCol + i : baseCol
-            );
+            int row = horizontal ? baseRow : baseRow + i;
+            row += rOffset;
+            int col = horizontal ? baseCol + i : baseCol;
+            System.out.println("ROW: "+row+" COL: "+col);
+            Vector3D[] field = terrain.tileBuilder.getField(row,col);
             addon.place(field[0], field[1], field[2], field[3]);
             terrain.addons.pushBack(addon);
         }
     }
 
     private void handleReserveHorizontal(float[] buffer, int offset) {
+        assert terrain.structureGridStack.size() == 1;
         int row = (int) buffer[offset + 2];
         int col = (int) buffer[offset + 3];
         int segLength = (int) buffer[offset + 4];
@@ -79,6 +88,7 @@ public class AddonsCommandsExecutor implements CommandExecutor {
     }
 
     private void handleReserveRandomVertical(float[] buffer, int offset) {
+        assert terrain.structureGridStack.size() == 1;
         int segLength = (int) buffer[offset + 2];
         GridCreator latest = terrain.structureGridStack.peek();
         GridSegment found = latest.reserveRandomFittingVertical(segLength);
@@ -86,6 +96,7 @@ public class AddonsCommandsExecutor implements CommandExecutor {
     }
 
     private void handleReserveRandomHorizontal(float[] buffer, int offset) {
+        assert terrain.structureGridStack.size() == 1;
         int segLength = (int) buffer[offset + 2];
         GridCreator latest = terrain.structureGridStack.peek();
         GridSegment found = latest.reserveRandomFittingHorizontal(segLength);
@@ -98,7 +109,9 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         GridCreator ng = new GridCreator(nRowsAdded, terrain.nCols,
                 parent, terrain.lastStructureStartRowCount
         );
+        rowOffsetStack.push((int)(buffer[offset + 3]));
         terrain.structureGridStack.push(ng);
+        assert terrain.structureGridStack.size() == 1;
     }
 
     @Override
