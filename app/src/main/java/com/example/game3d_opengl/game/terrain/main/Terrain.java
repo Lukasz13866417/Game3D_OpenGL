@@ -214,7 +214,7 @@ public class Terrain {
         long dt = (t1 - t0) / 1_000_000;
         System.out.println("Interpreted " + d + " commands. Took: " + dt + "ms");
         if (!commandBuffer.hasAnyCommands() && waitingStructuresQueue.isEmpty()) {
-            tileBuilder.resetBuffers();
+        //    tileBuilder.resetBuffers();
         }
     }
 
