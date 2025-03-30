@@ -10,15 +10,16 @@ import android.content.Context;
 import android.content.res.AssetManager;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.rendering.object3d.Camera;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_api.Tile;
-import com.example.game3d_opengl.game.terrain_api.structures.Terrain2DCurve;
-import com.example.game3d_opengl.game.terrain_api.structures.TerrainCurve;
-import com.example.game3d_opengl.game.terrain_api.structures.TerrainLine;
+import com.example.game3d_opengl.game.terrain_structures.Terrain2DCurve;
+import com.example.game3d_opengl.game.terrain_structures.TerrainCurve;
+import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
 
 /**
  * Demonstration of a gameplay stage that:
@@ -67,6 +68,7 @@ public class GameplayStage implements Stage {
 
         AssetManager assetManager = context.getAssets();
         Player.LOAD_PLAYER_ASSETS(assetManager);
+        Potion.LOAD_POTION_ASSETS(assetManager);
         player = new Player();
         float segWidth = 3.2f, segLength = 1.4f;
         terrain = new Terrain(2000,6,

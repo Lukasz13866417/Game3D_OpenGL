@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.terrain_api.structures;
+package com.example.game3d_opengl.game.terrain_structures;
 
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;

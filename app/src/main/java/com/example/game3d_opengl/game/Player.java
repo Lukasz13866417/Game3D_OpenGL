@@ -56,7 +56,7 @@ public class Player extends Object3D implements WorldActor {
             playerBuilder = new Builder()
                     .angles(0, 0, 0)
                     .edgeColor(CLR(1.0f, 1.0f, 1.0f, 1.0f))
-                    .fillColor(CLR(0.0f, 0.0f, 0.0f, 0.0f))
+                    .fillColor(CLR(0.0f, 0.0f, 0.0f, 1.0f))
                     .position(0.0f, -0.5f, -0.5f)
                     .verts(playerCreator.getVerts())
                     .faces(playerCreator.getFaces());
