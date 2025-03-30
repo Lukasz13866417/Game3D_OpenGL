@@ -156,17 +156,12 @@ public class TileBuilder {
         Vector3D r1 = lastTile.farRight;
 
         Vector3D axis;
-        if (tiles.size() == 1) {
-            axis = V3(0, -1, 0);
-        } else {
-            // Get the previous tile (second-to-last in the deque)
-            Tile prevTile = tiles.get(tiles.size() - 2);
-            Vector3D r0 = prevTile.farRight;
-            Vector3D l0 = prevTile.farLeft;
-            Vector3D e1 = l0.sub(r0);
-            Vector3D e2 = r1.sub(r0);
-            axis = e1.crossProduct(e2).mult(1);
-        }
+        // Get the previous tile (second-to-last in the deque)
+        Vector3D r0 = lastTile.nearRight;
+        Vector3D l0 = lastTile.nearLeft;
+        Vector3D e1 = l0.sub(r0);
+        Vector3D e2 = r1.sub(r0);
+        axis = e1.crossProduct(e2).mult(1);
 
         Vector3D mid = l1.add(r1).div(2);
         Vector3D newL1 = rotateAroundAxis(mid, axis, l1, dHorizontalAng);
@@ -175,7 +170,7 @@ public class TileBuilder {
         dHorizontalAng = 0.0f;
 
         Vector3D dir = rotateAroundTwoPoints(axis, V3(0, 0, 0),
-                                            newR1.sub(newL1), PI / 2).withLen(segLength);
+                newR1.sub(newL1), PI / 2).withLen(segLength);
 
         Vector3D l2 = newL1.add(dir);
         Vector3D r2 = newR1.add(dir);
@@ -197,7 +192,7 @@ public class TileBuilder {
     }
 
     public void removeOldTiles(float playerX, float playerY, float playerZ) {
-        Vector3D pp = V3(playerX,playerY,playerZ);
+        Vector3D pp = V3(playerX, playerY, playerZ);
         while (!tiles.isEmpty() && tiles.getFirst().farLeft.sub(pp).sqlen() > 100f) {
             tiles.removeFirst();
         }
