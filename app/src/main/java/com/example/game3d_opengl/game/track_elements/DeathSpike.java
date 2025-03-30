@@ -1,13 +1,12 @@
 package com.example.game3d_opengl.game.track_elements;
 
-import static com.example.game3d_opengl.engine.util3d.FColor.CLR;
-import static com.example.game3d_opengl.engine.util3d.GameMath.getNormal;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3S;
+import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.getNormal;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3S;
 
-import com.example.game3d_opengl.engine.object3d.Object3D;
-import com.example.game3d_opengl.engine.util3d.GameRandom;
-import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
-import com.example.game3d_opengl.game.WorldActor;
+import com.example.game3d_opengl.rendering.object3d.Object3D;
+import com.example.game3d_opengl.rendering.util3d.GameRandom;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.addon.Addon;
 
 public class DeathSpike extends Addon {

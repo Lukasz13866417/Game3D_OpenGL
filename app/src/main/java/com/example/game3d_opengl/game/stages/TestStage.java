@@ -1,13 +1,13 @@
 package com.example.game3d_opengl.game.stages;
 
-import static com.example.game3d_opengl.engine.util3d.FColor.CLR;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3;
+import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
-import com.example.game3d_opengl.engine.object3d.Camera;
-import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
+import com.example.game3d_opengl.rendering.object3d.Camera;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.main.TileBuilder;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 

@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.engine.util3d.rect;
+package com.example.game3d_opengl.rendering.util3d.rect;
 
 public class Rect {
     public final float x1,y1,x2,y2,w,h;

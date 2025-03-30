@@ -1,35 +1,25 @@
 package com.example.game3d_opengl.game.terrain.main;
 
-import static com.example.game3d_opengl.engine.util3d.GameMath.PI;
-import static com.example.game3d_opengl.engine.util3d.GameMath.rotateAroundAxis;
-import static com.example.game3d_opengl.engine.util3d.GameMath.rotateAroundTwoPoints;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3;
-import static com.example.game3d_opengl.game.terrain.main.AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static com.example.game3d_opengl.game.terrain.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL;
 import static com.example.game3d_opengl.game.terrain.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL;
 import static com.example.game3d_opengl.game.terrain.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_VERTICAL;
 import static com.example.game3d_opengl.game.terrain.main.AddonsCommandsExecutor.CMD_RESERVE_VERTICAL;
-import static com.example.game3d_opengl.game.terrain.main.AddonsCommandsExecutor.CMD_START_STRUCTURE_ADDONS;
 import static com.example.game3d_opengl.game.terrain.main.LandscapeCommandsExecutor.CMD_ADD_H_ANG;
 import static com.example.game3d_opengl.game.terrain.main.LandscapeCommandsExecutor.CMD_ADD_SEG;
 import static com.example.game3d_opengl.game.terrain.main.LandscapeCommandsExecutor.CMD_ADD_V_ANG;
-import static com.example.game3d_opengl.game.terrain.main.LandscapeCommandsExecutor.CMD_FINISH_STRUCTURE_LANDSCAPE;
 import static com.example.game3d_opengl.game.terrain.main.LandscapeCommandsExecutor.CMD_SET_H_ANG;
 import static com.example.game3d_opengl.game.terrain.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
 import static com.example.game3d_opengl.game.terrain.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
-import static com.example.game3d_opengl.game.terrain.main.Util.printCommand;
 import static java.lang.Math.abs;
-import static java.lang.Math.atan;
 
 import com.example.game3d_opengl.game.terrain.Tile;
 import com.example.game3d_opengl.game.terrain.addon.Addon;
 import com.example.game3d_opengl.game.terrain.grid.symbolic.GridCreator;
-import com.example.game3d_opengl.game.terrain.grid.symbolic.GridSegment;
 import com.example.game3d_opengl.game.terrain.terrainutil.ArrayQueue;
 import com.example.game3d_opengl.game.terrain.terrainutil.ArrayStack;
 import com.example.game3d_opengl.game.terrain.terrainutil.FixedMaxSizeDeque;
-import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
-import com.example.game3d_opengl.game.terrain.terrainutil.PreallocatedCoordinateBuffer;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrainutil.execbuffer.CommandExecutor;
 import com.example.game3d_opengl.game.terrain.terrainutil.execbuffer.PreallocatedCommandBuffer;
 

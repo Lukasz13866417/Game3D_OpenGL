@@ -1,13 +1,13 @@
-package com.example.game3d_opengl.engine.util3d;
+package com.example.game3d_opengl.rendering.util3d;
 
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.add;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.div;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.dotProduct;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.sub;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.add;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.div;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.dotProduct;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.sub;
 import static java.lang.Math.sqrt;
 
-import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 
 public class GameMath {

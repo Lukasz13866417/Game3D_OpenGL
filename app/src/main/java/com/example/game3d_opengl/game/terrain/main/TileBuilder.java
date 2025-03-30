@@ -1,19 +1,17 @@
 package com.example.game3d_opengl.game.terrain.main;
 
-import static com.example.game3d_opengl.engine.util3d.GameMath.EPSILON;
-import static com.example.game3d_opengl.engine.util3d.GameMath.PI;
-import static com.example.game3d_opengl.engine.util3d.GameMath.rotateAroundAxis;
-import static com.example.game3d_opengl.engine.util3d.GameMath.rotateAroundTwoPoints;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.EPSILON;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.rotateAroundAxis;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.rotateAroundTwoPoints;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static java.lang.Math.abs;
 import static java.lang.Math.atan;
 import static java.lang.Math.min;
 
-import android.util.Log;
-
 import com.example.game3d_opengl.game.terrain.Tile;
 import com.example.game3d_opengl.game.terrain.terrainutil.FixedMaxSizeDeque;
-import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrainutil.PreallocatedCoordinateBuffer;
 
 

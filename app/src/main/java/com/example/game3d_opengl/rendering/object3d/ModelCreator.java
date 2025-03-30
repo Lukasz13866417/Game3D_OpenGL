@@ -1,15 +1,15 @@
-package com.example.game3d_opengl.engine.object3d;
+package com.example.game3d_opengl.rendering.object3d;
 
 
-import static com.example.game3d_opengl.engine.util3d.GameMath.rotX;
-import static com.example.game3d_opengl.engine.util3d.GameMath.rotY;
-import static com.example.game3d_opengl.engine.util3d.GameMath.rotZ;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.rotX;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.rotY;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.rotZ;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import android.content.res.AssetManager;
 
 
-import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 import java.io.BufferedReader;
 import java.io.IOException;

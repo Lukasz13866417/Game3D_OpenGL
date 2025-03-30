@@ -1,6 +1,6 @@
 package com.example.game3d_opengl.game.terrain.addon;
 
-import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.WorldActor;
 
 public abstract class Addon implements WorldActor {

@@ -1,11 +1,11 @@
 
 package com.example.game3d_opengl.game.terrain;
 
-import static com.example.game3d_opengl.engine.util3d.FColor.CLR;
+import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 
-import com.example.game3d_opengl.engine.object3d.Polygon3D;
-import com.example.game3d_opengl.engine.util3d.FColor;
-import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
+import com.example.game3d_opengl.rendering.object3d.Polygon3D;
+import com.example.game3d_opengl.rendering.util3d.FColor;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 import java.util.Locale;
 

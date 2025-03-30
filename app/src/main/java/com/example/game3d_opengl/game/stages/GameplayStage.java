@@ -1,18 +1,18 @@
 package com.example.game3d_opengl.game.stages;
 
 
-import static com.example.game3d_opengl.engine.util3d.FColor.CLR;
-import static com.example.game3d_opengl.engine.util3d.GameMath.PI;
-import static com.example.game3d_opengl.engine.util3d.vector.Vector3D.V3;
+import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static java.lang.Math.abs;
 
 import android.content.Context;
 import android.content.res.AssetManager;
 
 import com.example.game3d_opengl.MyGLRenderer;
-import com.example.game3d_opengl.engine.object3d.Camera;
-import com.example.game3d_opengl.engine.util3d.FColor;
-import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
+import com.example.game3d_opengl.rendering.object3d.Camera;
+import com.example.game3d_opengl.rendering.util3d.FColor;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
 import com.example.game3d_opengl.game.terrain.main.Terrain;
 import com.example.game3d_opengl.game.terrain.Tile;
