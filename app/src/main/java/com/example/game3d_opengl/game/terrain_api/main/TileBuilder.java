@@ -193,7 +193,7 @@ public class TileBuilder {
 
     public void removeOldTiles(float playerX, float playerY, float playerZ) {
         Vector3D pp = V3(playerX, playerY, playerZ);
-        while (!tiles.isEmpty() && tiles.getFirst().farLeft.sub(pp).sqlen() > 100f) {
+        while (tiles.size() > 1 && tiles.getFirst().farLeft.sub(pp).sqlen() > 100f) {
             tiles.removeFirst();
         }
     }
