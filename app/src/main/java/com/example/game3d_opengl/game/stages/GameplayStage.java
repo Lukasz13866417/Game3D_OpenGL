@@ -89,11 +89,17 @@ public class GameplayStage implements Stage {
     public void updateThenDraw(float dt) {
 
 
-        terrain.removeOldTiles(player.objZ);
+        terrain.removeOldTiles(player.objX,player.objY,player.objZ);
         if(terrain.getTileCount() < 500){
             terrain.enqueueStructure(new TerrainLine(100));
+            terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
+            terrain.enqueueStructure(new Terrain2DCurve(50, 0, 0.5f * PI/4));
+            terrain.enqueueStructure(new Terrain2DCurve(50, PI/12, -0.5f * PI/4));
+            terrain.enqueueStructure(new TerrainLine(100));
+            terrain.enqueueStructure(new TerrainLine(100));
+            terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
         }
-        terrain.generateChunks(5);
+        terrain.generateChunks(2);
         for(int i=0;i<terrain.getTileCount();++i){
             Tile tile = terrain.getTile(i);
             if(player.collidesTile(tile)){
@@ -126,8 +132,6 @@ public class GameplayStage implements Stage {
         }
 
         player.updateAfterDraw(dt);
-
-
 
     }
 }

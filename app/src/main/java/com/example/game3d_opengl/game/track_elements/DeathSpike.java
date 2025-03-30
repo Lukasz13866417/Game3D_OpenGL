@@ -16,7 +16,7 @@ public class DeathSpike extends Addon {
     private Object3D object3D;
     public DeathSpike(){
         super();
-        height = GameRandom.randFloat(0.2f,0.3f,5);
+        height = GameRandom.randFloat(0.225f,0.5f,5);
     }
     @Override
     protected void init(Vector3D fieldNearLeft, Vector3D fieldNearRight,

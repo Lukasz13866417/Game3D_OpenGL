@@ -88,7 +88,7 @@ public class Terrain {
     public class GridBrush {
         public void reserveVertical(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            commandBuffer.addCommand(CMD_RESERVE_VERTICAL,row,col,length);
+            commandBuffer.addCommand(CMD_RESERVE_VERTICAL, row, col, length);
             for (Addon addon : addons) {
                 addonStack.push(addon);
             }
@@ -96,7 +96,7 @@ public class Terrain {
 
         public void reserveHorizontal(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL,row,col,length);
+            commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL, row, col, length);
             for (Addon addon : addons) {
                 addonStack.push(addon);
             }
@@ -104,7 +104,7 @@ public class Terrain {
 
         public void reserveRandomFittingHorizontal(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            commandBuffer.addCommand(CMD_RESERVE_RANDOM_HORIZONTAL,length);
+            commandBuffer.addCommand(CMD_RESERVE_RANDOM_HORIZONTAL, length);
             for (Addon addon : addons) {
                 addonStack.push(addon);
             }
@@ -112,7 +112,7 @@ public class Terrain {
 
         public void reserveRandomFittingVertical(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            commandBuffer.addCommand(CMD_RESERVE_RANDOM_VERTICAL,length);
+            commandBuffer.addCommand(CMD_RESERVE_RANDOM_VERTICAL, length);
             for (Addon addon : addons) {
                 addonStack.push(addon);
             }
@@ -177,8 +177,8 @@ public class Terrain {
     }
 
 
-    public void removeOldTiles(float playerZ) {
-        tileBuilder.removeOldTiles(playerZ);
+    public void removeOldTiles(float playerX, float playerY, float playerZ) {
+        tileBuilder.removeOldTiles(playerX, playerY, playerZ);
     }
 
     public int getAddonCount() {
@@ -199,10 +199,10 @@ public class Terrain {
         int d = 0;
         long t0 = System.nanoTime();
         while (nChunks != 0) {
-            if(!commandBuffer.hasAnyCommands()){
-                if(!waitingStructuresQueue.isEmpty()) {
+            if (!commandBuffer.hasAnyCommands()) {
+                if (!waitingStructuresQueue.isEmpty()) {
                     commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE);
-                }else{
+                } else {
                     break;
                 }
             }
@@ -210,12 +210,11 @@ public class Terrain {
             --nChunks;
             ++d;
         }
-        long t1 = System.nanoTime();
-        long dt = (t1 - t0) / 1_000_000;
-        System.out.println("Interpreted " + d + " commands. Took: " + dt + "ms");
-        if (!commandBuffer.hasAnyCommands() && waitingStructuresQueue.isEmpty()) {
-        //    tileBuilder.resetBuffers();
-        }
+           long t1 = System.nanoTime();
+           long dt = (t1 - t0) / 1_000_000;
+           if(d>0) {
+               System.out.println("Interpreted " + d + " commands. Took: " + dt + "ms");
+           }
     }
 
     /**
@@ -225,7 +224,7 @@ public class Terrain {
         @Override
         public void execute(float[] buffer, int offset, int length) {
             //int code = (int) (buffer[offset]);
-            printCommand(buffer, offset, length);
+            //printCommand(buffer, offset);
             if (landscapeCommandExecutor.canHandle(buffer[offset])) {
                 assert structureGridStack.isEmpty();
                 landscapeCommandExecutor.execute(buffer, offset, length);

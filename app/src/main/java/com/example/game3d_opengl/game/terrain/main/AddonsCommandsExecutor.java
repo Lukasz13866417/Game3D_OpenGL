@@ -70,7 +70,6 @@ public class AddonsCommandsExecutor implements CommandExecutor {
             int row = horizontal ? baseRow : baseRow + i;
             row += rOffset;
             int col = horizontal ? baseCol + i : baseCol;
-            System.out.println("ROW: "+row+" COL: "+col);
             Vector3D[] field = terrain.tileBuilder.getField(row,col);
             addon.place(field[0], field[1], field[2], field[3]);
             terrain.addons.pushBack(addon);

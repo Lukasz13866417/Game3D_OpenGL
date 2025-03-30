@@ -15,7 +15,7 @@ import static com.example.game3d_opengl.game.terrain.main.LandscapeCommandsExecu
 import static com.example.game3d_opengl.game.terrain.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
 
 class Util {
-    static void printCommand(float[] buffer, int offset, int length) {
+    static void printCommand(float[] buffer, int offset) {
         int code = (int)(buffer[offset]);
         if (code == CMD_SET_H_ANG) {
             System.out.println("SET H ANG " + buffer[offset + 2]);

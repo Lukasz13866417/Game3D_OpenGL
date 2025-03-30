@@ -9,6 +9,8 @@ import static java.lang.Math.abs;
 import static java.lang.Math.atan;
 import static java.lang.Math.min;
 
+import android.util.Log;
+
 import com.example.game3d_opengl.game.terrain.Tile;
 import com.example.game3d_opengl.game.terrain.terrainutil.FixedMaxSizeDeque;
 import com.example.game3d_opengl.engine.util3d.vector.Vector3D;
@@ -53,7 +55,8 @@ public class TileBuilder {
         Vector3D startRight = V3(startMid.add(segWidth / 2, 0, 0));
 
         // Guardian tile: store near and far edges the same
-        this.guardian = new Tile(startLeft,                      // nearLeft
+        this.guardian = new Tile(
+                startLeft,                                       // nearLeft
                 startRight,                                      // nearRight
                 startLeft.sub(0, 0, 0.01f),              // farLeft
                 startRight.sub(0, 0, 0.01f),             // farRight
@@ -85,7 +88,8 @@ public class TileBuilder {
      * Helper: builds a new tile and adds it to the deque.
      */
     void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr) {
-        float slopeVal = (float) atan((fl.y - nl.y) / Math.sqrt((fl.x - nl.x) * (fl.x - nl.x) + (fl.z - nl.z) * (fl.z - nl.z)));
+        float slopeVal = (float) atan((fl.y - nl.y) /
+                Math.sqrt((fl.x - nl.x) * (fl.x - nl.x) + (fl.z - nl.z) * (fl.z - nl.z)));
         Tile t = new Tile(nl, nr, fl, fr, slopeVal);
         this.tiles.pushBack(t);
         float lastLen = lastTile == null ? 0.0f
@@ -108,7 +112,7 @@ public class TileBuilder {
             borderRowPosHere = rowSpacing - (lastLen - lastTileProgress);
             leftSide = nl.add(edgeLeft.withLen(borderRowPosHere));
             rightSide = nr.add(edgeRight.withLen(borderRowPosHere));
-            //System.out.println("LS: " + leftSide + " RS: " + rightSide);
+
             leftSideBuffer.addPos(leftSide.x, leftSide.y, leftSide.z);
             rightSideBuffer.addPos(rightSide.x, rightSide.y, rightSide.z);
             ++currRowCount;
@@ -120,14 +124,11 @@ public class TileBuilder {
             lastTileProgress = min(lastTileProgress + rowSpacing, len);
             leftSide = nl.add(edgeLeft.withLen(lastTileProgress));
             rightSide = nr.add(edgeRight.withLen(lastTileProgress));
-            //System.out.println("EL: " + edgeLeft + " WL " + lastTileProgress + " -> " + edgeLeft.withLen(lastTileProgress));
-            //System.out.println("LS: " + leftSide + " RS: " + rightSide);
             leftSideBuffer.addPos(leftSide.x, leftSide.y, leftSide.z);
             rightSideBuffer.addPos(rightSide.x, rightSide.y, rightSide.z);
             ++currRowCount;
             ++lastTimeCntRowsAdded;
         }
-        //System.out.println("#########");
     }
 
     /*
@@ -175,7 +176,8 @@ public class TileBuilder {
 
         dHorizontalAng = 0.0f;
 
-        Vector3D dir = rotateAroundTwoPoints(axis, V3(0, 0, 0), newR1.sub(newL1), PI / 2).withLen(segLength);
+        Vector3D dir = rotateAroundTwoPoints(axis, V3(0, 0, 0),
+                                            newR1.sub(newL1), PI / 2).withLen(segLength);
 
         Vector3D l2 = newL1.add(dir);
         Vector3D r2 = newR1.add(dir);
@@ -196,8 +198,9 @@ public class TileBuilder {
         addTile(newL1, newR1, l2, r2);
     }
 
-    public void removeOldTiles(float playerZ) {
-        while (!tiles.isEmpty() && tiles.getFirst().farLeft.z > playerZ + 10f) {
+    public void removeOldTiles(float playerX, float playerY, float playerZ) {
+        Vector3D pp = V3(playerX,playerY,playerZ);
+        while (!tiles.isEmpty() && tiles.getFirst().farLeft.sub(pp).sqlen() > 100f) {
             tiles.removeFirst();
         }
     }
@@ -226,16 +229,6 @@ public class TileBuilder {
 
     public Tile getTile(int i) {
         return tiles.get(i);
-    }
-
-    public void resetBuffers() {
-        float[] leftLast = leftSideBuffer.pop();
-        float[] rightLast = rightSideBuffer.pop();
-        leftSideBuffer.clear();
-        rightSideBuffer.clear();
-        leftSideBuffer.addPos(leftLast[0],leftLast[1],leftLast[2]);
-        rightSideBuffer.addPos(rightLast[0],rightLast[1],rightLast[2]);
-        lastTimeCntRowsAdded = 0;
     }
 
     public Vector3D[] getField(int row, int col) {
