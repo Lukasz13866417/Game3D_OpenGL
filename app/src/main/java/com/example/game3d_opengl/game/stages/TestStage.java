@@ -8,7 +8,7 @@ import android.content.Context;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.rendering.object3d.Camera;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
-import com.example.game3d_opengl.game.terrain.main.TileBuilder;
+import com.example.game3d_opengl.game.terrain_api.main.TileBuilder;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 
 public class TestStage implements Stage {

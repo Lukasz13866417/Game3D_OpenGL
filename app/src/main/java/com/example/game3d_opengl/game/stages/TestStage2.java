@@ -8,10 +8,10 @@ import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.rendering.object3d.Camera;
-import com.example.game3d_opengl.game.terrain.main.Terrain;
-import com.example.game3d_opengl.game.terrain.structures.Terrain2DCurve;
-import com.example.game3d_opengl.game.terrain.structures.TerrainCurve;
-import com.example.game3d_opengl.game.terrain.structures.TerrainLine;
+import com.example.game3d_opengl.game.terrain_api.main.Terrain;
+import com.example.game3d_opengl.game.terrain_api.structures.Terrain2DCurve;
+import com.example.game3d_opengl.game.terrain_api.structures.TerrainCurve;
+import com.example.game3d_opengl.game.terrain_api.structures.TerrainLine;
 
 public class TestStage2 implements Stage {
 

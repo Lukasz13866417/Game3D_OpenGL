@@ -7,7 +7,7 @@ import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3S;
 import com.example.game3d_opengl.rendering.object3d.Object3D;
 import com.example.game3d_opengl.rendering.util3d.GameRandom;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
-import com.example.game3d_opengl.game.terrain.addon.Addon;
+import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 
 public class DeathSpike extends Addon {
 
