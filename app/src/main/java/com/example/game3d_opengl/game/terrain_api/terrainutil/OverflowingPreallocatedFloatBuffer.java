@@ -1,6 +1,6 @@
 package com.example.game3d_opengl.game.terrain_api.terrainutil;
 
-public class PreallocatedFloatBuffer {
+public class OverflowingPreallocatedFloatBuffer {
     private static final int MAX_SIZE = 100_000;
     private static final int MAX_BUFFER_COUNT = 2;
     private static final float[][] BUFFERS = new float[MAX_BUFFER_COUNT][MAX_SIZE];
@@ -23,7 +23,7 @@ public class PreallocatedFloatBuffer {
     // Number of elements currently stored in the buffer.
     private int mySize = 0;
 
-    public PreallocatedFloatBuffer() {
+    public OverflowingPreallocatedFloatBuffer() {
         int slot = findFreeSlot();
         if (slot == -1) {
             throw new IllegalStateException("No more available preallocated buffers.");

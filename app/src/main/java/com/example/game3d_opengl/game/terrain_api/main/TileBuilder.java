@@ -12,7 +12,7 @@ import static java.lang.Math.min;
 import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.FixedMaxSizeDeque;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
-import com.example.game3d_opengl.game.terrain_api.terrainutil.PreallocatedCoordinateBuffer;
+import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedCoordinateBuffer;
 
 
 public class TileBuilder {
@@ -24,7 +24,7 @@ public class TileBuilder {
     private final int nCols;
     public int currRowCount;
 
-    private final PreallocatedCoordinateBuffer leftSideBuffer, rightSideBuffer;
+    private final OverflowingPreallocatedCoordinateBuffer leftSideBuffer, rightSideBuffer;
 
     /**
      * Deque to hold all tiles (including the guardian).
@@ -71,8 +71,8 @@ public class TileBuilder {
         this.dVerticalAng = 0.0f;
         this.currRowCount = 0;
 
-        this.leftSideBuffer = new PreallocatedCoordinateBuffer();
-        this.rightSideBuffer = new PreallocatedCoordinateBuffer();
+        this.leftSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
+        this.rightSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
 
         Vector3D startLeftRow = new Vector3D(guardian.farLeft.x, guardian.farLeft.y, guardian.farLeft.z);
         Vector3D startRightRow = new Vector3D(guardian.farRight.x, guardian.farRight.y, guardian.farRight.z);

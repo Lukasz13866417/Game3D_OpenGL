@@ -118,6 +118,16 @@ public class FixedMaxSizeDeque<T> implements Iterable<T> {
         return new FixedMaxSizeDequeIterator();
     }
 
+    public void pushFront(T val) {
+        if (curr_size == max_size) {
+            throw new IllegalStateException("Size exceeded " + curr_size + " out of " + max_size);
+        }
+        front = (front - 1 + max_size) % max_size;
+        int index = (front + 1) % max_size;
+        elements[index] = val;
+        curr_size++;
+    }
+
     private class FixedMaxSizeDequeIterator implements Iterator<T> {
         private int count = 0;
         private int index = front + 1;

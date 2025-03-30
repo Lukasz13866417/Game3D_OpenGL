@@ -7,7 +7,7 @@ public class PreallocatedHashedSegmentsByLengthNodes extends HashedSegmentsByLen
     protected final int LEAF_CNT;
 
 
-    private static final int POOL_SIZE = 5;
+    private static final int POOL_SIZE = 6;
     private static final int MAX_STRUCTURE_SIZE = 2000 * 24 + 1;
     private static final boolean[] slotInUse = new boolean[POOL_SIZE];
 

@@ -30,15 +30,15 @@ public class Player extends Object3D implements WorldActor {
     private Vector3D dir;
     private Vector3D move;
 
-    private final float stickyRotationLastingTime = 35f;
+    private final float stickyRotationLastingTime = 42f;
     private float stickyRotationTime = 0.0f;
     private float stickyRotationAng = 0.0f;
-    private final float stickyRotationAngDecayRate = 0.06f;
+    private final float stickyRotationAngDecayRate = 0.0575f;
     private final float playerSpeed = 0.04f;
 
-    private final float stickyRotationCoeff = 0.00825f;
+    private final float stickyRotationCoeff = 0.0085f;
 
-    private final float rotationSwipeSensitivity = 0.0005f;
+    private final float rotationSwipeSensitivity = 0.00052f;
 
     private Tile tileBelow;
 

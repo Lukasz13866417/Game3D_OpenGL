@@ -1,5 +1,7 @@
 package com.example.game3d_opengl.game.terrain_api.main;
 
+import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_FINISH_STRUCTURE_LANDSCAPE;
+import static com.example.game3d_opengl.game.terrain_api.main.Util.printCommand;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static com.example.game3d_opengl.game.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL;
 import static com.example.game3d_opengl.game.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL;
@@ -15,7 +17,7 @@ import static java.lang.Math.abs;
 
 import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
-import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreator;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.ArrayQueue;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.ArrayStack;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.FixedMaxSizeDeque;
@@ -70,6 +72,13 @@ public class Terrain {
             // Just store the command code, no arg
             commandBuffer.addCommand(CMD_ADD_SEG);
         }
+
+        public void addChild(TerrainStructure child) {
+            childStructuresQueue.enqueue(child);
+            commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE, 1);
+            child.generateTiles(this);
+            commandBuffer.addCommand(CMD_FINISH_STRUCTURE_LANDSCAPE);
+        }
     }
 
     /**
@@ -80,7 +89,7 @@ public class Terrain {
             assert addons.length == length : "Addon count doesn't match segment length";
             commandBuffer.addCommand(CMD_RESERVE_VERTICAL, row, col, length);
             for (Addon addon : addons) {
-                addonStack.push(addon);
+                addonQueue.enqueue(addon);
             }
         }
 
@@ -88,7 +97,7 @@ public class Terrain {
             assert addons.length == length : "Addon count doesn't match segment length";
             commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL, row, col, length);
             for (Addon addon : addons) {
-                addonStack.push(addon);
+                addonQueue.enqueue(addon);
             }
         }
 
@@ -96,7 +105,7 @@ public class Terrain {
             assert addons.length == length : "Addon count doesn't match segment length";
             commandBuffer.addCommand(CMD_RESERVE_RANDOM_HORIZONTAL, length);
             for (Addon addon : addons) {
-                addonStack.push(addon);
+                addonQueue.enqueue(addon);
             }
         }
 
@@ -104,25 +113,31 @@ public class Terrain {
             assert addons.length == length : "Addon count doesn't match segment length";
             commandBuffer.addCommand(CMD_RESERVE_RANDOM_VERTICAL, length);
             for (Addon addon : addons) {
-                addonStack.push(addon);
+                addonQueue.enqueue(addon);
             }
         }
 
     }
 
-    final ArrayStack<GridCreator> structureGridStack;
-    final ArrayStack<Addon> addonStack;
+    final ArrayStack<GridCreatorWrapper> gridCreatorWrapperStack;
+    final ArrayQueue<GridCreatorWrapper> gridCreatorWrapperQueue;
+
+    final ArrayQueue<Integer> rowOffsetQueue;
+
+    final ArrayQueue<Addon> addonQueue;
+
+    final ArrayStack<Integer> rowCountStack;
 
     // structures waiting for command interpretation
     final ArrayStack<TerrainStructure> structureStack;
 
     // structures waiting for command generation
     final ArrayQueue<TerrainStructure> waitingStructuresQueue;
+    final ArrayQueue<TerrainStructure> childStructuresQueue;
+
 
     final TileBrush tileBrush;
     final GridBrush gridBrush;
-
-    int lastStructureStartRowCount = 0;
 
     /**
      * Deque to hold all tiles (including the guardian).
@@ -156,10 +171,14 @@ public class Terrain {
         // For addon grid commands
         this.addonsCommandExecutor = new AddonsCommandsExecutor(this);
 
-        this.structureGridStack = new ArrayStack<>();
-        this.addonStack = new ArrayStack<>();
+        this.rowOffsetQueue = new ArrayQueue<>();
+        this.rowCountStack = new ArrayStack<>();
+        this.gridCreatorWrapperStack = new ArrayStack<>();
+        this.gridCreatorWrapperQueue = new ArrayQueue<>();
+        this.addonQueue = new ArrayQueue<>();
         this.structureStack = new ArrayStack<>();
         this.waitingStructuresQueue = new ArrayQueue<>();
+        this.childStructuresQueue = new ArrayQueue<>();
 
         this.gridBrush = new GridBrush();
         this.tileBrush = new TileBrush();
@@ -191,7 +210,7 @@ public class Terrain {
         while (nChunks != 0) {
             if (!commandBuffer.hasAnyCommands()) {
                 if (!waitingStructuresQueue.isEmpty()) {
-                    commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE);
+                    commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE, 0);
                 } else {
                     break;
                 }
@@ -203,7 +222,7 @@ public class Terrain {
            long t1 = System.nanoTime();
            long dt = (t1 - t0) / 1_000_000;
            if(d>0) {
-               System.out.println("Interpreted " + d + " commands. Took: " + dt + "ms");
+          //     System.out.println("Interpreted " + d + " commands. Took: " + dt + "ms");
            }
     }
 
@@ -216,7 +235,6 @@ public class Terrain {
             //int code = (int) (buffer[offset]);
             //printCommand(buffer, offset);
             if (landscapeCommandExecutor.canHandle(buffer[offset])) {
-                assert structureGridStack.isEmpty();
                 landscapeCommandExecutor.execute(buffer, offset, length);
             } else {
                 addonsCommandExecutor.execute(buffer, offset, length);

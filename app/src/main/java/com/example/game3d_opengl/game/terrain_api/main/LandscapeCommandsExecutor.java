@@ -1,5 +1,7 @@
 package com.example.game3d_opengl.game.terrain_api.main;
 
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreator;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
 
 public class LandscapeCommandsExecutor implements CommandExecutor {
@@ -10,7 +12,6 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
     public static final int CMD_ADD_SEG = 5;
     public static final int CMD_FINISH_STRUCTURE_LANDSCAPE = 6;
     public static final int CMD_START_STRUCTURE_LANDSCAPE = 7;
-
     private final Terrain terrain;
 
     public LandscapeCommandsExecutor(Terrain terrain) {
@@ -41,16 +42,33 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 terrain.tileBuilder.addSegment();
                 break;
             case CMD_START_STRUCTURE_LANDSCAPE:
-                TerrainStructure what = terrain.waitingStructuresQueue.dequeue();
+                boolean isChild = (int) (buffer[offset + 2]) != 0;
+                TerrainStructure what;
+                if(!isChild){
+                    what = terrain.waitingStructuresQueue.dequeue();
+                }else{
+                    what = terrain.childStructuresQueue.dequeue();
+                }
                 terrain.structureStack.push(what);
-                what.generateTiles(terrain.tileBrush);
-                terrain.commandBuffer.addCommand(CMD_FINISH_STRUCTURE_LANDSCAPE);
-                terrain.lastStructureStartRowCount = terrain.tileBuilder.currRowCount;
+                terrain.gridCreatorWrapperStack.push(new GridCreatorWrapper());
+                if (!isChild) {
+                    what.generateTiles(terrain.tileBrush);
+                    terrain.commandBuffer.addCommand(CMD_FINISH_STRUCTURE_LANDSCAPE);
+                }
+                terrain.rowCountStack.push(terrain.tileBuilder.currRowCount);
                 break;
             case CMD_FINISH_STRUCTURE_LANDSCAPE:
                 TerrainStructure thatStructure = terrain.structureStack.pop();
-                int nRowsAdded = terrain.tileBuilder.currRowCount - terrain.lastStructureStartRowCount;
-                terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_START_STRUCTURE_ADDONS, nRowsAdded, terrain.lastStructureStartRowCount);
+                int startRowCount = terrain.rowCountStack.pop();
+                GridCreatorWrapper myGridCreatorWrapper = terrain.gridCreatorWrapperStack.pop();
+                GridCreatorWrapper parentGridCreatorWrapper = terrain.gridCreatorWrapperStack.peek();
+                int nRowsAdded = terrain.tileBuilder.currRowCount - startRowCount;
+                myGridCreatorWrapper.content = new GridCreator(
+                        nRowsAdded, terrain.nCols, parentGridCreatorWrapper,
+                        startRowCount
+                );
+                terrain.gridCreatorWrapperQueue.enqueue(myGridCreatorWrapper);
+                terrain.rowOffsetQueue.enqueue(startRowCount);
                 thatStructure.generateAddons(terrain.gridBrush, nRowsAdded, terrain.nCols);
                 terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS);
                 break;

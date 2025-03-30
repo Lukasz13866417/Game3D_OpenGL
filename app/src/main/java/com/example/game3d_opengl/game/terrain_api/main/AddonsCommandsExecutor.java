@@ -4,7 +4,6 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreator;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
-import com.example.game3d_opengl.game.terrain_api.terrainutil.ArrayStack;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
 
 public class AddonsCommandsExecutor implements CommandExecutor {
@@ -17,7 +16,6 @@ public class AddonsCommandsExecutor implements CommandExecutor {
 
     private final Terrain terrain;
 
-    private final ArrayStack<Integer> rowOffsetStack = new ArrayStack<>();
 
     public AddonsCommandsExecutor(Terrain terrain) {
         this.terrain = terrain;
@@ -40,11 +38,8 @@ public class AddonsCommandsExecutor implements CommandExecutor {
                 handleReserveRandomHorizontal(buffer, offset);
                 break;
             case CMD_FINISH_STRUCTURE_ADDONS:
-                terrain.structureGridStack.pop().destroy();
-                rowOffsetStack.pop();
-                break;
-            case CMD_START_STRUCTURE_ADDONS:
-                handleStartStructureAddons(buffer, offset);
+                terrain.gridCreatorWrapperQueue.dequeue().content.destroy();
+                terrain.rowOffsetQueue.dequeue();
                 break;
             default:
                 throw new IllegalArgumentException("Unknown command code: " + code);
@@ -55,18 +50,15 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         int row = (int) buffer[offset + 2];
         int col = (int) buffer[offset + 3];
         int segLength = (int) buffer[offset + 4];
-
-        assert terrain.structureGridStack.size() == 1;
-        GridCreator latest = terrain.structureGridStack.peek();
+        GridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
         latest.reserveVertical(row, col, segLength);
         processAddons(row, col, segLength, latest, false);
     }
 
     private void processAddons(int baseRow, int baseCol, int length, GridCreator creator, boolean horizontal) {
-        assert terrain.structureGridStack.size() == 1;
-        int rOffset = rowOffsetStack.peek();
+        int rOffset = terrain.rowOffsetQueue.peek();
         for (int i = 0; i < length; ++i) {
-            Addon addon = terrain.addonStack.pop();
+            Addon addon = terrain.addonQueue.dequeue();
             int row = horizontal ? baseRow : baseRow + i;
             row += rOffset;
             int col = horizontal ? baseCol + i : baseCol;
@@ -77,40 +69,26 @@ public class AddonsCommandsExecutor implements CommandExecutor {
     }
 
     private void handleReserveHorizontal(float[] buffer, int offset) {
-        assert terrain.structureGridStack.size() == 1;
         int row = (int) buffer[offset + 2];
         int col = (int) buffer[offset + 3];
         int segLength = (int) buffer[offset + 4];
-        GridCreator latest = terrain.structureGridStack.peek();
+        GridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
         latest.reserveHorizontal(row, col, segLength);
         processAddons(row, col, segLength, latest, true);
     }
 
     private void handleReserveRandomVertical(float[] buffer, int offset) {
-        assert terrain.structureGridStack.size() == 1;
         int segLength = (int) buffer[offset + 2];
-        GridCreator latest = terrain.structureGridStack.peek();
+        GridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
         GridSegment found = latest.reserveRandomFittingVertical(segLength);
         processAddons(found.row, found.col, segLength, latest, false);
     }
 
     private void handleReserveRandomHorizontal(float[] buffer, int offset) {
-        assert terrain.structureGridStack.size() == 1;
         int segLength = (int) buffer[offset + 2];
-        GridCreator latest = terrain.structureGridStack.peek();
+        GridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
         GridSegment found = latest.reserveRandomFittingHorizontal(segLength);
         processAddons(found.row, found.col, segLength, latest, true);
-    }
-
-    private void handleStartStructureAddons(float[] buffer, int offset) {
-        int nRowsAdded = (int) buffer[offset + 2];
-        GridCreator parent = terrain.structureGridStack.peek();
-        GridCreator ng = new GridCreator(nRowsAdded, terrain.nCols,
-                parent, terrain.lastStructureStartRowCount
-        );
-        rowOffsetStack.push((int)(buffer[offset + 3]));
-        terrain.structureGridStack.push(ng);
-        assert terrain.structureGridStack.size() == 1;
     }
 
     @Override

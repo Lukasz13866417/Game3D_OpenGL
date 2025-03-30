@@ -7,6 +7,9 @@ import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.terrain_api.addon.Addon;
+import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;
+import com.example.game3d_opengl.game.track_elements.DeathSpike;
 import com.example.game3d_opengl.rendering.object3d.Camera;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_api.structures.Terrain2DCurve;
@@ -33,6 +36,7 @@ public class TestStage2 implements Stage {
     public void onTouchMove(float x1, float y1, float x2, float y2) {
     }
 
+
     @Override
     public void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
@@ -43,18 +47,65 @@ public class TestStage2 implements Stage {
         camera.setProjectionAsScreen();
         terrain = new Terrain(
                 200, 4,
-                V3(-1f, -0.5f, -15.5f),
+                V3(-1f, -0.5f, -5.5f),
                 2.5f, 1.5f
         );
 
-        terrain.enqueueStructure(new TerrainLine(20));
-        terrain.enqueueStructure(new TerrainCurve(20, PI/8));
-        terrain.enqueueStructure(new Terrain2DCurve(30, 0, 0.5f * PI/4));
-        terrain.enqueueStructure(new Terrain2DCurve(30, PI/12, -0.5f * PI/4));
-        terrain.enqueueStructure(new TerrainLine(20));
-        terrain.enqueueStructure(new TerrainLine(20));
-        terrain.enqueueStructure(new TerrainCurve(20, -PI/2));
-        //terrain.generateChunks(-1);
+        terrain.enqueueStructure(new TerrainStructure(23,"A") {
+            @Override
+            protected void generateTiles(Terrain.TileBrush brush) {
+                brush.addSegment();
+                brush.addSegment();
+                brush.addSegment();
+                addChild(new TerrainStructure(10, "B") {
+                             @Override
+                             protected void generateTiles(Terrain.TileBrush brush) {
+                                 for(int i=0;i<10;++i){
+                                     brush.addHorizontalAng(PI/60);
+                                     brush.addSegment();
+                                 }
+                             }
+
+                             @Override
+                             protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
+                                    brush.reserveHorizontal(1,1,4,new Addon[]{
+                                            new DeathSpike(),
+                                            new DeathSpike(),
+                                            new DeathSpike(),
+                                            new DeathSpike(),
+                                    });
+                             }
+                         },
+                        brush);
+                addChild(new TerrainStructure(10,"C") {
+                             @Override
+                             protected void generateTiles(Terrain.TileBrush brush) {
+                                 for(int i=0;i<10;++i){
+                                     brush.addHorizontalAng(-PI/60);
+                                     brush.addSegment();
+                                 }
+                             }
+
+                             @Override
+                             protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
+                                 brush.reserveVertical(1,1,4,new Addon[]{
+                                         new DeathSpike(),
+                                         new DeathSpike(),
+                                         new DeathSpike(),
+                                         new DeathSpike(),
+                                 });
+                             }
+                         },
+                        brush);
+
+
+            }
+
+            @Override
+            protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
+
+            }
+        });
 
         /*System.out.println("TILE COUNT: "+terrain.getTileCount());
         for (int i = 0; i < terrain.getTileCount(); ++i) {
