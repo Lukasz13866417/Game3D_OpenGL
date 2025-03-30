@@ -9,6 +9,7 @@ import android.content.Context;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;
+import com.example.game3d_opengl.game.terrain_structures.TerrainFunction;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 import com.example.game3d_opengl.rendering.object3d.Camera;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
@@ -48,61 +49,7 @@ public class TestStage2 implements Stage {
                 2.5f, 1.5f
         );
 
-        terrain.enqueueStructure(new TerrainStructure(23,"A") {
-            @Override
-            protected void generateTiles(Terrain.TileBrush brush) {
-                brush.addSegment();
-                brush.addSegment();
-                brush.addSegment();
-                addChild(new TerrainStructure(10, "B") {
-                             @Override
-                             protected void generateTiles(Terrain.TileBrush brush) {
-                                 for(int i=0;i<10;++i){
-                                     brush.addHorizontalAng(PI/60);
-                                     brush.addSegment();
-                                 }
-                             }
-
-                             @Override
-                             protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
-                                    brush.reserveHorizontal(1,1,4,new Addon[]{
-                                            new DeathSpike(),
-                                            new DeathSpike(),
-                                            new DeathSpike(),
-                                            new DeathSpike(),
-                                    });
-                             }
-                         },
-                        brush);
-                addChild(new TerrainStructure(10,"C") {
-                             @Override
-                             protected void generateTiles(Terrain.TileBrush brush) {
-                                 for(int i=0;i<10;++i){
-                                     brush.addHorizontalAng(-PI/60);
-                                     brush.addSegment();
-                                 }
-                             }
-
-                             @Override
-                             protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
-                                 brush.reserveVertical(1,1,4,new Addon[]{
-                                         new DeathSpike(),
-                                         new DeathSpike(),
-                                         new DeathSpike(),
-                                         new DeathSpike(),
-                                 });
-                             }
-                         },
-                        brush);
-
-
-            }
-
-            @Override
-            protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
-
-            }
-        });
+        terrain.enqueueStructure(new TerrainFunction(20,x -> x*x,0,2));
 
         /*System.out.println("TILE COUNT: "+terrain.getTileCount());
         for (int i = 0; i < terrain.getTileCount(); ++i) {

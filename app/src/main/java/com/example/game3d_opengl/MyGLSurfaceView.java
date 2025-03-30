@@ -23,7 +23,7 @@ public class MyGLSurfaceView extends GLSurfaceView {
                     EGL10.EGL_BLUE_SIZE, 8,
                     EGL10.EGL_ALPHA_SIZE, 8,
                     EGL10.EGL_DEPTH_SIZE, 24,
-                    EGL10.EGL_RENDERABLE_TYPE, 4, // EGL_OPENGL_ES2_BIT
+                    EGL10.EGL_RENDERABLE_TYPE, 4,  // EGL_OPENGL_ES2_BIT
                     EGL10.EGL_SAMPLE_BUFFERS, 1,   // 💥 Enable MSAA
                     EGL10.EGL_SAMPLES, 4,          // 💥 4x MSAA
                     EGL10.EGL_NONE
@@ -46,7 +46,6 @@ public class MyGLSurfaceView extends GLSurfaceView {
         setRenderMode(RENDERMODE_CONTINUOUSLY);
         setKeepScreenOn(true);
     }
-
 
     float lastX=0, lastY=0;
     @Override
