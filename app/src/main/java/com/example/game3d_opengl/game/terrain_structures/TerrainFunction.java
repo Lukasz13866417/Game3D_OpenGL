@@ -60,7 +60,6 @@ public class TerrainFunction extends TerrainStructure {
 
     @Override
     protected void generateAddons(GridBrush brush, int nRows, int nCols) {
-        // For now, do nothing or add your own logic for placing obstacles/power-ups.
-        // e.g., brush.reserveRandomFittingVertical(1, new Addon[]{ new DeathSpike() });
+       
     }
 }
