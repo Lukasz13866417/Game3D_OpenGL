@@ -54,7 +54,7 @@ The **terrain generation** system is designed for flexibility and performance.
 ## Building & Running
 1. **Clone the Repository**  
    ```bash
-   git clone https://github.com/Lukasz13866417/YourGameRepo.git
+   git clone https://github.com/Lukasz13866417/Game3D_OpenGL.git
    ```
 2. **Open in Android Studio**  
    - Select “Open an Existing Project” and point to the cloned folder.
