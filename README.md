@@ -121,13 +121,4 @@ The **terrain generation** system is designed for flexibility and performance. Y
 - **Refined Collision System**: Extend the Möller–Trumbore approach to handle complex polygons or skeletal animations.
 
 ## License
-*(Choose a license that fits your needs—MIT, Apache, GPL, etc.)*
-
-```
-MIT License (example)
-Copyright (c) 20XX ...
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of 
-this software and associated documentation files ...
-```
 
