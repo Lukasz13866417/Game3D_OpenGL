@@ -1,16 +1,5 @@
 # OpenGL 3D Game From Scratch
-
-> **A fully custom 3D game engine built on OpenGL for Android, featuring a robust terrain generation API and lazy, on-the-fly world creation.**
-
-## Table of Contents
-1. [Introduction](#introduction)
-2. [Key Features](#key-features)
-3. [Screenshots](#screenshots)
-4. [Project Structure](#project-structure)
-5. [Terrain Generation & SymbolicGrid API](#terrain-generation--symbolicgrid-api)
-6. [Technical Highlights](#technical-highlights)
-7. [Building & Running](#building--running)
-8. [License](#license)
+**A fully custom 3D game engine built on OpenGL for Android, featuring a robust terrain generation API and lazy, on-the-fly world creation.**
 
 ## Introduction
 This project began as an experiment to render 3D graphics on Android using the **Canvas** API—an unconventional approach that required numerous tricks (like face-culling, Painter’s algorithm modifications, and more) to achieve acceptable performance. However, the limitations of 2D rendering soon became a bottleneck.
