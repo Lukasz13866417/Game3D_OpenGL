@@ -5,10 +5,6 @@
 This project began as an experiment to render 3D graphics on Android using the **Canvas** API—an unconventional approach that required numerous tricks (like face-culling, Painter’s algorithm modifications, and more) to achieve acceptable performance. However, the limitations of 2D rendering soon became a bottleneck.
 
 The codebase has since evolved into a **full OpenGL** rendering solution, complete with:
-- A custom terrain-generation API for building large, detailed worlds on the fly.
-- A clean, object-oriented structure that separates rendering logic from game logic.
-- A focus on performance and low-level optimizations, including preallocation to minimize the impact of garbage collection.
-
 ## Key Features
 - **Custom 3D Rendering Pipeline**: Built on OpenGL, encapsulated in clean classes like `Camera`, `Object3D`, and more.
 - **Modular Terrain API**: Create subclasses of `TerrainStructure` to define tiles, place “addons” (like spikes or potions), and customize your landscape.
