@@ -17,7 +17,7 @@ This project began as an experiment to render 3D graphics on Android using the *
 
 The codebase has since evolved into a **full OpenGL** rendering solution, complete with:
 - A custom terrain-generation API for building large, detailed worlds on the fly.
-- An object-oriented structure that separates rendering logic from game logic.
+- A clean, object-oriented structure that separates rendering logic from game logic.
 - A focus on performance and low-level optimizations, including preallocation to minimize the impact of garbage collection.
 
 ## Key Features
@@ -25,7 +25,6 @@ The codebase has since evolved into a **full OpenGL** rendering solution, comple
 - **Modular Terrain API**: Create subclasses of `TerrainStructure` to define tiles, place “addons” (like spikes or potions), and customize your landscape.
 - **Lazy Terrain Generation**: Terrain structures can have child structures, which are compiled into commands and then “interpreted” at runtime to generate the environment as needed.
 - **SymbolicGrid Integration**: Efficient 2D grid queries and randomization, enabling complex terrain features and item placement without heavy performance hits.
-- **Collision Detection**: Leveraging the Möller–Trumbore algorithm (and other geometric routines) for accurate collision and ray-plane intersections.
 - **Performance-Focused**: Preallocation, minimal heap allocations, and specialized data structures ensure smooth gameplay and quick load times on mobile devices.
 
 ## Screenshots
@@ -33,69 +32,25 @@ Below is one of the game stages rendered via OpenGL:
 
 ![Screenshot of Game Stage](https://github.com/user-attachments/assets/2b78fd37-cfe1-4630-b902-ea5328005814)
 
-*In the screenshot, you can see the terrain tiles, in-game objects, and the 3D perspective managed by the camera.*
-
 ## Project Structure
-```
-app
-├── AndroidManifest.xml
-└── java
-    └── com.example.game3d_opengl
-        ├── game
-        │   ├── stages
-        │   │   ├── GameplayStage
-        │   │   ├── Stage
-        │   │   ├── TestStage
-        │   │   └── TestStage2
-        │   ├── terrain_api
-        │   │   ├── addon
-        │   │   │   └── Addon
-        │   │   ├── grid.symbolic
-        │   │   ├── main
-        │   │   ├── terrainutil
-        │   │   └── Tile
-        │   ├── terrain_structures
-        │   │   └── TerrainLine
-        │   ├── track_elements
-        │   │   └── Player
-        │   └── WorldActor
-        └── rendering
-            ├── object3d
-            │   ├── Camera
-            │   ├── Icon
-            │   ├── ModelRenderer
-            │   ├── Object3D
-            │   └── Polygon3D
-            ├── util3d
-            │   ├── rColor
-            │   ├── rCamera
-            │   ├── rGameMath
-            │   ├── rGameMiscUtil
-            └── MyGLRenderer
-                MyGLSurfaceView
-                OpenGL2DSActivity
+Packages:
 ```
 - **`game`**: Core game logic, player handling, and world interactions.
 - **`terrain_api`**: Classes and interfaces for procedural terrain generation. Includes the `SymbolicGrid` integration.
 - **`rendering`**: All OpenGL and 3D rendering classes, from camera setup to object definitions.
 
 ## Terrain Generation & SymbolicGrid API
-The **terrain generation** system is designed for flexibility and performance. You can:
-- **Extend `TerrainStructure`** to define your own shape, tile arrangement, or layering logic.
-- Place **addons** (items, spikes, power-ups, etc.) on a grid, orchestrated by the `SymbolicGrid` library.
-- Enjoy **lazy loading**: your custom `TerrainStructure` classes compile their commands, which the engine interprets later, generating only what’s needed in real-time.
+The **terrain generation** system is designed for flexibility and performance.
+- All terrain patterns extend the **```TerrainStructure```** class - an API for arranging tiles and placing addons on a grid.
+- Terrain structures form a "tree" - each structure can incorporate child structures with their own addons and tiles. 
+- The ```Tile``` class can be extended for extra capabilities.
+- **lazy loading**:  Instead of instantly generating tiles&addons based on provided structures, the information is turned into commands. At any time, the user can tell the terrain to "interpret" a given number of commands.
 
 ### SymbolicGrid
 [SymbolicGrid](https://github.com/Lukasz13866417/SymbolicGrid) is my own, self-made library for efficient, randomized 2D grid queries. It significantly boosts performance by:
 - Reducing memory overhead with specialized data structures.
 - Minimizing random lookups and generation overhead.
 - Supporting large, on-demand worlds without major slowdowns or stutters.
-
-## Technical Highlights
-- **Custom Projection**: Implemented the mathematics of 3D point projection onto a 2D plane, enabling a deeper understanding of how shapes are rasterized.
-- **Depth Buffer Handling**: Learned and implemented standard depth buffer logic to correctly render overlapping objects.
-- **Collision & Intersection**: Uses Möller–Trumbore for ray-plane (and ray-triangle) intersection, ensuring precise collision detection and interactive gameplay.
-- **Preallocation**: To avoid frequent garbage collection, data structures (tiles, addons, etc.) are allocated in pools and reused wherever possible.
 
 ## Building & Running
 1. **Clone the Repository**  
