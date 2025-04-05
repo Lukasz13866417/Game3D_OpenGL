@@ -35,7 +35,7 @@ Below is one of the game stages rendered via OpenGL:
 ## Project Structure
 Packages:
 - **`game`**: Core game logic, player handling, and world interactions.
-- **`terrain_api`**: Classes and interfaces for procedural terrain generation. Includes the `SymbolicGrid` integration.
+- **`game/terrain_api`**: Classes and interfaces for procedural terrain generation. Includes the `SymbolicGrid` integration.
 - **`rendering`**: All OpenGL and 3D rendering classes, from camera setup to object definitions.
 
 ## Terrain Generation & SymbolicGrid API
