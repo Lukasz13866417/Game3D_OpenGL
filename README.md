@@ -43,7 +43,7 @@ The **terrain generation** system is designed for flexibility and performance.
 - All terrain patterns extend the **```TerrainStructure```** class - an API for arranging tiles and placing addons on a grid.
 - Terrain structures form a "tree" - each structure can incorporate child structures with their own addons and tiles. 
 - The ```Tile``` class can be extended for extra capabilities.
-- **lazy loading**:  Instead of instantly generating tiles&addons based on provided structures, the information is turned into commands. At any time, the user can tell the terrain to "interpret" a given number of commands.
+- **lazy loading**:  Instead of instantly generating tiles&addons based on provided structures, the information is turned into commands. At any time, the user can tell the terrain to "interpret" a given number of commands. The commands generated for a structure can be reused, allowing for reduced overhead later.
 
 ### SymbolicGrid
 [SymbolicGrid](https://github.com/Lukasz13866417/SymbolicGrid) is my own, self-made library for efficient, randomized 2D grid queries. It significantly boosts performance by:
