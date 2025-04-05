@@ -1,6 +1,5 @@
 package com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments;
 
-
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
 
 import java.util.TreeSet;

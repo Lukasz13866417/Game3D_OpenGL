@@ -1,6 +1,4 @@
-package com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments;
-
-
+package com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.by_length;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
 
 public interface SegmentsByLength {
@@ -13,5 +11,5 @@ public interface SegmentsByLength {
 
     GridSegment getKthFittingSpace(int spaceSize, int k);
 
-    void freeArraysIfCleanedUp();
+    void destroy();
 }

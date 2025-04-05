@@ -92,7 +92,7 @@ public class GameplayStage implements Stage {
 
 
         terrain.removeOldTiles(player.objX,player.objY,player.objZ);
-        if(terrain.getTileCount() < 500){
+        if(terrain.getTileCount() < 400){
             terrain.enqueueStructure(new TerrainLine(100));
             terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
             terrain.enqueueStructure(new Terrain2DCurve(50, 0, 0.5f * PI/4));
@@ -101,7 +101,9 @@ public class GameplayStage implements Stage {
             terrain.enqueueStructure(new TerrainLine(100));
             terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
         }
-        terrain.generateChunks(2);
+        if(terrain.getTileCount() < 300) {
+            terrain.generateChunks(1);
+        }
         for(int i=0;i<terrain.getTileCount();++i){
             Tile tile = terrain.getTile(i);
             if(player.collidesTile(tile)){
@@ -134,6 +136,8 @@ public class GameplayStage implements Stage {
         }
 
         player.updateAfterDraw(dt);
+
+        System.out.println((int)(dt)+" "+(terrain.getTileCount()+terrain.getAddonCount()));
 
     }
 }

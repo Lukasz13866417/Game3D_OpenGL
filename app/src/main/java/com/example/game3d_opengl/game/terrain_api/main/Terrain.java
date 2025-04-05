@@ -205,8 +205,6 @@ public class Terrain {
     final PreallocatedCommandBuffer commandBuffer;
 
     public void generateChunks(int nChunks) {
-        int d = 0;
-        long t0 = System.nanoTime();
         while (nChunks != 0) {
             if (!commandBuffer.hasAnyCommands()) {
                 if (!waitingStructuresQueue.isEmpty()) {
@@ -217,13 +215,7 @@ public class Terrain {
             }
             commandBuffer.executeFirstCommand(generalExecutor);
             --nChunks;
-            ++d;
         }
-           long t1 = System.nanoTime();
-           long dt = (t1 - t0) / 1_000_000;
-           if(d>0) {
-          //     System.out.println("Interpreted " + d + " commands. Took: " + dt + "ms");
-           }
     }
 
     /**

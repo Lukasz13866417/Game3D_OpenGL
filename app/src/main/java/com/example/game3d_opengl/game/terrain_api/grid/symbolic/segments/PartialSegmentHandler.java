@@ -1,7 +1,8 @@
 package com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments;
 
-
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.by_length.SegmentsByLength;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.by_length.segtree_implementation.PreallocatedHashedSegmentsByLengthNodes;
 
 import java.util.Random;
 
@@ -56,12 +57,12 @@ public class PartialSegmentHandler {
         segmentsByEndPosition.printGrid();
     }
 
-    public void free(){
+    public void flush(){
         while(!segmentsByEndPosition.tree.isEmpty()){
             GridSegment curr = segmentsByEndPosition.tree.pollFirst();
             segmentsByLength.delete(curr.row,curr.col,curr.length);
         }
-        segmentsByLength.freeArraysIfCleanedUp();
+        segmentsByLength.destroy();
     }
 
 

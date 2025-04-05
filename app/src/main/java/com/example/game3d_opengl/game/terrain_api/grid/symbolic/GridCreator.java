@@ -10,7 +10,6 @@ public class GridCreator {
     private final int parentRowOffset;
 
     public GridCreator(int nRows, int nCols, GridCreatorWrapper parentGrid, int parentRowOffset) {
-        System.out.println("NEW GRID CREATOR! rows: "+nRows+" cols: "+nCols);
         this.nRows = nRows;
         this.nCols = nCols;
         this.horizontal = new PartialSegmentHandler(nRows, nCols, false);
@@ -66,8 +65,8 @@ public class GridCreator {
     }
 
     public void destroy(){
-        vertical.free();
-        horizontal.free();
+        vertical.flush();
+        horizontal.flush();
     }
 
     public void printGrid(){
