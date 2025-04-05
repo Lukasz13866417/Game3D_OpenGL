@@ -87,8 +87,8 @@ The **terrain generation** system is designed for flexibility and performance. Y
 - Place **addons** (items, spikes, power-ups, etc.) on a grid, orchestrated by the `SymbolicGrid` library.
 - Enjoy **lazy loading**: your custom `TerrainStructure` classes compile their commands, which the engine interprets later, generating only what’s needed in real-time.
 
-### Why SymbolicGrid?
-[SymbolicGrid](https://github.com/Lukasz13866417/SymbolicGrid) is a separate library for efficient, randomized 2D grid queries. It significantly boosts performance by:
+### SymbolicGrid
+[SymbolicGrid](https://github.com/Lukasz13866417/SymbolicGrid) is my own, self-made library for efficient, randomized 2D grid queries. It significantly boosts performance by:
 - Reducing memory overhead with specialized data structures.
 - Minimizing random lookups and generation overhead.
 - Supporting large, on-demand worlds without major slowdowns or stutters.
