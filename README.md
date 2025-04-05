@@ -122,3 +122,5 @@ The **terrain generation** system is designed for flexibility and performance. Y
 
 ## License
 
+This project is licensed under the **Creative Commons Attribution 4.0 International License**.  
+You are free to share and adapt the material as long as you provide proper attribution. For more details, please see the [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).
