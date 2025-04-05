@@ -10,9 +10,7 @@
 5. [Terrain Generation & SymbolicGrid API](#terrain-generation--symbolicgrid-api)
 6. [Technical Highlights](#technical-highlights)
 7. [Building & Running](#building--running)
-8. [Future Plans](#future-plans)
-9. [License](#license)
-10. [Acknowledgments](#acknowledgments)
+8. [License](#license)
 
 ## Introduction
 This project began as an experiment to render 3D graphics on Android using the **Canvas** API—an unconventional approach that required numerous tricks (like face-culling, Painter’s algorithm modifications, and more) to achieve acceptable performance. However, the limitations of 2D rendering soon became a bottleneck.
@@ -112,13 +110,6 @@ The **terrain generation** system is designed for flexibility and performance. Y
 4. **Install on Device/Emulator**  
    - Connect an Android device or use an emulator, then press “Run.”
    - Once installed, the game should launch automatically.
-
-## Future Plans
-- **Additional Terrain Features**: Support for dynamic water, weather effects, or day-night cycles.
-- **AI and Pathfinding**: Add basic or advanced NPC behaviors with pathfinding (potentially integrated with `SymbolicGrid`).
-- **Multiplayer Support**: Investigate the feasibility of real-time or turn-based multiplayer modes.
-- **Level Editor**: An in-game or external level editor to design terrain structures and place addons visually.
-- **Refined Collision System**: Extend the Möller–Trumbore approach to handle complex polygons or skeletal animations.
 
 ## License
 
