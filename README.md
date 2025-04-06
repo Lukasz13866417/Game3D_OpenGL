@@ -13,8 +13,6 @@ The codebase has since evolved into a **full OpenGL** rendering solution, comple
 - **Performance-Focused**: Preallocation, minimal heap allocations, and specialized data structures ensure smooth gameplay and quick load times on mobile devices.
 
 ## Screenshots
-Below is one of the game stages rendered via OpenGL:
-
 ![Screenshot of Game Stage](https://github.com/user-attachments/assets/2b78fd37-cfe1-4630-b902-ea5328005814)
 
 ## Project Structure
