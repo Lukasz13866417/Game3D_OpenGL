@@ -1,5 +1,5 @@
 # OpenGL 3D Game From Scratch
-> **A fully custom 3D game engine built on OpenGL for Android, featuring a robust terrain generation API and lazy, on-the-fly world creation.**
+> **A fully custom 3D game engine built on OpenGL for Android, featuring a robust terrain generation API and cutting-edge on-the-fly world creation.**
 
 ## Introduction
 This project began as an experiment to render 3D graphics on Android using the **Canvas** API—an unconventional approach that required numerous tricks (like face-culling, Painter’s algorithm modifications, and more) to achieve acceptable performance. However, the limitations of 2D rendering soon became a bottleneck.
@@ -28,7 +28,7 @@ The **terrain generation** system is designed for flexibility and performance.
 - All terrain patterns extend the **```TerrainStructure```** class - an API for arranging tiles and placing addons on a grid.
 - Terrain structures form a "tree" - each structure can incorporate child structures with their own addons and tiles. 
 - The ```Tile``` class can be extended for extra capabilities.
-- **lazy loading**:  Instead of instantly generating tiles&addons based on provided structures, the information is turned into commands. At any time, the user can tell the terrain to "interpret" a given number of commands. The commands generated for a structure can be reused.
+- **lazy loading**:  Instead of instantly generating tiles&addons based on provided structures, the information is turned into commands. At any time, the user can tell the terrain to "interpret" a given number of commands. The commands generated for a structure can be reused. This approach resulted in better performance than running the terrain generation on a separate thread and synchronizing.
 
 ### SymbolicGrid
 [SymbolicGrid](https://github.com/Lukasz13866417/SymbolicGrid) is my own, self-made library for efficient, randomized 2D grid queries. It significantly boosts performance by:
