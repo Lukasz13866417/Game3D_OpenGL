@@ -2,8 +2,10 @@ package com.example.game3d_opengl.game;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.getNormal;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.isPointInTriangle;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.pointAndPlanePosition;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.rayTriangleDistance;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.rotY;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
@@ -76,13 +78,28 @@ public class Player extends Object3D implements WorldActor {
     }
 
     public boolean collidesTile(Tile tile) {
-        Vector3D fl2D = tile.farLeft.setY(0), nl2D = tile.nearLeft.setY(0),
+        Vector3D n1 = getNormal(tile.triangles[0]);
+        Vector3D n2 = getNormal(tile.triangles[1]);
+        float d1 = rayTriangleDistance(
+                V3(objX,objY,objZ),
+                n1.mult(-signum(n1.y)),
+                tile.triangles[0][0],tile.triangles[0][1],tile.triangles[0][2]
+                );
+        if(!(!Float.isInfinite(d1) && d1/PLAYER_HEIGHT < 1.05f)){
+            float d2 = rayTriangleDistance(
+                    V3(objX,objY,objZ),
+                    n2.mult(-signum(n2.y)),
+                    tile.triangles[1][0],tile.triangles[1][1],tile.triangles[1][2]
+            );
+            return !Float.isInfinite(d2) && d2/PLAYER_HEIGHT < 1.05f;
+        }
+        return true;
+        /*Vector3D fl2D = tile.farLeft.setY(0), nl2D = tile.nearLeft.setY(0),
                 fr2D = tile.farRight.setY(0), nr2D = tile.nearRight.setY(0);
 
         Vector3D fl = tile.farLeft, nl = tile.nearLeft,
                 fr = tile.farRight, nr = tile.nearRight;
 
-        Vector3D tmid = fl.add(nl).add(fr).add(nr).div(4);
         // pos + dir
         Vector3D ppd = V3(objX, objY, objZ).add(dir.mult(0.1f));
         float maxy = max(fl.y, max(fr.y, max(nl.y, nr.y)));
@@ -91,7 +108,7 @@ public class Player extends Object3D implements WorldActor {
                         || isPointInTriangle(nr2D, fr2D, fl2D, ppd.setY(0))
         )
                 && objY - maxy < PLAYER_HEIGHT + 0.15f
-                && pointAndPlanePosition(nl, fl, fr, ppd) == -1);
+                && pointAndPlanePosition(nl, fl, fr, ppd) == -1);*/
     }
 
     public void setFooting(Tile what) {
@@ -112,23 +129,60 @@ public class Player extends Object3D implements WorldActor {
         }
 
         if (tileBelow != null) {
-            fallSpeed = 0.0f;
 
-            Vector3D u = tileBelow.farLeft.sub(tileBelow.nearLeft),
-                    w = tileBelow.farLeft.sub(tileBelow.farRight);
-            Vector3D n = u.crossProduct(w); // normal of tile plane
-            // Below I solve the vector equation: v = alpha*n + beta*u + gamma*w for alpha,beta,gamma
-            // projection equals u*beta + w*gamma, so no need to compute alpha
-            float beta, gamma;
-            float det = n.x * u.y * w.z - n.x * u.z * w.y - n.y * u.x * w.z
-                    + n.y * u.z * w.x + n.z * u.x * w.y - n.z * u.y * w.x;
-            beta = (n.x * dir.y * w.z - n.x * dir.z * w.y - n.y * dir.x * w.z +
-                    n.y * dir.z * w.x + n.z * dir.x * w.y - n.z * dir.y * w.x)
-                    / det;
-            gamma = (n.x * u.y * dir.z - n.x * u.z * dir.y - n.y * u.x * dir.z
-                    + n.y * u.z * dir.x + n.z * u.x * dir.y - n.z * u.y * dir.x)
-                    / det;
-            move = u.mult(beta).add(w.mult(gamma)).withLen(playerSpeed * dt);
+            // find which of the two triangles we’re standing on
+            Vector3D origin = V3(objX, objY, objZ);
+            float bestDist = Float.POSITIVE_INFINITY;
+            Vector3D[] hitTri = null;
+
+            for (Vector3D[] tri : tileBelow.triangles) {
+                // use the unit-normal for the “downward” test ray
+                Vector3D nUnit = getNormal(tri);
+                float d = rayTriangleDistance(
+                        origin,
+                        nUnit.mult(-signum(nUnit.y)),
+                        tri[0], tri[1], tri[2]
+                );
+                if (!Float.isInfinite(d) && d < bestDist) {
+                    bestDist = d;
+                    hitTri = tri;
+                }
+            }
+
+            if (hitTri != null) {
+                // we’re on that triangle → no fall
+                fallSpeed = 0f;
+
+                // edges
+                Vector3D u = hitTri[1].sub(hitTri[0]);
+                Vector3D w = hitTri[2].sub(hitTri[0]);
+                Vector3D n = u.crossProduct(w);  // raw normal
+
+                // solve dir = β·u + γ·w + α·n  → projection = β·u + γ·w
+                float det =
+                        n.x * u.y * w.z - n.x * u.z * w.y
+                                - n.y * u.x * w.z + n.y * u.z * w.x
+                                + n.z * u.x * w.y - n.z * u.y * w.x;
+
+                float beta = (
+                        n.x * dir.y * w.z - n.x * dir.z * w.y
+                                - n.y * dir.x * w.z + n.y * dir.z * w.x
+                                + n.z * dir.x * w.y - n.z * dir.y * w.x
+                ) / det;
+
+                float gamma = (
+                        n.x * u.y * dir.z - n.x * u.z * dir.y
+                                - n.y * u.x * dir.z + n.y * u.z * dir.x
+                                + n.z * u.x * dir.y - n.z * u.y * dir.x
+                ) / det;
+
+                // build the slide vector along the triangle plane
+                move = u.mult(beta)
+                        .add(w.mult(gamma))
+                        .withLen(playerSpeed * dt);
+
+            }
+
         } else {
             Vector3D dwl = dir.withLen(playerSpeed * dt);
             move = V3(dwl.x, move.y, dwl.z);

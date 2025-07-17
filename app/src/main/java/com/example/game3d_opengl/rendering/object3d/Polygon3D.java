@@ -15,7 +15,7 @@ public class Polygon3D {
     final float[] polygonCoords;
 
     // VBO handle
-    private int vertexBufferId;
+    private final int vertexBufferId;
 
     private static int mProgram;
     private final int positionHandle, colorHandle, vPMatrixHandle;
@@ -123,10 +123,6 @@ public class Polygon3D {
 
         GLES20.glDisableVertexAttribArray(positionHandle);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
-    }
-
-    public float[] getVertexCoords() {
-        return polygonCoords;
     }
 
     public void setFillAndOutline(FColor newFillColor, FColor newOutlineColor) {

@@ -55,14 +55,14 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                     what.generateTiles(terrain.tileBrush);
                     terrain.commandBuffer.addCommand(CMD_FINISH_STRUCTURE_LANDSCAPE);
                 }
-                terrain.rowCountStack.push(terrain.tileBuilder.currRowCount);
+                terrain.rowCountStack.push(terrain.tileBuilder.getCurrRowCount());
                 break;
             case CMD_FINISH_STRUCTURE_LANDSCAPE:
                 TerrainStructure thatStructure = terrain.structureStack.pop();
                 int startRowCount = terrain.rowCountStack.pop();
                 GridCreatorWrapper myGridCreatorWrapper = terrain.gridCreatorWrapperStack.pop();
                 GridCreatorWrapper parentGridCreatorWrapper = terrain.gridCreatorWrapperStack.peek();
-                int nRowsAdded = terrain.tileBuilder.currRowCount - startRowCount;
+                int nRowsAdded = terrain.tileBuilder.getCurrRowCount() - startRowCount;
                 myGridCreatorWrapper.content = new GridCreator(
                         nRowsAdded, terrain.nCols, parentGridCreatorWrapper,
                         startRowCount

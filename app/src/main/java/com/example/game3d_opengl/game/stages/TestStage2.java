@@ -4,6 +4,8 @@ import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
+import static java.lang.Math.sqrt;
+
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
@@ -49,7 +51,7 @@ public class TestStage2 implements Stage {
                 2.5f, 1.5f
         );
 
-        terrain.enqueueStructure(new TerrainFunction(20,x -> x*x,0,2));
+        terrain.enqueueStructure(new TerrainFunction(20,x -> 0.1f*(float)sqrt(x),0,2));
 
         /*System.out.println("TILE COUNT: "+terrain.getTileCount());
         for (int i = 0; i < terrain.getTileCount(); ++i) {

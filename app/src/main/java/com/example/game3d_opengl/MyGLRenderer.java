@@ -19,7 +19,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private long lastFrameTime = System.nanoTime();
 
     private final StageManager stageManager = new StageManager();
-    private Stage currStage = new GameplayStage(stageManager);
+    private Stage currStage = new TestStage(stageManager);
 
 
     // Simple API that enables stages to order the renderer to switch stages

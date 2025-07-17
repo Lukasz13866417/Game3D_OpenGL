@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.res.AssetManager;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.rendering.object3d.Camera;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -78,11 +79,12 @@ public class GameplayStage implements Stage {
         );
         terrain.enqueueStructure(new TerrainLine(100));
         terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
-        terrain.enqueueStructure(new Terrain2DCurve(50, 0, 0.5f * PI/4));
-        terrain.enqueueStructure(new Terrain2DCurve(50, PI/12, -0.5f * PI/4));
+        terrain.enqueueStructure(new Terrain2DCurve(50, PI/3, 0.25f * PI/4));
+        terrain.enqueueStructure(new Terrain2DCurve(50, PI/12, -0.25f * PI/4));
         terrain.enqueueStructure(new TerrainLine(100));
         terrain.enqueueStructure(new TerrainLine(100));
         terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
+        terrain.enqueueStructure(new TerrainSpiral(80, PI/12, 0.25f * PI/4));
         terrain.generateChunks(-1);
 
     }

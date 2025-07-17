@@ -24,6 +24,7 @@ public class Tile {
      * The terrain doesn't move, the player does. And the camera follows him around.
      */
     public final Vector3D nearLeft, nearRight, farLeft, farRight;
+    public final Vector3D[][] triangles;
 
     /**
      * Polygon wrapper that handles the vertex buffer, shaders, and rendering for this tile.
@@ -40,6 +41,11 @@ public class Tile {
         this.farLeft = fl;
         this.farRight = fr;
         this.slope = slope;
+
+        this.triangles = new Vector3D[][]{
+            new Vector3D[]{this.nearLeft,this.nearRight,this.farRight},
+            new Vector3D[]{this.nearLeft,this.farLeft,this.farRight}
+        };
 
         // Build an array of perimeter coords: nearLeft -> nearRight -> farRight -> farLeft
         // so that Polygon3D will form a closed shape (triangle fan).
@@ -88,11 +94,11 @@ public class Tile {
 
     @Override
     public String toString() {
-        return "TILE [\n"
+        return "TILE\n[\n"
                 + "NEAR L=" + nearLeft + ", R=" + nearRight+"\n"
-                + "FAR  L=" + farLeft + ", R=" + farRight+"\n"
-                + ", slope=" + String.format(Locale.ROOT,"{%5f}",slope)
-                + "\n]";
+                + "FAR  L=" + farLeft  + ", R=" + farRight+"\n"
+                //+ ", slope=" + String.format(Locale.ROOT,"{%5f}",slope)
+                + "]";
     }
 
 }
