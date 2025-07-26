@@ -3,6 +3,11 @@ package com.example.game3d_opengl.game.terrain_api.terrainutil;
 public class OverflowingPreallocatedCoordinateBuffer {
     private final OverflowingPreallocatedFloatBuffer floatBuffer;
 
+    public void free(){
+        clear();
+        floatBuffer.free();
+    }
+
     public OverflowingPreallocatedCoordinateBuffer() {
         this.floatBuffer = new OverflowingPreallocatedFloatBuffer();
     }

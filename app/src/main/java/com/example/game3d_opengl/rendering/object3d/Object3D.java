@@ -56,6 +56,12 @@ public class Object3D {
         }
     }
 
+    public void cleanup(){
+        for(Polygon3D poly : facePolys){
+            poly.cleanup();
+        }
+    }
+
     public static class Builder {
         protected float objX = 0, objY = 0, objZ = 0;
         protected float objYaw = 0, objPitch = 0, objRoll = 0;

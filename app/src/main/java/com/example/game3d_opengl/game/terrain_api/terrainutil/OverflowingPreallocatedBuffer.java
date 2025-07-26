@@ -114,12 +114,17 @@ public class OverflowingPreallocatedBuffer<T> {
         }
         int idx = (head + size - 1) % MAX_SIZE;
         T value = myBuffer[idx];
+        myBuffer[idx] = null;
         size--;
         return value;
     }
 
     /** Empty the buffer (does not release its slot). */
     public void clear() {
+        int sz = size();
+        for(int i=0;i<sz;++i){
+            myBuffer[(head + i) % MAX_SIZE] = null;
+        }
         head = 0;
         size = 0;
     }

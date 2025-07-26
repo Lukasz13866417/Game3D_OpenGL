@@ -13,29 +13,30 @@ public class DeathSpike extends Addon {
 
     private final float height;
     private Object3D object3D;
-    public DeathSpike(){
+
+    public DeathSpike() {
         super();
-        height = GameRandom.randFloat(0.225f,0.5f,5);
+        height = GameRandom.randFloat(0.225f, 0.5f, 5);
     }
+
     @Override
-    protected void init(Vector3D fieldNearLeft, Vector3D fieldNearRight,
-                        Vector3D fieldFarLeft, Vector3D fieldFarRight) {
+    protected void onPlace(Vector3D fieldNearLeft, Vector3D fieldNearRight,
+                           Vector3D fieldFarLeft, Vector3D fieldFarRight) {
         Vector3D fieldMid = fieldFarLeft.add(fieldFarRight)
                 .add(fieldNearRight).add(fieldNearLeft).div(4);
-        Vector3D out = getNormal(fieldNearLeft,fieldFarLeft,fieldFarRight).mult(-1);
+        Vector3D out = getNormal(fieldNearLeft, fieldFarLeft, fieldFarRight).mult(-1);
         Vector3D myNL = fieldMid.add(fieldNearLeft.sub(fieldMid).mult(0.8f));
         Vector3D myNR = fieldMid.add(fieldFarLeft.sub(fieldMid).mult(0.8f));
         Vector3D myFL = fieldMid.add(fieldNearRight.sub(fieldMid).mult(0.8f));
         Vector3D myFR = fieldMid.add(fieldFarRight.sub(fieldMid).mult(0.8f));
-
         Vector3D[] verts = V3S(
                 myNL.add(out.withLen(0.025f)), myNR.add(out.withLen(0.025f)),
                 myFL.add(out.withLen(0.025f)), myFR.add(out.withLen(0.025f))
-                ,fieldMid.add(out.withLen(height))
+                , fieldMid.add(out.withLen(height))
         );
         object3D = new Object3D.Builder()
-                .angles(0,0,0)
-                .position(0,0,0)
+                .angles(0, 0, 0)
+                .position(0, 0, 0)
                 .verts(verts)
                 .faces(
                         new int[][]{
@@ -45,9 +46,9 @@ public class DeathSpike extends Addon {
                                 new int[]{3, 2, 4},
                                 new int[]{2, 0, 4}
                         }
-                        )
-                .edgeColor(CLR(1.0f,1.0f,1.0f,1.0f))
-                .fillColor(CLR(0,0,0,0)).buildObject();
+                )
+                .edgeColor(CLR(1.0f, 1.0f, 1.0f, 1.0f))
+                .fillColor(CLR(0, 0, 0, 0)).buildObject();
     }
 
     @Override
@@ -63,5 +64,10 @@ public class DeathSpike extends Addon {
     @Override
     public void updateAfterDraw(float dt) {
 
+    }
+
+    @Override
+    public void cleanupOnDeath() {
+        object3D.cleanup();
     }
 }

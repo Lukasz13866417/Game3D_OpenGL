@@ -4,6 +4,7 @@ import static com.example.game3d_opengl.rendering.util3d.GameMath.EPSILON;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.rotateAroundAxis;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.rotateAroundTwoPoints;
+import static com.example.game3d_opengl.rendering.util3d.GameMath.tan;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static java.lang.Math.abs;
 import static java.lang.Math.atan;
@@ -12,264 +13,181 @@ import static java.lang.Math.sqrt;
 
 import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.FixedMaxSizeDeque;
-import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedBuffer;
-import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
+import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedRowInfoBuffer;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedCoordinateBuffer;
+import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedFloatBuffer;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
+/**
+ * Builds a deque of terrain tiles and, in parallel, keeps three buffers
+ * – left edge points, right edge points and per-row metadata – that are always
+ * size-synchronised.  Row placement is driven by a single “centre-line”
+ * distance counter so it remains consistent even when the tile turns.
+ */
 public class TileBuilder {
+    private long nextId = 0L;
 
-    private final float rowSpacing, segLength;
-    private float lastTileProgressLeft, lastTileProgressRight;
-    private float dHorizontalAng, currHorizontalAng, currVerticalAng;
-    private float lastLastTileProgressLeft, lastLastTileProgressRight;
-    private int lastTimeCntRowsLeft = 0, lastTimeCntRowsRight = 0;
-    private final int nCols;
-    private final OverflowingPreallocatedCoordinateBuffer leftSideBuffer, rightSideBuffer;
-    private final OverflowingPreallocatedBuffer<GridRowHelper> rowInfoBuffer;
+    /*––––––––––––  CONFIG & STATE  ––––––––––––*/
 
-    /**
-     * Deque to hold all tiles (including the guardian).
-     */
-    private final FixedMaxSizeDeque<Tile> tiles;
+    private final float rowSpacing;                 // desired spacing between logical rows
+    private final float segLength;                  // preferred tile length (used by generators)
+    private final int nCols;                      // grid columns – passed to GridCreator
 
-    /**
-     * Points to the newest tile added.
-     */
-    private Tile lastTile;
-    private Tile currTile;
+    // Distance already travelled since the last emitted row, in the range [0,rowSpacing).
+    private float leftover = 0f;
+
+    /*––––––––––––  BUFFERS  ––––––––––––*/
+
+    private final OverflowingPreallocatedCoordinateBuffer leftSideBuffer;
+    private final OverflowingPreallocatedCoordinateBuffer rightSideBuffer;
+    private final OverflowingPreallocatedRowInfoBuffer rowInfoBuffer;
+
+    // One entry per tile – value of `leftover` *before* rows for that tile were generated.
+    private final OverflowingPreallocatedFloatBuffer leftoverHistory;
+    // One entry per tile – how many rows were appended by that tile.
+    private final OverflowingPreallocatedFloatBuffer rowsAddedHistory;
+
+    /*––––––––––––  TILE STORAGE  ––––––––––––*/
+
+    private final FixedMaxSizeDeque<Tile> tiles;    // includes the guardian
+    private Tile lastTile;                          // newest tile (back of deque)
 
     public int getCurrRowCount() {
-        return min(leftSideBuffer.size(), rightSideBuffer.size())-1;
+        return leftSideBuffer.size();
     }
 
-    public int getLastTimeCntRowsAdded() {
-        return getCurrRowCount() - min(lastTimeCntRowsLeft, lastTimeCntRowsRight) + 1;
+    public void cleanup() {
+        while (!tiles.isEmpty()) {
+            tiles.popFirst().cleanupOnDeath();
+        }
+        leftSideBuffer.free();
+        rightSideBuffer.free();
+        rowInfoBuffer.free();
+        leftoverHistory.free();
+        rowsAddedHistory.free();
     }
 
-    public TileBuilder(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength, float rowSpacing) {
+    public TileBuilder(int maxSegments, int nCols,
+                       Vector3D startMid,
+                       float segWidth, float segLength,
+                       float rowSpacing) {
 
-        this.tiles = new FixedMaxSizeDeque<>(maxSegments + 1);
-
-        this.nCols = nCols;
         this.rowSpacing = rowSpacing;
         this.segLength = segLength;
+        this.nCols = nCols;
 
-        // Create the "guardian" tile as the first tile
+        /*–––– data structures ––––*/
+        this.leftSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
+        this.rightSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
+        this.rowInfoBuffer = new OverflowingPreallocatedRowInfoBuffer();
+
+        this.tiles = new FixedMaxSizeDeque<>(maxSegments + 1);
+        this.leftoverHistory = new OverflowingPreallocatedFloatBuffer();
+        this.rowsAddedHistory = new OverflowingPreallocatedFloatBuffer();
+
+        /*–––– guardian tile (length ≈ 0) ––––*/
         Vector3D startLeft = V3(startMid.sub(segWidth / 2, 0, 0));
         Vector3D startRight = V3(startMid.add(segWidth / 2, 0, 0));
 
-        // Guardian tile: store near and far edges the same
-        // nearLeft
-        // nearRight
-        // farLeft
-        // farRight
-        // slope
         Tile guardian = new Tile(
-                startLeft,                                       // nearLeft
-                startRight,                                      // nearRight
-                startLeft.sub(0, 0, 0.01f),              // farLeft
-                startRight.sub(0, 0, 0.01f),             // farRight
-                0.0f                                             // slope
-        );
+                startLeft,
+                startRight,
+                startLeft.sub(0, 0, 0.01f),   // farLeft = nearLeft shifted a bit so len>0
+                startRight.sub(0, 0, 0.01f),  // farRight
+                0f, nextId++);
 
-        this.lastTileProgressLeft = (float) (Math.sqrt(guardian.farLeft.sub(guardian.nearLeft).sqlen()));
-        this.lastTileProgressRight = (float) (Math.sqrt(guardian.farRight.sub(guardian.nearRight).sqlen()));
+        tiles.pushBack(guardian);
+        lastTile = guardian;
 
-        this.tiles.pushBack(guardian);
-        this.lastTile = guardian;
-        this.currTile = null;
+        // seed buffers with a single starting row placed at guardian’s far edge
+        leftSideBuffer.addPos(guardian.farLeft.x, guardian.farLeft.y, guardian.farLeft.z);
+        rightSideBuffer.addPos(guardian.farRight.x, guardian.farRight.y, guardian.farRight.z);
+        // no rowInfo for the guardian
 
-        this.currHorizontalAng = 0.0f;
-        this.currVerticalAng = 0.0f;
-        this.dHorizontalAng = 0.0f;
-
-        this.leftSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
-        this.rightSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
-
-        Vector3D startLeftRow = new Vector3D(guardian.farLeft.x, guardian.farLeft.y, guardian.farLeft.z);
-        Vector3D startRightRow = new Vector3D(guardian.farRight.x, guardian.farRight.y, guardian.farRight.z);
-
-        leftSideBuffer.addPos(startLeftRow.x, startLeftRow.y, startLeftRow.z);
-        rightSideBuffer.addPos(startRightRow.x, startRightRow.y, startRightRow.z);
-
-        this.rowInfoBuffer = new OverflowingPreallocatedBuffer<>(
-                GridRowHelper.class,
-                GridRowHelper::new
-        );
-
+        leftoverHistory.add(leftover);   // 0
+        rowsAddedHistory.add(1);          // the single seed-row
     }
 
-    private void updateLeft(Vector3D nl, Vector3D fl) {
-
-        float lastLen = lastTile == null ? 0.0f
-                : (float) (Math.sqrt(lastTile.farLeft.sub(lastTile.nearLeft).sqlen()));
-
-        Vector3D edgeLeft = fl.sub(nl);
-        float len = (float) (Math.sqrt(edgeLeft.sqlen()));
-        Vector3D leftSide;
-        float borderRowPosHere;
-
-        // Calc the amount of space we have in this tile
-        // (considering progress in previous tile)
-        if (abs(lastLen - lastTileProgressLeft) < 0.0001f) {
-            // progress in previous tile was too small - ignoring it
-            // (or we are the first real tile or even the guardian)
-            borderRowPosHere = 0.0f;
-            if (this.tiles.size() == 1) {
-                // we are guardian
-                leftSideBuffer.addPos(fl.x,fl.y,fl.z);
-                lastTileProgressLeft = len;
-                return;
-            }
-        } else {
-            // Add the row that overlaps this and last tile
-            borderRowPosHere = rowSpacing - (lastLen - lastTileProgressLeft);
-            leftSide = nl.add(edgeLeft.withLen(borderRowPosHere));
-
-            leftSideBuffer.addPos(leftSide.x, leftSide.y, leftSide.z);
-        }
-        lastLastTileProgressLeft = lastTileProgressLeft;
-        lastTileProgressLeft = borderRowPosHere;
-        while (lastTileProgressLeft + rowSpacing <= len + 10f * EPSILON) {
-            lastTileProgressLeft = min(lastTileProgressLeft + rowSpacing, len);
-            leftSide = nl.add(edgeLeft.withLen(lastTileProgressLeft));
-            leftSideBuffer.addPos(leftSide.x, leftSide.y, leftSide.z);
-        }
-    }
-
-    private void updateRight(Vector3D nr, Vector3D fr) {
-
-        float lastLen = lastTile == null ? 0.0f
-                : (float) (Math.sqrt(lastTile.farRight.sub(lastTile.nearRight).sqlen()));
-
-        Vector3D edgeRight = fr.sub(nr);
-        float len = (float) (Math.sqrt(edgeRight.sqlen()));
-        Vector3D rightSide;
-        float borderRowPosHere;
-        // Calc the amount of space we have in this tile
-        // (considering progress in previous tile)
-        if (abs(lastLen - lastTileProgressRight) < 0.0001f) {
-            // progress in previous tile was too small - ignoring it
-            // (or we are the first real tile or even the guardian)
-            borderRowPosHere = 0.0f;
-            if (this.tiles.size() == 1) {
-                // we are guardian
-                rightSideBuffer.addPos(fr.x,fr.y,fr.z);
-                lastTileProgressRight = len;
-                return;
-            }else{
-                // we are first real tile
-                rowInfoBuffer.add(new GridRowHelper(
-                        currTile.farLeft,
-                        currTile.farLeft.sub(currTile.nearLeft),
-                        currTile.nearRight.sub(currTile.nearLeft),
-                        V3(
-                                leftSideBuffer.getX(0),
-                                leftSideBuffer.getY(0),
-                                leftSideBuffer.getZ(0)
-                        ),
-                        nr
-                ));
-            }
-        } else {
-            // Add the row that overlaps this and last tile
-            borderRowPosHere = rowSpacing - (lastLen - lastTileProgressRight);
-            rightSide = nr.add(edgeRight.withLen(borderRowPosHere));
-
-            rightSideBuffer.addPos(rightSide.x, rightSide.y, rightSide.z);
-
-            // Vector3D farLeft,
-            // Vector3D eL,
-            // Vector3D eN,
-            // Vector3D startL,
-            // Vector3D endR
-            int rowInd = getCurrRowCount() - 1;
-            rowInfoBuffer.add(new GridRowHelper(
-                    currTile.farLeft,
-                    currTile.farLeft.sub(currTile.nearLeft),
-                    currTile.nearRight.sub(currTile.nearLeft),
-                    V3(
-                        leftSideBuffer.getX(rowInd),
-                        leftSideBuffer.getY(rowInd),
-                        leftSideBuffer.getZ(rowInd)
-                    ),
-                    V3(rightSide.x, rightSide.y, rightSide.z)
-            ));
-        }
-        lastLastTileProgressRight = lastTileProgressRight;
-        lastTileProgressRight = borderRowPosHere;
-        while (lastTileProgressRight + rowSpacing <= len + 10f * EPSILON) {
-            lastTileProgressRight = min(lastTileProgressRight + rowSpacing, len);
-            rightSide = nr.add(edgeRight.withLen(lastTileProgressRight));
-            rightSideBuffer.addPos(rightSide.x, rightSide.y, rightSide.z);
-
-            // Vector3D farLeft,
-            // Vector3D eL,
-            // Vector3D eN,
-            // Vector3D startL,
-            // Vector3D endR
-            int ind = rightSideBuffer.size()-1;
-            rowInfoBuffer.add(new GridRowHelper(
-                    currTile.farLeft,
-                    currTile.farLeft.sub(currTile.nearLeft),
-                    currTile.nearRight.sub(currTile.nearLeft),
-                    V3(
-                            leftSideBuffer.getX(ind),
-                            leftSideBuffer.getY(ind),
-                            leftSideBuffer.getZ(ind)
-                    ),
-                    V3(rightSide.x, rightSide.y, rightSide.z)
-            ));
-        }
-    }
+    /*––––––––––––  TILE GENERATION  ––––––––––––*/
 
     /**
-     * Helper: builds a new tile and adds it to the deque.
+     * Helper: builds a new tile and fully integrates it with row/buffer tracking.
      */
-    void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr) {
-
-        lastTimeCntRowsLeft = leftSideBuffer.size();
-        lastTimeCntRowsRight = rightSideBuffer.size();
+    private void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr) {
 
         float slopeVal = (float) atan((fl.y - nl.y) /
-                Math.sqrt((fl.x - nl.x) * (fl.x - nl.x) + (fl.z - nl.z) * (fl.z - nl.z)));
+                sqrt((fl.x - nl.x) * (fl.x - nl.x) + (fl.z - nl.z) * (fl.z - nl.z)));
 
-        Tile t = new Tile(nl, nr, fl, fr, slopeVal);
-        this.tiles.pushBack(t);
+        Tile tile = new Tile(nl, nr, fl, fr, slopeVal, nextId++);
+        tile.setID(nextId++);
+        tiles.pushBack(tile);
 
-        currTile = t;
+        /* save state *before* generating rows so we can roll back later if needed */
+        leftoverHistory.add(leftover);
+        int rowCountBefore = getCurrRowCount();
 
-        updateLeft(nl, fl);
-        updateRight(nr, fr);
-
-        lastTile = t;
-        currTile = null;
-
-    }
-
-    /*
-    Helper. Never called twice in a row.
-     */
-    private Tile removeLastTile() {
-        Tile oldLast = tiles.popLast();
-        int last = getLastTimeCntRowsAdded();
-        System.out.println("XD "+last);
-        for (int i = 0; i < last; ++i) {
-            leftSideBuffer.pop();
-            rightSideBuffer.pop();
-            if(rowInfoBuffer.size()>0) {
-                rowInfoBuffer.pop();
-            }
+        // Insert the very first logical row (flush with near edge) only once –
+        // i.e. when this is the first tile ever that generates rows.
+        if (rowInfoBuffer.size() == 0) {
+            // First real tile – add bridging row along its near edge so the grid starts flush.
+            leftSideBuffer.addPos(nl.x, nl.y, nl.z);
+            rightSideBuffer.addPos(nr.x, nr.y, nr.z);
+            rowInfoBuffer.add(tile.getID(), tile.farLeft,
+                    fl.sub(nl),
+                    nr.sub(nl),
+                    nl, nr);
         }
-        lastTile = tiles.peekLast();
-        currTile = null;
-        lastTileProgressLeft = lastLastTileProgressLeft; // that's why not called twice in a row
-        lastTileProgressRight = lastLastTileProgressRight;
-        return oldLast;
+
+        generateRowsForTile(tile);
+
+        /* rows added by this tile (including possible bridging row) */
+        int rowsAdded = getCurrRowCount() - rowCountBefore;
+        rowsAddedHistory.add(rowsAdded);
+
+        lastTile = tile;
     }
 
     /**
-     * Creates one additional tile, continuing from lastTile’s far edge.
+     * Core routine: append as many rows as fit into {@code tile}, keeping both
+     * edge-buffers and the row-info buffer perfectly in sync.
+     */
+    private void generateRowsForTile(Tile tile) {
+        Vector3D nl = tile.nearLeft;
+        Vector3D nr = tile.nearRight;
+        Vector3D fl = tile.farLeft;
+        Vector3D fr = tile.farRight;
+
+        Vector3D eL = fl.sub(nl);
+        Vector3D eR = fr.sub(nr);
+        Vector3D eN = nr.sub(nl);
+
+        float lenL = (float) sqrt(eL.sqlen());
+        float lenR = (float) sqrt(eR.sqlen());
+        float len = min(lenL, lenR);          // safe distance inside both edges
+
+        // distance from tile.near edge to first potential row position
+        float firstDist = (rowSpacing - leftover);
+        if (abs(firstDist - rowSpacing) < 1e-6f) firstDist = rowSpacing; // leftover == 0
+
+        for (float d = firstDist; d <= len + 10f * EPSILON; d += rowSpacing) {
+            float fraction = d / lenL;          // 0..1 along left edge
+
+            Vector3D leftP = nl.add(eL.withLen(d));
+            Vector3D rightP = nr.add(eR.mult(fraction));
+
+            leftSideBuffer.addPos(leftP.x, leftP.y, leftP.z);
+            rightSideBuffer.addPos(rightP.x, rightP.y, rightP.z);
+            rowInfoBuffer.add(tile.getID(), tile.farLeft, eL, eN, leftP, rightP);
+        }
+
+        // Advance leftover: total distance progressed inside this tile = len
+        leftover = (leftover + len) % rowSpacing;
+    }
+
+    /*––––––––––––  PUBLIC API  ––––––––––––*/
+
+    /**
+     * Creates one additional tile, continuing from {@code lastTile}’s far edge.
      */
     public void addSegment() {
         if (tiles.size() == tiles.getMaxSize()) {
@@ -282,93 +200,88 @@ public class TileBuilder {
         Vector3D axis = V3(0, -1, 0);
 
         Vector3D mid = l1.add(r1).div(2);
-        Vector3D newL1 = rotateAroundAxis(mid, axis, l1, dHorizontalAng);
-        Vector3D newR1 = rotateAroundAxis(mid, axis, r1, dHorizontalAng);
 
-        assert (abs(newL1.y - newR1.y) < 0.01f);
+        Vector3D line1 = l1.sub(lastTile.nearLeft).setY(0),
+                line2 = r1.sub(lastTile.nearRight).setY(0);
+        Vector3D baseLen = r1.sub(l1).div(2);
+        float dLen = (float) (Math.sqrt(baseLen.sqlen()) * tan(dHorizontalAng));
+
+        Vector3D rotatedL1 = rotateAroundAxis(mid, axis, l1, dHorizontalAng),
+                 rotatedR1 = rotateAroundAxis(mid, axis, r1, dHorizontalAng);
+
+        Vector3D newL1 = l1.sub(line1.withLen(dLen));
+        Vector3D newR1 = r1.add(line2.withLen(dLen));
+
+        assert abs(newL1.y - newR1.y) < 0.01f;
 
         dHorizontalAng = 0.0f;
 
         Vector3D dir = rotateAroundTwoPoints(
                 V3(0, 0, 0),
-                newR1.sub(newL1),
+                rotatedR1.sub(rotatedL1),
                 axis,
                 PI / 2 + currVerticalAng).withLen(segLength);
 
-        Vector3D l2 = newL1.add(dir);
-        Vector3D r2 = newR1.add(dir);
+        Vector3D l2 = rotatedL1.add(dir);
+        Vector3D r2 = rotatedR1.add(dir);
 
-        // Update the last tile's far edge.
-        // Remove the old last tile, update it, and push it back.
+        // Update the last tile's far edge by replacing it with [newL1,newR1].
         Tile oldLast = removeLastTile();
-        System.out.println();
-        System.out.println("======================================");
-        System.out.println("After remove: ");
-        System.out.println("L: ");
-        for(Vector3D v3d : leftSideToArrayDebug()){
-            System.out.print(v3d);
-        }
-        System.out.println();
-        System.out.println("R: ");
-        for(Vector3D v3d : rightSideToArrayDebug()){
-            System.out.print(v3d);
-        }
-        System.out.println();
-        System.out.println("row infos: "+rowInfoBuffer.size());
-        System.out.println();
-
-        addTile(oldLast.nearLeft, oldLast.nearRight,
-                newL1, newR1);
-
-        System.out.println("After first add: ");
-        System.out.println("L: ");
-        for(Vector3D v3d : leftSideToArrayDebug()){
-            System.out.print(v3d);
-        }
-        System.out.println();
-        System.out.println("R: ");
-        for(Vector3D v3d : rightSideToArrayDebug()){
-            System.out.print(v3d);
-        }
-        System.out.println();
-        System.out.println("row infos: "+rowInfoBuffer.size());
-        System.out.println();
-
-        // Add the new tile segment.
+        addTile(oldLast.nearLeft, oldLast.nearRight, newL1, newR1);
+        // Add the new segment tile.
         addTile(newL1, newR1, l2, r2);
+        oldLast.cleanupOnDeath();
+    }
 
-        System.out.println("After second add: ");
-        System.out.println("L: ");
-        for(Vector3D v3d : leftSideToArrayDebug()){
-            System.out.print(v3d);
+    /**
+     * Removes the current last tile (never the guardian) and rolls back all
+     * associated buffers so the builder can overwrite that tile.
+     */
+    private Tile removeLastTile() {
+        // It is legal to remove the guardian (initial placeholder) – the very
+        // next addTile() will immediately create a proper first tile.  We only
+        // forbid popping when the deque is already empty (should never happen).
+        if (tiles.isEmpty()) {
+            throw new IllegalStateException("Tile deque is empty – nothing to remove");
         }
-        System.out.println();
-        System.out.println("R: ");
-        for(Vector3D v3d : rightSideToArrayDebug()){
-            System.out.print(v3d);
+
+        Tile oldLast = tiles.popLast();
+
+        // pop rows belonging to that tile
+        int rowsToRemove = (int) (rowsAddedHistory.pop());
+        for (int i = 0; i < rowsToRemove; i++) {
+            leftSideBuffer.pop();
+            rightSideBuffer.pop();
+            if (rowInfoBuffer.size() > 0) {
+                rowInfoBuffer.removeLast();
+            }
         }
-        System.out.println();
-        System.out.println("row infos: "+rowInfoBuffer.size());
-        System.out.println();
-        System.out.println("======================================");
-        System.out.println();
+
+        // restore leftover to the value before that tile was generated
+        leftover = leftoverHistory.pop();
+
+        lastTile = tiles.peekLast();
+        return oldLast;
     }
 
 
-    public void removeOldTiles(float playerX, float playerY, float playerZ) {
-        Vector3D pp = V3(playerX, playerY, playerZ);
-        while (tiles.size() > 1 && tiles.getFirst().farLeft.sub(pp).sqlen() > 100f) {
-            tiles.removeFirst();
+    public void removeOldTiles(long playerTileId) {
+        // If first tile is far from player, this it has been visited a long time ago
+        // In that case, it can be removed because we are sure it wont be displayed anymore.
+        while (tiles.size() > 1 && (playerTileId - tiles.getFirst().getID() > 50L)) {
+            tiles.popFirst().cleanupOnDeath();
         }
     }
+
+    private float dHorizontalAng = 0f, currHorizontalAng = 0f, currVerticalAng = 0f;
 
     public void addVerticalAngle(float angle) {
-        this.currVerticalAng += angle;
+        currVerticalAng += angle;
     }
 
     public void addHorizontalAngle(float angle) {
-        this.dHorizontalAng = angle;
-        this.currHorizontalAng += angle;
+        dHorizontalAng = angle;
+        currHorizontalAng += angle;
     }
 
     public void setHorizontalAngle(float angle) {
@@ -388,141 +301,90 @@ public class TileBuilder {
         return tiles.get(i);
     }
 
-    private Vector3D getGridPoint(GridRowHelper info, int c){
+    private Vector3D getGridPoint(GridRowHelper info, int c) {
+        float leftEdgeLen = (float) sqrt(info.eL.sqlen());
+        float nearEdgeLen = (float) sqrt(info.eN.sqlen());
 
-        float leftEdgeLen = (float)(sqrt(info.eL.sqlen()));
-        float nearEdgeLen = (float)(sqrt(info.eN.sqlen()));
-
-        System.out.println("Info:");
-        System.out.println(info);
-
-        // Tales
-        float d1 = nearEdgeLen * (float)(sqrt((info.farLeft.sub(info.startL)).sqlen())) / leftEdgeLen;
-
+        float d1 = nearEdgeLen * (float) sqrt(info.farLeft.sub(info.startL).sqlen()) / leftEdgeLen;
         Vector3D startR = info.startL.add(info.eN.withLen(d1));
-
         Vector3D eXD = info.endR.sub(startR);
+        float d2 = (float) sqrt(eXD.sqlen());
 
-        float d2 = (float)(sqrt((info.endR.sub(startR)).sqlen()));
+        float colSpacing = (d1 + d2) / nCols;
+        int borderIdx = (int) (nCols * d1 / (d1 + d2));
 
-        float colSpacing = (d1 + d2) / (float)(nCols);
-
-        int borderIdx = (int)(nCols*d1 / (d1+d2));
-
-        // Check which part
-        if(c <= borderIdx){
-            // Left triangle
-            return info.startL.add(info.eN.mult(c*colSpacing / nearEdgeLen));
-        }else{
-            // Right triangle
+        if (c <= borderIdx) {
+            return info.startL.add(info.eN.mult(c * colSpacing / nearEdgeLen));
+        } else {
             float len = (colSpacing * c) - d1;
             return startR.add(eXD.withLen(len));
         }
     }
 
-    public Vector3D getGridPointDebug(int row, int col){
-        return getGridPoint(rowInfoBuffer.get(row),col);
+    /**
+     * Return the tile ID for a given row index.
+     */
+    public long getTileIdForRow(int row) {
+        return rowInfoBuffer.get(row).tileId;
     }
-
-    public Vector3D[] leftSideToArrayDebug(){
-        Vector3D[] res = new Vector3D[leftSideBuffer.size()];
-        for(int i=0;i<res.length;++i){
-            res[i] = V3(leftSideBuffer.getX(i),leftSideBuffer.getY(i),leftSideBuffer.getZ(i)).addY(0.01f);
-        }
-        return res;
-    }
-
-    public Vector3D[] rightSideToArrayDebug(){
-        Vector3D[] res = new Vector3D[rightSideBuffer.size()];
-        for(int i=0;i<res.length;++i){
-            res[i] = V3(rightSideBuffer.getX(i),rightSideBuffer.getY(i),rightSideBuffer.getZ(i)).addY(0.01f);
-        }
-        return res;
-    }
-
-    public GridRowHelper[] rowInfoToArrayDebug(){
-        GridRowHelper[] res = new GridRowHelper[rowInfoBuffer.size()];
-        for(int i=0;i<res.length;++i){
-            GridRowHelper from = rowInfoBuffer.get(i);
-            res[i] = new GridRowHelper(
-                    from.farLeft,
-                    from.eL,
-                    from.eN,
-                    from.startL,
-                    from.endR
-            );
-        }
-        return res;
-    }
-
 
     public Vector3D[] getField(int row, int col) {
-
-        /*Vector3D nearLeftOnSide = V3(
-                leftSideBuffer.getX(row - 1),
-                leftSideBuffer.getY(row - 1),
-                leftSideBuffer.getZ(row - 1)
-        );
-        Vector3D nearRightOnSide = V3(
-                rightSideBuffer.getX(row - 1),
-                rightSideBuffer.getY(row - 1),
-                rightSideBuffer.getZ(row - 1)
-        );
-        Vector3D farLeftOnSide = V3(
-                leftSideBuffer.getX(row),
-                leftSideBuffer.getY(row),
-                leftSideBuffer.getZ(row)
-        );
-        Vector3D farRightOnSide = V3(
-                rightSideBuffer.getX(row),
-                rightSideBuffer.getY(row),
-                rightSideBuffer.getZ(row)
-        );
-
-        Vector3D nearEdge = nearRightOnSide.sub(nearLeftOnSide);
-        Vector3D farEdge = farRightOnSide.sub(farLeftOnSide);
-
-        Vector3D nearLeft = nearLeftOnSide.add(nearEdge.mult(col - 1).div(nCols));
-        Vector3D farLeft = farLeftOnSide.add(nearEdge.mult(col - 1).div(nCols));
-
-        Vector3D nearRight = nearLeftOnSide.add(farEdge.mult(col).div(nCols));
-        Vector3D farRight = farLeftOnSide.add(farEdge.mult(col).div(nCols));*/
-
         return new Vector3D[]{
-                getGridPoint(rowInfoBuffer.get(row-1),col-1),
-                getGridPoint(rowInfoBuffer.get(row-1),col),
-                getGridPoint(rowInfoBuffer.get(row),col-1),
-                getGridPoint(rowInfoBuffer.get(row),col)
+                getGridPoint(rowInfoBuffer.get(row - 1), col - 1),
+                getGridPoint(rowInfoBuffer.get(row - 1), col),
+                getGridPoint(rowInfoBuffer.get(row), col - 1),
+                getGridPoint(rowInfoBuffer.get(row), col)
         };
     }
 
+
+    /*–––––  debug helpers  –––––*/
+    public Vector3D getGridPointDebug(int row, int col) {
+        return getGridPoint(rowInfoBuffer.get(row), col);
+    }
+
+    public Vector3D[] leftSideToArrayDebug() {
+        return bufferToArray(leftSideBuffer);
+    }
+
+    public Vector3D[] rightSideToArrayDebug() {
+        return bufferToArray(rightSideBuffer);
+    }
+
+    private Vector3D[] bufferToArray(OverflowingPreallocatedCoordinateBuffer buf) {
+        Vector3D[] res = new Vector3D[buf.size()];
+        for (int i = 0; i < res.length; i++) {
+            res[i] = V3(buf.getX(i), buf.getY(i), buf.getZ(i)).addY(0.01f);
+        }
+        return res;
+    }
+
+    @SuppressWarnings("unused")
+    public void printRowInfoToArrayDebug() {
+        GridRowHelper[] res = new GridRowHelper[rowInfoBuffer.size()];
+        for (int i = 0; i < res.length; i++) {
+            System.out.println(rowInfoBuffer.get(i));
+        }
+    }
+
     public static class GridRowHelper {
+        public long tileId = -1L;
         public Vector3D farLeft = V3(0, 0, 0), startL = V3(0, 0, 0), endR = V3(0, 0, 0);
         public Vector3D eL = V3(0, 0, 0), eN = V3(0, 0, 0);
 
         public GridRowHelper() {
         }
 
-        public GridRowHelper(Vector3D farLeft, Vector3D eL, Vector3D eN, Vector3D startL, Vector3D endR) {
+        public GridRowHelper(Vector3D farLeft,
+                             Vector3D eL,
+                             Vector3D eN,
+                             Vector3D startL,
+                             Vector3D endR) {
             this.farLeft = farLeft;
             this.eL = eL;
             this.eN = eN;
             this.startL = startL;
             this.endR = endR;
         }
-
-        @Override
-        public String toString() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("INFO: ").append(System.lineSeparator());
-            sb.append("farLeft: ").append(farLeft).append(System.lineSeparator());
-            sb.append("eL:      ").append(eL).append(System.lineSeparator());
-            sb.append("eN:      ").append(eN).append(System.lineSeparator());
-            sb.append("startL:  ").append(startL).append(System.lineSeparator());
-            sb.append("endR:    ").append(endR).append(System.lineSeparator());
-            sb.append(System.lineSeparator()); // extra blank line
-            return sb.toString();
-        }
     }
-
 }

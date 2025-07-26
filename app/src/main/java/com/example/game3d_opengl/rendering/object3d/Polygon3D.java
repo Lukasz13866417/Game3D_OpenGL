@@ -129,4 +129,11 @@ public class Polygon3D {
         this.fillColor = newFillColor;
         this.outlineColor = newOutlineColor;
     }
+
+    public void cleanup() {
+        // Delete the VBO
+        int[] buffer = { vertexBufferId };
+        GLES20.glDeleteBuffers(1, buffer, 0);
+    }
+
 }

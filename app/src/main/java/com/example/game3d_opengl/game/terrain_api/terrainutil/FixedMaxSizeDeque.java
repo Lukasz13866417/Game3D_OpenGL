@@ -50,10 +50,16 @@ public class FixedMaxSizeDeque<T> implements Iterable<T> {
         return ind < max_size ? elements[ind] : elements[ind - max_size];
     }
 
+    private void cleanSlot(int ind){
+        int firstEl = ind < max_size ? ind : ind - max_size;
+        elements[firstEl] = null;
+    }
+
     public void removeFirst() {
         if (curr_size == 0) {
             throw new IllegalStateException("Deque is empty");
         }
+        cleanSlot(front + 1);
         --curr_size;
         front = front < max_size - 1 ? front + 1 : 0;
     }
@@ -62,6 +68,7 @@ public class FixedMaxSizeDeque<T> implements Iterable<T> {
         if (curr_size == 0) {
             throw new IllegalStateException("Deque is empty");
         }
+        cleanSlot(front + curr_size);
         --curr_size;
     }
 

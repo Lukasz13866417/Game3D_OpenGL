@@ -2,7 +2,7 @@ package com.example.game3d_opengl.game.terrain_api.terrainutil;
 
 public class OverflowingPreallocatedFloatBuffer {
     private static final int MAX_SIZE = 100_000;
-    private static final int MAX_BUFFER_COUNT = 2;
+    private static final int MAX_BUFFER_COUNT = 4;
     private static final float[][] BUFFERS = new float[MAX_BUFFER_COUNT][MAX_SIZE];
     private static final boolean[] isTaken = new boolean[MAX_BUFFER_COUNT];
 
