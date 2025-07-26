@@ -42,8 +42,8 @@ public class Potion extends Addon {
         super();
     }
     @Override
-    protected void init(Vector3D fieldNearLeft, Vector3D fieldNearRight,
-                        Vector3D fieldFarLeft, Vector3D fieldFarRight) {
+    protected void onPlace(Vector3D fieldNearLeft, Vector3D fieldNearRight,
+                           Vector3D fieldFarLeft, Vector3D fieldFarRight) {
         Vector3D fieldMid = fieldFarLeft.add(fieldFarRight)
                 .add(fieldNearRight).add(fieldNearLeft).div(4);
         Vector3D out = getNormal(fieldNearLeft,fieldFarLeft,fieldFarRight).mult(-1);
@@ -63,6 +63,9 @@ public class Potion extends Addon {
 
     @Override
     public void updateAfterDraw(float dt) {
+    }
 
+    @Override
+    public void cleanupOnDeath() {
     }
 }

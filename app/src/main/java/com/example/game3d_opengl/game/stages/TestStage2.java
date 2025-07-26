@@ -1,7 +1,6 @@
 package com.example.game3d_opengl.game.stages;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import static java.lang.Math.sqrt;
@@ -9,14 +8,12 @@ import static java.lang.Math.sqrt;
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
-import com.example.game3d_opengl.game.terrain_api.addon.Addon;
-import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;
+import com.example.game3d_opengl.game.Stage;
 import com.example.game3d_opengl.game.terrain_structures.TerrainFunction;
-import com.example.game3d_opengl.game.track_elements.DeathSpike;
 import com.example.game3d_opengl.rendering.object3d.Camera;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 
-public class TestStage2 implements Stage {
+public class TestStage2 extends Stage {
 
     private Terrain terrain;
     private Camera camera;
@@ -75,5 +72,20 @@ public class TestStage2 implements Stage {
         for(int i=0;i<terrain.getAddonCount();++i){
             terrain.getAddon(i).draw(camera.getViewProjectionMatrix());
         }
+    }
+
+    @Override
+    public void onClose() {
+
+    }
+
+    @Override
+    public void onSwitch() {
+
+    }
+
+    @Override
+    public void onReturn() {
+
     }
 }

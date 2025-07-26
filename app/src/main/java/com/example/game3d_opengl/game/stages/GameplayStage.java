@@ -8,8 +8,11 @@ import static java.lang.Math.abs;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.util.Log;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.Stage;
+import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.rendering.object3d.Camera;
@@ -27,16 +30,12 @@ import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
  * - Spawns multiple terrain segments via your Terrain class
  * - Renders them with slope-based coloring or as a "guardian" tile
  */
-public class GameplayStage implements Stage {
+public class GameplayStage extends Stage {
 
     private final MyGLRenderer.StageManager stageManager;
-    private Camera camera;
-    private FColor colorTheme = CLR(0.7f,0,0,1);
-    private Player player;
 
     public GameplayStage(MyGLRenderer.StageManager stageManager){
         this.stageManager = stageManager;
-        this.camera = new Camera();
     }
 
     @Override
@@ -58,9 +57,16 @@ public class GameplayStage implements Stage {
 
     Terrain terrain;
 
+    private Camera camera;
+    private int frameCounter = 0; // throttled logging counter
+    private FColor colorTheme = CLR(0.7f,0,0,1);
+    private Player player;
+
     @Override
     public void initScene(Context context, int screenWidth, int screenHeight) {
         // --- Camera Setup ---
+        this.camera = new Camera();
+
         Camera.setGlobalScreenSize(screenWidth, screenHeight);
         this.camera.set(0f, 0f, 3f, // eye pos
                 0f, 0f, 0f, // look at
@@ -72,7 +78,7 @@ public class GameplayStage implements Stage {
         Potion.LOAD_POTION_ASSETS(assetManager);
         player = new Player();
         float segWidth = 3.2f, segLength = 1.4f;
-        terrain = new Terrain(2000,6,
+        this.terrain = new Terrain(2000,6,
                 V3(player.objX,player.objY - 3f, player.objZ + 3f),
                 segWidth,
                 segLength
@@ -87,13 +93,14 @@ public class GameplayStage implements Stage {
         terrain.enqueueStructure(new TerrainSpiral(80, PI/12, 0.25f * PI/4));
         terrain.generateChunks(-1);
 
+        System.out.println("GAMEPLAY STAGE INIT");
+
     }
 
     @Override
     public void updateThenDraw(float dt) {
 
-
-        terrain.removeOldTiles(player.objX,player.objY,player.objZ);
+        terrain.removeOldTerrainElements(player.getNearestTileId());
         if(terrain.getTileCount() < 400){
             terrain.enqueueStructure(new TerrainLine(100));
             terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
@@ -106,6 +113,7 @@ public class GameplayStage implements Stage {
         if(terrain.getTileCount() < 300) {
             terrain.generateChunks(1);
         }
+
         for(int i=0;i<terrain.getTileCount();++i){
             Tile tile = terrain.getTile(i);
             if(player.collidesTile(tile)){
@@ -139,7 +147,26 @@ public class GameplayStage implements Stage {
 
         player.updateAfterDraw(dt);
 
-        System.out.println((int)(dt)+" "+(terrain.getTileCount()+terrain.getAddonCount()));
+        if ((frameCounter++ & 127) == 0) {
+            Log.d("Perf", "dt=" + dt + " visible=" + terrain.getTileCount() + ","+ terrain.getAddonCount());
+        }
 
+
+
+    }
+
+    @Override
+    public void onClose() {
+
+    }
+
+    @Override
+    public void onSwitch() {
+        System.out.println("SWITCHING FROM GAMEPLAY");
+    }
+
+    @Override
+    public void onReturn() {
+        System.out.println("RETURNING TO GAMEPLAY");
     }
 }

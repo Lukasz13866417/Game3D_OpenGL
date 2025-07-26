@@ -14,6 +14,7 @@ import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsE
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
 
+@SuppressWarnings("unused")
 class Util {
     static void printCommand(float[] buffer, int offset) {
         int code = (int)(buffer[offset]);

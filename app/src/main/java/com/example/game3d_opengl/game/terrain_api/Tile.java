@@ -7,9 +7,20 @@ import com.example.game3d_opengl.rendering.object3d.Polygon3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
-import java.util.Locale;
+import java.util.Collections;
+import java.util.Set;
+import java.util.WeakHashMap;
 
-public class Tile {
+public class Tile implements TerrainElement {
+    private long id = -1L;
+
+    public long getID() {
+        return id;
+    }
+
+    public void setID(long id) {
+        this.id = id;
+    }
 
     /**
      * The slope of this tile. Computed once from its geometry.
@@ -30,12 +41,14 @@ public class Tile {
      * Polygon wrapper that handles the vertex buffer, shaders, and rendering for this tile.
      */
     private Polygon3D polygon3D;
+    // Reusable color instance to avoid per-frame allocations
+    private final FColor cachedColor = CLR(1,1,1,1);
 
     /**
      * Constructs a Tile using 4 corners plus slope.
      * Then builds a Polygon3D to render that quad with a fill + outline color.
      */
-    public Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope) {
+    public Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l) {
         this.nearLeft = nl;
         this.nearRight = nr;
         this.farLeft = fl;
@@ -56,7 +69,7 @@ public class Tile {
                 fl.x, fl.y, fl.z
         };
 
-        polygon3D = new Polygon3D(perimeterCoords, CLR(1, 1, 1), CLR(1, 1, 1));
+        polygon3D = new Polygon3D(perimeterCoords, cachedColor, cachedColor);
     }
 
     /**
@@ -65,8 +78,8 @@ public class Tile {
      * then applies it to the Polygon3D.
      */
     public void setTileColor(FColor colorTheme) {
-
-        double brightnessMul = 1.0 + 3.0f*slope*slope;
+        // reuse cachedColor to avoid new allocations
+        double brightnessMul = 1.0 + 3.0f * slope * slope;
 
         float baseR = colorTheme.r();
         float baseG = colorTheme.g();
@@ -76,11 +89,12 @@ public class Tile {
         float finalG = (float) Math.min(1.0, baseG * brightnessMul);
         float finalB = (float) Math.min(1.0, baseB * brightnessMul);
 
+        cachedColor.rgba[0] = finalR;
+        cachedColor.rgba[1] = finalG;
+        cachedColor.rgba[2] = finalB;
+        cachedColor.rgba[3] = 1.0f;
 
-        polygon3D.setFillAndOutline(
-                CLR(finalR, finalG, finalB, 1.0f),
-                CLR(finalR, finalG, finalB, 1.0f)
-        );
+        polygon3D.setFillAndOutline(cachedColor, cachedColor);
     }
 
     /**
@@ -88,17 +102,38 @@ public class Tile {
      *
      * @param mvpMatrix The combined Model-View-Projection matrix.
      */
+    @Override
     public void draw(float[] mvpMatrix) {
         polygon3D.draw(mvpMatrix);
     }
 
     @Override
     public String toString() {
-        return "TILE\n[\n"
+        return "TILE["
                 + "NEAR L=" + nearLeft + ", R=" + nearRight+"\n"
                 + "FAR  L=" + farLeft  + ", R=" + farRight+"\n"
                 //+ ", slope=" + String.format(Locale.ROOT,"{%5f}",slope)
                 + "]";
+    }
+
+    @Override
+    public void updateBeforeDraw(float dt) {
+
+    }
+
+    @Override
+    public void updateAfterDraw(float dt) {
+
+    }
+
+    @Override
+    public void cleanupOnDeath() {
+        polygon3D.cleanup();
+    }
+
+    @Override
+    public boolean isGoneBy(long playerID) {
+        return playerID - getID() > 50;
     }
 
 }

@@ -1,8 +1,6 @@
 package com.example.game3d_opengl.game.terrain_api.main;
 
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_FINISH_STRUCTURE_LANDSCAPE;
-import static com.example.game3d_opengl.game.terrain_api.main.Util.printCommand;
-import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static com.example.game3d_opengl.game.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL;
 import static com.example.game3d_opengl.game.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL;
 import static com.example.game3d_opengl.game.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_VERTICAL;
@@ -13,7 +11,8 @@ import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsE
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_H_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
-import static java.lang.Math.abs;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.add;
 
 import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
@@ -30,11 +29,27 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.Preallo
  * Terrain with a fixed-size deque of tiles. We keep a `lastTile` pointer
  * to always build from the newest tile, even as older ones remain in the deque.
  * All terrain is LAZILY generated - every generation "request" is quickly translated into commands.
- * These commands are at some point (chosen by user) "interpreted" by CommandExecutors.
+ * These commands are at some point (which is chosen by user) "interpreted" by CommandExecutors.
  * This gives the user control over what part of the generation process should be actually completed
  * in a given frame (single generateChunks(cnt) call).
  */
 public class Terrain {
+
+    public void cleanup(){
+        commandBuffer.free();
+        tileBuilder.cleanup();
+        gridCreatorWrapperQueue.clear();
+        gridCreatorWrapperStack.clear();
+        rowOffsetQueue.clear();
+        rowCountStack.clear();
+        structureStack.clear();
+        waitingStructuresQueue.clear();
+        childStructuresQueue.clear();
+        for(Addon addon : addons){
+            addon.cleanupOnDeath();
+        }
+        addons.clear();
+    }
 
     final TileBuilder tileBuilder;
 
@@ -186,8 +201,16 @@ public class Terrain {
     }
 
 
-    public void removeOldTiles(float playerX, float playerY, float playerZ) {
-        tileBuilder.removeOldTiles(playerX, playerY, playerZ);
+    private void removeOldAddons(long playerTileId) {
+        while (!addons.isEmpty() && addons.getFirst().isGoneBy(playerTileId)) {
+            addons.popFirst().cleanupOnDeath();
+        }
+    }
+
+    public void removeOldTerrainElements(long playerTileId) {
+        
+        tileBuilder.removeOldTiles(playerTileId);
+        removeOldAddons(playerTileId);
     }
 
     public int getAddonCount() {
@@ -202,14 +225,16 @@ public class Terrain {
         waitingStructuresQueue.enqueue(what);
     }
 
-    final PreallocatedCommandBuffer commandBuffer;
 
     public void generateChunks(int nChunks) {
         while (nChunks != 0) {
             if (!commandBuffer.hasAnyCommands()) {
                 if (!waitingStructuresQueue.isEmpty()) {
+                    // Only now generate commands of structures waiting for generation of commands.
+                    // This is because there are no "fresh" commands to execute.
                     commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE, 0);
                 } else {
+                    // No commands waiting to execute AND no structures with ungenerated commands.
                     break;
                 }
             }
@@ -218,8 +243,12 @@ public class Terrain {
         }
     }
 
+    final PreallocatedCommandBuffer commandBuffer;
+
+
     /**
      * Based on command code, tells one of the executors to execute a command.
+     * It simply dispatches commands to appropriate executors.
      */
     private class GeneralExecutor implements CommandExecutor {
         @Override

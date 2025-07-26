@@ -6,7 +6,6 @@ import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 
 public class TerrainSpiral extends TerrainStructure {
-
     private final float dAngHor, angVer;
 
     public TerrainSpiral(int tilesToMake,

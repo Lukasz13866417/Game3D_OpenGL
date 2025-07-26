@@ -64,7 +64,7 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 GridCreatorWrapper parentGridCreatorWrapper = terrain.gridCreatorWrapperStack.peek();
                 int nRowsAdded = terrain.tileBuilder.getCurrRowCount() - startRowCount;
                 myGridCreatorWrapper.content = new GridCreator(
-                        nRowsAdded, terrain.nCols, parentGridCreatorWrapper,
+                        nRowsAdded-1, terrain.nCols, parentGridCreatorWrapper,
                         startRowCount
                 );
                 terrain.gridCreatorWrapperQueue.enqueue(myGridCreatorWrapper);

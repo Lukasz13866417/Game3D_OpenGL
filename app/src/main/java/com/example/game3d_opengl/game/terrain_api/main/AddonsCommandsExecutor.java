@@ -1,5 +1,8 @@
 package com.example.game3d_opengl.game.terrain_api.main;
 
+import android.util.Pair;
+
+import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreator;
@@ -59,8 +62,12 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         int rOffset = terrain.rowOffsetQueue.peek();
         for (int i = 0; i < length; ++i) {
             Addon addon = terrain.addonQueue.dequeue();
+             
+            
             int row = horizontal ? baseRow : baseRow + i;
             row += rOffset;
+            long tileId = terrain.tileBuilder.getTileIdForRow(row);
+            addon.setTileId(tileId);
             int col = horizontal ? baseCol + i : baseCol;
             Vector3D[] field = terrain.tileBuilder.getField(row,col);
             addon.place(field[0], field[1], field[2], field[3]);

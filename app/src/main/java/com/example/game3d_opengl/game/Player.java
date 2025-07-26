@@ -43,6 +43,7 @@ public class Player extends Object3D implements WorldActor {
     private final float rotationSwipeSensitivity = 0.00052f;
 
     private Tile tileBelow;
+    private long nearestTileId = -1L;
 
     public static void LOAD_PLAYER_ASSETS(AssetManager assetManager) {
         ModelCreator playerCreator = new ModelCreator(assetManager);
@@ -113,6 +114,7 @@ public class Player extends Object3D implements WorldActor {
 
     public void setFooting(Tile what) {
         this.tileBelow = what;
+        if (what != null) this.nearestTileId = what.getID();
     }
 
     private float fallSpeed = 0f;
@@ -150,7 +152,7 @@ public class Player extends Object3D implements WorldActor {
             }
 
             if (hitTri != null) {
-                // we’re on that triangle → no fall
+                // we’re on that triangle -> no fall
                 fallSpeed = 0f;
 
                 // edges
@@ -158,7 +160,7 @@ public class Player extends Object3D implements WorldActor {
                 Vector3D w = hitTri[2].sub(hitTri[0]);
                 Vector3D n = u.crossProduct(w);  // raw normal
 
-                // solve dir = β·u + γ·w + α·n  → projection = β·u + γ·w
+                // solve dir = β·u + γ·w + α·n -> projection = β·u + γ·w
                 float det =
                         n.x * u.y * w.z - n.x * u.z * w.y
                                 - n.y * u.x * w.z + n.y * u.z * w.x
@@ -201,12 +203,21 @@ public class Player extends Object3D implements WorldActor {
         tileBelow = null;
     }
 
+    @Override
+    public void cleanupOnDeath() {
+
+    }
+
     private float maxByAbs(float a, float b) {
         return abs(a) > abs(b) ? a : b;
     }
 
     private float minByAbs(float a, float b) {
         return abs(a) < abs(b) ? a : b;
+    }
+
+    public long getNearestTileId() {
+        return nearestTileId;
     }
 
     public void rotDirOnTouch(float dx) {

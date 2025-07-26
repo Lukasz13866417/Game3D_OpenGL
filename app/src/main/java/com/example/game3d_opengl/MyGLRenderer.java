@@ -8,29 +8,48 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 
 import com.example.game3d_opengl.game.stages.GameplayStage;
-import com.example.game3d_opengl.game.stages.Stage;
-import com.example.game3d_opengl.game.stages.TestStage;
-import com.example.game3d_opengl.game.stages.TestStage2;
+import com.example.game3d_opengl.game.stages.MenuStage;
+import com.example.game3d_opengl.game.Stage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
     private final Context androidContext;
-
-    private long lastFrameTime = System.nanoTime();
-
-    private final StageManager stageManager = new StageManager();
-    private Stage currStage = new TestStage(stageManager);
+    private int surfaceW = 0, surfaceH = 0;
+    private long lastFrameTime = -1;
+    private final StageManager stageManager;
+    // Stage requested by UI thread, applied next frame on GL thread
+    private volatile Stage pendingStage = null;
+    private Stage currStage;
+    private MenuStage menuStage;
+    private GameplayStage gameplayStage;
 
 
     // Simple API that enables stages to order the renderer to switch stages
     public class StageManager {
-        public void switchTo(Stage to) {
-            currStage = to;
+        public void toMenu() {
+            switchTo(menuStage);
+        }
+
+        public void toGameplay() {
+            switchTo(gameplayStage);
+        }
+
+        public void toSettings() {
+            throw new IllegalStateException("Not implemented");
+        }
+
+        private void switchTo(Stage to) {
+            // Request the change; actual switch occurs on GL thread
+            pendingStage = to;
         }
     }
 
     public MyGLRenderer(Context androidContext) {
         this.androidContext = androidContext;
+        this.stageManager = new StageManager();
+        this.gameplayStage = new GameplayStage(stageManager);
+        this.menuStage = new MenuStage(stageManager);
+        this.currStage = menuStage;
     }
 
     public Stage getCurrentStage() {
@@ -45,6 +64,23 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(GL10 gl) {
+        // Apply pending stage switch (GL thread)
+        if (pendingStage != null) {
+            if (currStage != null) {
+                currStage.onSwitch();
+            }
+            currStage = pendingStage;
+            pendingStage = null;
+            if (!currStage.isInitialized()) {
+                currStage.setInitialized();
+                currStage.initScene(androidContext, surfaceW, surfaceH);
+            } else {
+                currStage.onReturn();
+            }
+        }
+        if (lastFrameTime == -1) {
+            lastFrameTime = System.nanoTime();
+        }
         long now = System.nanoTime();
         float deltaTime = (now - lastFrameTime) / 1000000f;
         lastFrameTime = now;
@@ -55,6 +91,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     @Override
     public void onSurfaceChanged(GL10 unused, int width, int height) {
         GLES20.glViewport(0, 0, width, height);
+        surfaceW = width;
+        surfaceH = height;
         getCurrentStage().initScene(androidContext, width, height);
     }
 }
