@@ -49,7 +49,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.stageManager = new StageManager();
         this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
-        this.currStage = menuStage;
+        this.currStage = gameplayStage;
     }
 
     public Stage getCurrentStage() {
@@ -60,6 +60,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     public void onSurfaceCreated(GL10 unused, EGLConfig config) {
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        lastFrameTime = System.nanoTime();
+        if(getCurrentStage().isInitialized()){
+            getCurrentStage().resetGPUResources();
+        }
     }
 
     @Override
@@ -85,7 +89,9 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         float deltaTime = (now - lastFrameTime) / 1000000f;
         lastFrameTime = now;
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-        currStage.updateThenDraw(deltaTime);
+        if (!currStage.isPaused()) {
+            currStage.updateThenDraw(deltaTime);
+        }
     }
 
     @Override
@@ -93,6 +99,14 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glViewport(0, 0, width, height);
         surfaceW = width;
         surfaceH = height;
-        getCurrentStage().initScene(androidContext, width, height);
+        // Initialise or re-enter current stage appropriately
+        if(!getCurrentStage().isInitialized()){
+            getCurrentStage().setInitialized();
+            getCurrentStage().initScene(androidContext, width, height);
+        }else if(getCurrentStage().isPaused()){
+            getCurrentStage().resume();
+        }else{
+            getCurrentStage().pause();
+        }
     }
 }

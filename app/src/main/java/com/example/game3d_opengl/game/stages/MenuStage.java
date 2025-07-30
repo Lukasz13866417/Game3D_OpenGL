@@ -65,4 +65,9 @@ public class MenuStage extends Stage {
     public void onReturn() {
         System.out.println("RETURNING TO MENU");
     }
+
+    @Override
+    public void resetGPUResources() {
+
+    }
 }

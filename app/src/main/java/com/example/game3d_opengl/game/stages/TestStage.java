@@ -8,7 +8,7 @@ import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.Stage;
-import com.example.game3d_opengl.rendering.object3d.Camera;
+import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.object3d.LineSet3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -37,7 +37,7 @@ public class TestStage extends Stage {
     @Override
     public void onTouchMove(float x1, float y1, float x2, float y2) {}
 
-    @Override
+     @Override
     public void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
         Camera.setGlobalScreenSize(screenWidth, screenHeight);
@@ -73,6 +73,9 @@ public class TestStage extends Stage {
         );
         left  = new LineSet3D(tileBuilder.leftSideToArrayDebug(),  new int[][]{}, FColor.CLR(1,1,1), FColor.CLR(1,0,1));
         right = new LineSet3D(tileBuilder.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1,1,1), FColor.CLR(0,0,1));
+
+
+
     }
 
     @Override
@@ -94,6 +97,7 @@ public class TestStage extends Stage {
         grid.draw(camera.getViewProjectionMatrix());
         left.draw(camera.getViewProjectionMatrix());
         right.draw(camera.getViewProjectionMatrix());
+
     }
 
     @Override
@@ -108,6 +112,11 @@ public class TestStage extends Stage {
 
     @Override
     public void onReturn() {
+
+    }
+
+    @Override
+    public void resetGPUResources() {
 
     }
 }

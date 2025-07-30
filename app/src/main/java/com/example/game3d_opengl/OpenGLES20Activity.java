@@ -35,11 +35,17 @@ public class OpenGLES20Activity extends Activity {
     protected void onPause() {
         super.onPause();
         glSurfaceView.onPause();
+        if (glSurfaceView.getRenderer().getCurrentStage() != null) {
+            glSurfaceView.getRenderer().getCurrentStage().pause();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         glSurfaceView.onResume();
+        if (glSurfaceView.getRenderer().getCurrentStage() != null) {
+            glSurfaceView.getRenderer().getCurrentStage().resume();
+        }
     }
 }

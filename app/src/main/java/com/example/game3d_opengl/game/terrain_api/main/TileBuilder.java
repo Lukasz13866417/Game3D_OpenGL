@@ -119,7 +119,6 @@ public class TileBuilder {
                 sqrt((fl.x - nl.x) * (fl.x - nl.x) + (fl.z - nl.z) * (fl.z - nl.z)));
 
         Tile tile = new Tile(nl, nr, fl, fr, slopeVal, nextId++);
-        tile.setID(nextId++);
         tiles.pushBack(tile);
 
         /* save state *before* generating rows so we can roll back later if needed */

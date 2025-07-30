@@ -61,6 +61,15 @@ public class Terrain {
         return tileBuilder.getTile(i);
     }
 
+    public void resetGPUResources() {
+        for(int i=0;i<tileBuilder.getTileCount();++i){
+            tileBuilder.getTile(i).resetGPUResources();
+        }
+        for(Addon addon : addons){
+            addon.resetGPUResources();
+        }
+    }
+
     /**
      * API for terrain structures for creating landscape (tiles).
      **/

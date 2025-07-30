@@ -12,10 +12,11 @@ import android.util.Log;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.Stage;
-import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
-import com.example.game3d_opengl.rendering.object3d.Camera;
+import com.example.game3d_opengl.rendering.Camera;
+import com.example.game3d_opengl.rendering.object3d.LineSet3D;
+import com.example.game3d_opengl.rendering.object3d.Polygon3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
@@ -79,7 +80,7 @@ public class GameplayStage extends Stage {
         player = new Player();
         float segWidth = 3.2f, segLength = 1.4f;
         this.terrain = new Terrain(2000,6,
-                V3(player.objX,player.objY - 3f, player.objZ + 3f),
+                V3(player.getX(), player.getY() - 3f, player.getZ()),
                 segWidth,
                 segLength
         );
@@ -101,16 +102,16 @@ public class GameplayStage extends Stage {
     public void updateThenDraw(float dt) {
 
         terrain.removeOldTerrainElements(player.getNearestTileId());
-        if(terrain.getTileCount() < 400){
+        if (terrain.getTileCount() < 400) {
             terrain.enqueueStructure(new TerrainLine(100));
-            terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
-            terrain.enqueueStructure(new Terrain2DCurve(50, 0, 0.5f * PI/4));
-            terrain.enqueueStructure(new Terrain2DCurve(50, PI/12, -0.5f * PI/4));
+            terrain.enqueueStructure(new TerrainCurve(100, -PI / 2));
+            terrain.enqueueStructure(new Terrain2DCurve(50, 0, 0.5f * PI / 4));
+            terrain.enqueueStructure(new Terrain2DCurve(50, PI / 12, -0.5f * PI / 4));
             terrain.enqueueStructure(new TerrainLine(100));
             terrain.enqueueStructure(new TerrainLine(100));
-            terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
+            terrain.enqueueStructure(new TerrainCurve(100, -PI / 2));
         }
-        if(terrain.getTileCount() < 300) {
+        if (terrain.getTileCount() < 300) {
             terrain.generateChunks(1);
         }
 
@@ -123,7 +124,7 @@ public class GameplayStage extends Stage {
 
         player.updateBeforeDraw(dt);
 
-        Vector3D camPos = V3(player.objX, player.objY + 0.75f, player.objZ)
+        Vector3D camPos = V3(player.getX(), player.getY() + 0.75f, player.getZ())
                 .sub(player.getDir().withLen(3.8f));
         camera.updateEyePos(camPos);
         camera.updateLookPos(camPos.add(player.getDir().setY(0.0f)));
@@ -139,7 +140,7 @@ public class GameplayStage extends Stage {
             Tile tile = terrain.getTile(i);
             Vector3D tc = tile.farLeft.add(tile.farRight).add(tile.nearLeft).add(tile.nearRight)
                     .div(4);
-            if(tc.sub(V3(player.objX,player.objY,player.objZ)).sqlen() < 250*250) {
+            if(tc.sub(V3(player.getX(), player.getY(), player.getZ())).sqlen() < 250*250) {
                 tile.setTileColor(colorTheme);
                 tile.draw(camera.getViewProjectionMatrix());
             }
@@ -168,5 +169,14 @@ public class GameplayStage extends Stage {
     @Override
     public void onReturn() {
         System.out.println("RETURNING TO GAMEPLAY");
+    }
+
+    @Override
+    public void resetGPUResources() {
+        Polygon3D.resetProgram();
+        LineSet3D.resetProgram();
+        Potion.cleanupSharedResources();
+        player.resetGPUResources();
+        terrain.resetGPUResources();
     }
 }

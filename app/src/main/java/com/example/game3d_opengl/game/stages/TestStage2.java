@@ -10,7 +10,7 @@ import android.content.Context;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.Stage;
 import com.example.game3d_opengl.game.terrain_structures.TerrainFunction;
-import com.example.game3d_opengl.rendering.object3d.Camera;
+import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 
 public class TestStage2 extends Stage {
@@ -86,6 +86,11 @@ public class TestStage2 extends Stage {
 
     @Override
     public void onReturn() {
+
+    }
+
+    @Override
+    public void resetGPUResources() {
 
     }
 }

@@ -123,6 +123,16 @@ public class LineSet3D {
         }
     }
 
+    /* Package-private */
+    public static void resetProgram() {
+        if (mProgram != 0) {
+            if (android.opengl.GLES20.glIsProgram(mProgram)) {
+                android.opengl.GLES20.glDeleteProgram(mProgram);
+            }
+            mProgram = 0;
+        }
+    }
+
     /** Draws all lines, then all point-cubes. */
     public void draw(float[] vpMatrix) {
         // 1) draw lines

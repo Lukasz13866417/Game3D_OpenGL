@@ -21,7 +21,6 @@ public abstract class Addon implements TerrainElement {
 
     public Addon() {
         this.ready = false;
-        //AddonTracker.onCreate(this);
     }
 
     public void place(Vector3D fieldNearLeft,

@@ -47,6 +47,10 @@ public class MyGLSurfaceView extends GLSurfaceView {
         setKeepScreenOn(true);
     }
 
+    public MyGLRenderer getRenderer() {
+        return renderer;
+    }
+
     float lastX=0, lastY=0;
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -54,15 +58,19 @@ public class MyGLSurfaceView extends GLSurfaceView {
         float y = event.getY();
         switch (event.getAction()) {
             case MotionEvent.ACTION_MOVE:
-                if (x != lastX || y != lastY) {
+                if (x != lastX || y != lastY && renderer.getCurrentStage().isInitialized()) {
                     renderer.getCurrentStage().onTouchMove(lastX, lastY, x, y);
                 }
                 break;
             case MotionEvent.ACTION_DOWN:
-                renderer.getCurrentStage().onTouchDown(x,y);
+                if(renderer.getCurrentStage().isInitialized()) {
+                    renderer.getCurrentStage().onTouchDown(x, y);
+                }
                 break;
             case MotionEvent.ACTION_UP:
-                renderer.getCurrentStage().onTouchUp(x,y);
+                if(renderer.getCurrentStage().isInitialized()) {
+                    renderer.getCurrentStage().onTouchUp(x, y);
+                }
                 break;
         }
         lastX = x;

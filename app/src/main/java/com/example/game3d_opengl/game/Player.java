@@ -22,28 +22,10 @@ import com.example.game3d_opengl.game.terrain_api.Tile;
 
 import java.io.IOException;
 
-public class Player extends Object3D implements WorldActor {
+public class Player implements WorldActor {
 
     public static final float PLAYER_WIDTH = 0.132f;
     public static final float PLAYER_HEIGHT = PLAYER_WIDTH * 3.54f;
-
-    private static Object3D.Builder playerBuilder;
-
-    private Vector3D dir;
-    private Vector3D move;
-
-    private final float stickyRotationLastingTime = 42f;
-    private float stickyRotationTime = 0.0f;
-    private float stickyRotationAng = 0.0f;
-    private final float stickyRotationAngDecayRate = 0.0575f;
-    private final float playerSpeed = 0.04f;
-
-    private final float stickyRotationCoeff = 0.0085f;
-
-    private final float rotationSwipeSensitivity = 0.00052f;
-
-    private Tile tileBelow;
-    private long nearestTileId = -1L;
 
     public static void LOAD_PLAYER_ASSETS(AssetManager assetManager) {
         ModelCreator playerCreator = new ModelCreator(assetManager);
@@ -56,7 +38,7 @@ public class Player extends Object3D implements WorldActor {
             playerCreator.scaleY(PLAYER_HEIGHT);
             playerCreator.scaleZ(PLAYER_HEIGHT);
 
-            playerBuilder = new Builder()
+            playerBuilder = new Object3D.Builder()
                     .angles(0, 0, 0)
                     .edgeColor(CLR(1.0f, 1.0f, 1.0f, 1.0f))
                     .fillColor(CLR(0.0f, 0.0f, 0.0f, 1.0f))
@@ -69,9 +51,9 @@ public class Player extends Object3D implements WorldActor {
     }
 
     public Player() {
-        super(playerBuilder);
-        dir = new Vector3D(0, 0, -1f);
-        move = new Vector3D(0, 0, 0);
+        this.object3D = playerBuilder.buildObject();
+        this.dir = new Vector3D(0, 0, -1f);
+        this.move = new Vector3D(0, 0, 0);
     }
 
     public synchronized Vector3D getDir() {
@@ -82,34 +64,19 @@ public class Player extends Object3D implements WorldActor {
         Vector3D n1 = getNormal(tile.triangles[0]);
         Vector3D n2 = getNormal(tile.triangles[1]);
         float d1 = rayTriangleDistance(
-                V3(objX,objY,objZ),
+                V3(object3D.objX, object3D.objY, object3D.objZ),
                 n1.mult(-signum(n1.y)),
                 tile.triangles[0][0],tile.triangles[0][1],tile.triangles[0][2]
                 );
         if(!(!Float.isInfinite(d1) && d1/PLAYER_HEIGHT < 1.05f)){
             float d2 = rayTriangleDistance(
-                    V3(objX,objY,objZ),
+                    V3(object3D.objX, object3D.objY, object3D.objZ),
                     n2.mult(-signum(n2.y)),
                     tile.triangles[1][0],tile.triangles[1][1],tile.triangles[1][2]
             );
             return !Float.isInfinite(d2) && d2/PLAYER_HEIGHT < 1.05f;
         }
         return true;
-        /*Vector3D fl2D = tile.farLeft.setY(0), nl2D = tile.nearLeft.setY(0),
-                fr2D = tile.farRight.setY(0), nr2D = tile.nearRight.setY(0);
-
-        Vector3D fl = tile.farLeft, nl = tile.nearLeft,
-                fr = tile.farRight, nr = tile.nearRight;
-
-        // pos + dir
-        Vector3D ppd = V3(objX, objY, objZ).add(dir.mult(0.1f));
-        float maxy = max(fl.y, max(fr.y, max(nl.y, nr.y)));
-        return ((
-                isPointInTriangle(fl2D, nl2D, nr2D, ppd.setY(0))
-                        || isPointInTriangle(nr2D, fr2D, fl2D, ppd.setY(0))
-        )
-                && objY - maxy < PLAYER_HEIGHT + 0.15f
-                && pointAndPlanePosition(nl, fl, fr, ppd) == -1);*/
     }
 
     public void setFooting(Tile what) {
@@ -126,14 +93,14 @@ public class Player extends Object3D implements WorldActor {
         stickyRotationTime = max(0f, stickyRotationTime - dt);
         if (stickyRotationTime == 0 && stickyRotationAng != 0) {
             float dYaw = minByAbs(signum(stickyRotationAng) * stickyRotationAngDecayRate * dt, stickyRotationAng);
-            objYaw -= dYaw;
+            object3D.objYaw -= dYaw;
             stickyRotationAng -= dYaw;
         }
 
         if (tileBelow != null) {
 
             // find which of the two triangles we’re standing on
-            Vector3D origin = V3(objX, objY, objZ);
+            Vector3D origin = V3(object3D.objX, object3D.objY, object3D.objZ);
             float bestDist = Float.POSITIVE_INFINITY;
             Vector3D[] hitTri = null;
 
@@ -191,10 +158,10 @@ public class Player extends Object3D implements WorldActor {
             move = V3(move.x, move.y - fallSpeed * dt, move.z);
             fallSpeed += fallAcc * dt;
         }
-        objX += move.x;
-        objY += move.y;
-        objZ += move.z;
-        objPitch -= dt * playerSpeed / (PI * PLAYER_HEIGHT) * 2 * PI;
+        object3D.objX += move.x;
+        object3D.objY += move.y;
+        object3D.objZ += move.z;
+        object3D.objPitch -= dt * playerSpeed / (PI * PLAYER_HEIGHT) * 2 * PI;
 
     }
 
@@ -205,7 +172,12 @@ public class Player extends Object3D implements WorldActor {
 
     @Override
     public void cleanupOnDeath() {
+        object3D.cleanup();
+    }
 
+    @Override
+    public void resetGPUResources() {
+        object3D.reload();
     }
 
     private float maxByAbs(float a, float b) {
@@ -223,10 +195,42 @@ public class Player extends Object3D implements WorldActor {
     public void rotDirOnTouch(float dx) {
         float dYaw = dx * rotationSwipeSensitivity; // in radians
         dir = rotY(dir, dYaw);
-        objYaw -= dYaw * 180.0f / PI;
+        object3D.objYaw -= dYaw * 180.0f / PI;
 
         stickyRotationAng = stickyRotationAng - dx * stickyRotationCoeff;
         stickyRotationTime = stickyRotationLastingTime;
-        objYaw -= dx * stickyRotationCoeff;
+        object3D.objYaw -= dx * stickyRotationCoeff;
     }
+
+    @Override
+    public void draw(float[] mvpMatrix) {
+        object3D.draw(mvpMatrix);
+    }
+
+    // Delegated getters for position and rotation
+    public float getX() { return object3D.objX; }
+    public float getY() { return object3D.objY; }
+    public float getZ() { return object3D.objZ; }
+    public float getYaw() { return object3D.objYaw; }
+    public float getPitch() { return object3D.objPitch; }
+    public float getRoll() { return object3D.objRoll; }
+
+    private static Object3D.Builder playerBuilder;
+    private Object3D object3D;
+
+    private Vector3D dir;
+    private Vector3D move;
+
+    private final float stickyRotationLastingTime = 42f;
+    private float stickyRotationTime = 0.0f;
+    private float stickyRotationAng = 0.0f;
+    private final float stickyRotationAngDecayRate = 0.0575f;
+    private final float playerSpeed = 0.04f;
+
+    private final float stickyRotationCoeff = 0.0085f;
+
+    private final float rotationSwipeSensitivity = 0.00052f;
+
+    private Tile tileBelow;
+    private long nearestTileId = -1L;
 }

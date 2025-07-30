@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.rendering.object3d;
+package com.example.game3d_opengl.rendering;
 
 import android.opengl.Matrix;
 

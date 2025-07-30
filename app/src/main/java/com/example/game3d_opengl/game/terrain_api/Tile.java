@@ -12,14 +12,10 @@ import java.util.Set;
 import java.util.WeakHashMap;
 
 public class Tile implements TerrainElement {
-    private long id = -1L;
+    private final long id;
 
     public long getID() {
         return id;
-    }
-
-    public void setID(long id) {
-        this.id = id;
     }
 
     /**
@@ -54,6 +50,7 @@ public class Tile implements TerrainElement {
         this.farLeft = fl;
         this.farRight = fr;
         this.slope = slope;
+        this.id = l;
 
         this.triangles = new Vector3D[][]{
             new Vector3D[]{this.nearLeft,this.nearRight,this.farRight},
@@ -61,7 +58,7 @@ public class Tile implements TerrainElement {
         };
 
         // Build an array of perimeter coords: nearLeft -> nearRight -> farRight -> farLeft
-        // so that Polygon3D will form a closed shape (triangle fan).
+        // The center will be computed automatically by Polygon3D
         float[] perimeterCoords = new float[]{
                 nl.x, nl.y, nl.z,
                 nr.x, nr.y, nr.z,
@@ -69,7 +66,11 @@ public class Tile implements TerrainElement {
                 fl.x, fl.y, fl.z
         };
 
-        polygon3D = new Polygon3D(perimeterCoords, cachedColor, cachedColor);
+        // TODO move this to init():
+        polygon3D = Polygon3D.createWithVertexData(perimeterCoords,
+                false,
+                cachedColor,
+                cachedColor);
     }
 
     /**
@@ -129,6 +130,11 @@ public class Tile implements TerrainElement {
     @Override
     public void cleanupOnDeath() {
         polygon3D.cleanup();
+    }
+
+    @Override
+    public void resetGPUResources() {
+        polygon3D.reload();
     }
 
     @Override
