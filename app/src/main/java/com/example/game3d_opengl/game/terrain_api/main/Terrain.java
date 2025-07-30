@@ -35,7 +35,7 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.Preallo
  */
 public class Terrain {
 
-    public void cleanup(){
+    public void cleanupGPUResources(){
         commandBuffer.free();
         tileBuilder.cleanup();
         gridCreatorWrapperQueue.clear();
@@ -46,7 +46,7 @@ public class Terrain {
         waitingStructuresQueue.clear();
         childStructuresQueue.clear();
         for(Addon addon : addons){
-            addon.cleanupOnDeath();
+            addon.cleanupGPUResources();
         }
         addons.clear();
     }
@@ -212,7 +212,7 @@ public class Terrain {
 
     private void removeOldAddons(long playerTileId) {
         while (!addons.isEmpty() && addons.getFirst().isGoneBy(playerTileId)) {
-            addons.popFirst().cleanupOnDeath();
+            addons.popFirst().cleanupGPUResources();
         }
     }
 

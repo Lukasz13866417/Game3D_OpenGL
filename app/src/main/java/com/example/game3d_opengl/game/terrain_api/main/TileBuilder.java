@@ -58,7 +58,7 @@ public class TileBuilder {
 
     public void cleanup() {
         while (!tiles.isEmpty()) {
-            tiles.popFirst().cleanupOnDeath();
+            tiles.popFirst().cleanupGPUResources();
         }
         leftSideBuffer.free();
         rightSideBuffer.free();
@@ -229,7 +229,7 @@ public class TileBuilder {
         addTile(oldLast.nearLeft, oldLast.nearRight, newL1, newR1);
         // Add the new segment tile.
         addTile(newL1, newR1, l2, r2);
-        oldLast.cleanupOnDeath();
+        oldLast.cleanupGPUResources();
     }
 
     /**
@@ -268,7 +268,7 @@ public class TileBuilder {
         // If first tile is far from player, this it has been visited a long time ago
         // In that case, it can be removed because we are sure it wont be displayed anymore.
         while (tiles.size() > 1 && (playerTileId - tiles.getFirst().getID() > 50L)) {
-            tiles.popFirst().cleanupOnDeath();
+            tiles.popFirst().cleanupGPUResources();
         }
     }
 

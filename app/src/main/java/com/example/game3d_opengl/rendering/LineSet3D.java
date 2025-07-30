@@ -1,10 +1,10 @@
-package com.example.game3d_opengl.rendering.object3d;
+package com.example.game3d_opengl.rendering;
 
 import static com.example.game3d_opengl.rendering.util3d.GLUtil.loadShader;
 
 import android.opengl.GLES20;
-import android.opengl.Matrix;
 
+import com.example.game3d_opengl.rendering.object3d.Object3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 

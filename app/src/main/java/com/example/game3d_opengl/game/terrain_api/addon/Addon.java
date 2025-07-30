@@ -10,7 +10,6 @@ import java.util.Set;
 import java.util.WeakHashMap;
 
 public abstract class Addon implements TerrainElement {
-    private long tileId = -1L;
 
     /**
      * Assign the owning tile's ID
@@ -49,5 +48,6 @@ public abstract class Addon implements TerrainElement {
                                     Vector3D fieldFarRight);
 
     private boolean ready;
+    private long tileId = -1L;
 
 }
