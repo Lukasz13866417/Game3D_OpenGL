@@ -9,7 +9,7 @@ import android.content.Context;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.Stage;
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.rendering.object3d.LineSet3D;
+import com.example.game3d_opengl.rendering.LineSet3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.main.TileBuilder;

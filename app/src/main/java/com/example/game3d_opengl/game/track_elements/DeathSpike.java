@@ -67,7 +67,7 @@ public class DeathSpike extends Addon {
     }
 
     @Override
-    public void cleanupOnDeath() {
+    public void cleanupGPUResources() {
         object3D.cleanup();
     }
 

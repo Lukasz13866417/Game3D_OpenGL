@@ -15,7 +15,7 @@ import com.example.game3d_opengl.game.Stage;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.rendering.object3d.LineSet3D;
+import com.example.game3d_opengl.rendering.LineSet3D;
 import com.example.game3d_opengl.rendering.object3d.Polygon3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -158,7 +158,9 @@ public class GameplayStage extends Stage {
 
     @Override
     public void onClose() {
-
+        player.cleanupGPUResources();
+        Potion.cleanupSharedGPUResources();
+        terrain.cleanupGPUResources();
     }
 
     @Override
@@ -175,7 +177,7 @@ public class GameplayStage extends Stage {
     public void resetGPUResources() {
         Polygon3D.resetProgram();
         LineSet3D.resetProgram();
-        Potion.cleanupSharedResources();
+        Potion.resetSharedResources();
         player.resetGPUResources();
         terrain.resetGPUResources();
     }

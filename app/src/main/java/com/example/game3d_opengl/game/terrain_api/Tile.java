@@ -128,7 +128,7 @@ public class Tile implements TerrainElement {
     }
 
     @Override
-    public void cleanupOnDeath() {
+    public void cleanupGPUResources() {
         polygon3D.cleanup();
     }
 

@@ -171,7 +171,7 @@ public class Player implements WorldActor {
     }
 
     @Override
-    public void cleanupOnDeath() {
+    public void cleanupGPUResources() {
         object3D.cleanup();
     }
 

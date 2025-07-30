@@ -1,17 +1,13 @@
 package com.example.game3d_opengl.game.track_elements;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.getNormal;
-import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3S;
 
 import android.content.res.AssetManager;
 import android.opengl.Matrix;
 
 import com.example.game3d_opengl.rendering.object3d.ModelCreator;
-import com.example.game3d_opengl.rendering.object3d.Object3D;
-import com.example.game3d_opengl.rendering.object3d.Polygon3D;
-import com.example.game3d_opengl.rendering.util3d.GameRandom;
+import com.example.game3d_opengl.rendering.object3d.AbsoluteObject3D;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 
@@ -22,12 +18,11 @@ public class Potion extends Addon {
     private static final float POTION_WIDTH = 0.2f, POTION_HEIGHT = 0.62f;
     
     // Shared geometry for all potions
-    private static Polygon3D[] sharedPolygons;
+    private static AbsoluteObject3D sharedPotionMesh;
     private static boolean assetsLoaded = false;
     
     // Instance-specific transform
     private float objX, objY, objZ, objYaw = 0f;
-    private final float[] mvpMatrix = new float[16];
     private final float[] modelMatrix = new float[16];
     
     public static void LOAD_POTION_ASSETS(AssetManager assetManager){
@@ -41,36 +36,13 @@ public class Potion extends Addon {
             modelCreator.scaleY(POTION_HEIGHT);
             modelCreator.scaleZ(POTION_WIDTH);
             
-            // Create a single Object3D to extract shared polygons
-            Object3D tempObject = new Object3D.Builder()
-                    .angles(0, 0, 0)
+            // Create a shared AbsoluteObject3D mesh for all potions
+            sharedPotionMesh = new AbsoluteObject3D.Builder()
                     .edgeColor(CLR(1.0f, 1.0f, 1.0f, 1.0f))
                     .fillColor(CLR(1.0f, 0.0f, 1.0f, 1.0f))
                     .verts(modelCreator.getVerts())
                     .faces(modelCreator.getFaces())
                     .buildObject();
-            
-            // Extract the polygons for sharing (we need to access the polygons)
-            // For now, create shared polygons using createWithVertexData
-            Vector3D[] verts = modelCreator.getVerts();
-            int[][] faces = modelCreator.getFaces();
-            sharedPolygons = new Polygon3D[faces.length];
-            
-            for (int i = 0; i < faces.length; i++) {
-                int[] face = faces[i];
-                float[] coords = new float[face.length * 3];
-                for (int j = 0; j < face.length; j++) {
-                    coords[3 * j] = verts[face[j]].x;
-                    coords[3 * j + 1] = verts[face[j]].y;
-                    coords[3 * j + 2] = verts[face[j]].z;
-                }
-                sharedPolygons[i] = Polygon3D.createWithVertexData(
-                    coords, 
-                    false, // compute center
-                    CLR(1.0f, 0.0f, 1.0f, 1.0f), // magenta fill
-                    CLR(1.0f, 1.0f, 1.0f, 1.0f)  // white edges
-                );
-            }
             
             assetsLoaded = true;
         } catch (IOException e) {
@@ -96,23 +68,20 @@ public class Potion extends Addon {
         objZ = myMid.z;
     }
 
-    private void applyTransformations(float[] mMatrix, float[] vpMatrix) {
+    private void applyTransformations(float[] mMatrix) {
         Matrix.setIdentityM(mMatrix, 0);
         Matrix.translateM(mMatrix, 0, objX, objY, objZ);
         Matrix.rotateM(mMatrix, 0, objYaw, 0, 1, 0);
-        Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, mMatrix, 0);
     }
 
     @Override
     public void draw(float[] vpMatrix) {
-        if (!assetsLoaded || sharedPolygons == null) return;
+        if (!assetsLoaded || sharedPotionMesh == null) return;
         
-        applyTransformations(modelMatrix, vpMatrix);
+        applyTransformations(modelMatrix);
         
-        // Draw all shared polygons with this instance's transform
-        for (Polygon3D poly : sharedPolygons) {
-            poly.draw(mvpMatrix);
-        }
+        // Draw the shared mesh with this instance's transform
+        sharedPotionMesh.draw(modelMatrix, vpMatrix);
     }
 
     @Override
@@ -125,27 +94,26 @@ public class Potion extends Addon {
     }
 
     @Override
-    public void cleanupOnDeath() {
+    public void cleanupGPUResources() {
         // Don't cleanup shared resources here - they're shared among all potions
     }
 
     @Override
     public void resetGPUResources() {
-        for (Polygon3D poly : sharedPolygons) {
-            poly.reload();
-        }
     }
+
 
     /**
      * Call this when the application is shutting down to cleanup shared resources
      */
-    public static void cleanupSharedResources() {
-        if (sharedPolygons != null) {
-            for (Polygon3D poly : sharedPolygons) {
-                poly.cleanup();
-            }
-            sharedPolygons = null;
-            assetsLoaded = false;
+    public static void cleanupSharedGPUResources() {
+        if (sharedPotionMesh != null) {
+            sharedPotionMesh.cleanup();
+            sharedPotionMesh = null;
         }
+    }
+
+    public static void resetSharedResources(){
+        sharedPotionMesh.reload();
     }
 }
