@@ -7,7 +7,7 @@ import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
-import com.example.game3d_opengl.game.Stage;
+import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.LineSet3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -16,7 +16,7 @@ import com.example.game3d_opengl.game.terrain_api.main.TileBuilder;
 
 import java.util.stream.IntStream;
 
-public class TestStage extends Stage {
+public class TestGridRowsStage extends Stage {
 
     private Camera camera;
     private TileBuilder tileBuilder;
@@ -28,7 +28,9 @@ public class TestStage extends Stage {
     private float camZ = -6.5f;   // initial distance from origin
     private float moveSpeed = 0.00f; // movement per frame
 
-    public TestStage(MyGLRenderer.StageManager stageManager) {}
+    public TestGridRowsStage(MyGLRenderer.StageManager stageManager) {
+        super(stageManager);
+    }
 
     @Override
     public void onTouchDown(float x, float y) {}
@@ -57,13 +59,15 @@ public class TestStage extends Stage {
         );
         for (int i = 0; i < 3; ++i) tileBuilder.addSegment();
         tileBuilder.addHorizontalAngle(PI/20);
-        for (int i = 0; i < 3; ++i) tileBuilder.addSegment();
+        tileBuilder.addSegment();
+        tileBuilder.addEmptySegment();
+        for (int i = 0; i < 2; ++i) tileBuilder.addSegment();
         //tileBuilder.addHorizontalAngle(PI/20);
         //for (int i = 0; i < 3; ++i) tileBuilder.addSegment();
 
         // line sets for debugging
         grid = new LineSet3D(
-                IntStream.rangeClosed(0, tileBuilder.getCurrRowCount()-1)
+                IntStream.rangeClosed(0, tileBuilder.getCurrRowCount() - 2)
                         .boxed()
                         .flatMap(r -> IntStream.rangeClosed(0,2)
                                 .mapToObj(c -> tileBuilder.getGridPointDebug(r, c).addY(0.01f)))
@@ -112,6 +116,16 @@ public class TestStage extends Stage {
 
     @Override
     public void onReturn() {
+
+    }
+
+    @Override
+    public void onPause() {
+
+    }
+
+    @Override
+    public void onResume() {
 
     }
 

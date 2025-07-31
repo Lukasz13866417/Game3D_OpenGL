@@ -7,6 +7,7 @@ import static com.example.game3d_opengl.game.terrain_api.main.AddonsCommandsExec
 import static com.example.game3d_opengl.game.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_VERTICAL;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_H_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_SEG;
+import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_EMPTY_SEG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_V_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_H_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
@@ -97,6 +98,11 @@ public class Terrain {
             commandBuffer.addCommand(CMD_ADD_SEG);
         }
 
+        public void addEmptySegment() {
+            // Just store the command code, no arg
+            commandBuffer.addCommand(CMD_ADD_EMPTY_SEG);
+        }
+
         public void addChild(TerrainStructure child) {
             childStructuresQueue.enqueue(child);
             commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE, 1);
@@ -148,9 +154,11 @@ public class Terrain {
 
     final ArrayQueue<Integer> rowOffsetQueue;
 
+
     final ArrayQueue<Addon> addonQueue;
 
     final ArrayStack<Integer> rowCountStack;
+
 
     // structures waiting for command interpretation
     final ArrayStack<TerrainStructure> structureStack;
@@ -208,7 +216,6 @@ public class Terrain {
         this.tileBrush = new TileBrush();
 
     }
-
 
     private void removeOldAddons(long playerTileId) {
         while (!addons.isEmpty() && addons.getFirst().isGoneBy(playerTileId)) {

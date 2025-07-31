@@ -42,21 +42,24 @@ public class Tile implements TerrainElement {
 
     /**
      * Constructs a Tile using 4 corners plus slope.
-     * Then builds a Polygon3D to render that quad with a fill + outline color.
+     * The Polygon3D is created separately via factory method.
      */
-    public Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l) {
+    private Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, Polygon3D polygon3D) {
         this.nearLeft = nl;
         this.nearRight = nr;
         this.farLeft = fl;
         this.farRight = fr;
         this.slope = slope;
         this.id = l;
+        this.polygon3D = polygon3D;
 
         this.triangles = new Vector3D[][]{
             new Vector3D[]{this.nearLeft,this.nearRight,this.farRight},
             new Vector3D[]{this.nearLeft,this.farLeft,this.farRight}
         };
+    }
 
+    public static Polygon3D makePolygon3D(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr) {
         // Build an array of perimeter coords: nearLeft -> nearRight -> farRight -> farLeft
         // The center will be computed automatically by Polygon3D
         float[] perimeterCoords = new float[]{
@@ -66,11 +69,17 @@ public class Tile implements TerrainElement {
                 fl.x, fl.y, fl.z
         };
 
-        // TODO move this to init():
-        polygon3D = Polygon3D.createWithVertexData(perimeterCoords,
+        // Use default colors that will be updated later via setTileColor
+        FColor defaultColor = CLR(1,1,1,1);
+        return Polygon3D.createWithVertexData(perimeterCoords,
                 false,
-                cachedColor,
-                cachedColor);
+                defaultColor,
+                defaultColor);
+    }
+    
+    public static Tile createTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l) {
+        Polygon3D polygon = makePolygon3D(nl, nr, fl, fr);
+        return new Tile(nl, nr, fl, fr, slope, l, polygon);
     }
 
     /**

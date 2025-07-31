@@ -7,11 +7,10 @@ import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.Player;
-import com.example.game3d_opengl.game.Stage;
+import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
-public class TestStage3 extends Stage {
+public class TestPlayerStage extends Stage {
 
     private Camera camera;
     private Player player;
@@ -22,7 +21,9 @@ public class TestStage3 extends Stage {
     private float camZ = 3f;     // behind the player
     private float rotationY = 0f; // camera rotation
 
-    public TestStage3(MyGLRenderer.StageManager stageManager) {}
+    public TestPlayerStage(MyGLRenderer.StageManager stageManager) {
+        super(stageManager);
+    }
 
     @Override
     public void onTouchDown(float x, float y) {}
@@ -45,7 +46,7 @@ public class TestStage3 extends Stage {
         
         // Load player assets and create player
         Player.LOAD_PLAYER_ASSETS(context.getAssets());
-        player = new Player();
+        player = Player.createPlayer();
         
         updateCamera();
         camera.setProjectionAsScreen();
@@ -88,6 +89,16 @@ public class TestStage3 extends Stage {
     @Override
     public void onReturn() {
         System.out.println("RETURNING TO TEST STAGE 3");
+    }
+
+    @Override
+    public void onPause() {
+
+    }
+
+    @Override
+    public void onResume() {
+
     }
 
     @Override

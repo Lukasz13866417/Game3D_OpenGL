@@ -113,14 +113,18 @@ public class LineSet3D {
         pointCubes = new Object3D[points.length];
         for (int i = 0; i < points.length; i++) {
             Vector3D p = points[i];
-            pointCubes[i] = new Object3D.Builder()
+            pointCubes[i] = makePointCubeObject3D(cubeVerts, cubeFaces, p, pointColor);
+        }
+    }
+
+    private static Object3D makePointCubeObject3D(Vector3D[] cubeVerts, int[][] cubeFaces, Vector3D position, FColor color) {
+        return new Object3D.Builder()
                     .verts(cubeVerts)
                     .faces(cubeFaces)
-                    .fillColor(pointColor)
-                    .edgeColor(pointColor)
-                    .position(p.x, p.y, p.z)
+                .fillColor(color)
+                .edgeColor(color)
+                .position(position.x, position.y, position.z)
                     .buildObject();
-        }
     }
 
     /* Package-private */

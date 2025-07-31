@@ -3,6 +3,7 @@ package com.example.game3d_opengl.rendering.object3d;
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 
 import android.opengl.GLES20;
+import android.opengl.Matrix;
 
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -13,8 +14,10 @@ import java.nio.FloatBuffer;
 
 /**
  * An object that exists in absolute world space and does not have its own model matrix.
- * It is drawn directly using the provided view-projection matrix, without any translation,
- * rotation, or scaling transformations. This is efficient for static, world-space geometry.
+ * Drawn directly using the provided view-projection matrix, without any translation,
+ * rotation, or scaling transformations.
+ * Can be used for objects like Potions, which all look the same
+ * and only differ with regard to position or some angles.
  */
 public class AbsoluteObject3D {
 
@@ -47,9 +50,8 @@ public class AbsoluteObject3D {
      */
     public void draw(float[] modelMatrix, float[] vpMatrix) {
         // Combine the model and view-projection matrices
-        android.opengl.Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
+        Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
 
-        // Draw the polygons with the final MVP matrix
         for (Polygon3D poly : facePolys) {
             poly.draw(mvpMatrix);
         }
@@ -87,14 +89,13 @@ public class AbsoluteObject3D {
     }
 
     /**
-     * Builder for creating {@link AbsoluteObject3D} instances.
+     * Base class for Builders of 3D objects
      */
     protected static abstract class BaseBuilder<T extends AbsoluteObject3D, B extends BaseBuilder<T,B>> {
         protected Vector3D[] verts;
         protected int[][] faces;
         protected FColor fillColor = CLR(0, 0, 0, 1), edgeColor = CLR(1, 1, 1, 1);
         
-        // Implementation details - not part of the public API
         protected int vboId;
         protected FloatBuffer vertexData;
         protected Polygon3D[] polygons;
@@ -127,11 +128,11 @@ public class AbsoluteObject3D {
 
         public final T buildObject() {
             checkValid();
-            prepareImplementationDetails();
+            prepareGPUResources();
             return create();
         }
         
-        protected void prepareImplementationDetails() {
+        protected void prepareGPUResources() {
             // Compute center vertices and add them to the vertex array
             Vector3D[] centersToAdd = new Vector3D[faces.length];
             int[] faceCenterIndices = new int[faces.length];

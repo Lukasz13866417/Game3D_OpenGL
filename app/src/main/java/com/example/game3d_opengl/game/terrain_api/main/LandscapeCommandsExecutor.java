@@ -10,8 +10,9 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
     public static final int CMD_ADD_H_ANG = 3;
     public static final int CMD_ADD_V_ANG = 4;
     public static final int CMD_ADD_SEG = 5;
-    public static final int CMD_FINISH_STRUCTURE_LANDSCAPE = 6;
-    public static final int CMD_START_STRUCTURE_LANDSCAPE = 7;
+    public static final int CMD_ADD_EMPTY_SEG = 6;
+    public static final int CMD_FINISH_STRUCTURE_LANDSCAPE = 7;
+    public static final int CMD_START_STRUCTURE_LANDSCAPE = 8;
     private final Terrain terrain;
 
     public LandscapeCommandsExecutor(Terrain terrain) {
@@ -40,6 +41,9 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 break;
             case CMD_ADD_SEG:
                 terrain.tileBuilder.addSegment();
+                break;
+            case CMD_ADD_EMPTY_SEG:
+                terrain.tileBuilder.addEmptySegment();
                 break;
             case CMD_START_STRUCTURE_LANDSCAPE:
                 boolean isChild = (int) (buffer[offset + 2]) != 0;

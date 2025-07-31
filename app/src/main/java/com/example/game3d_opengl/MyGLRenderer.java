@@ -7,9 +7,10 @@ import android.content.Context;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 
+import com.example.game3d_opengl.game.stages.EmptySegmentTestStage;
 import com.example.game3d_opengl.game.stages.GameplayStage;
 import com.example.game3d_opengl.game.stages.MenuStage;
-import com.example.game3d_opengl.game.Stage;
+import com.example.game3d_opengl.game.stage_api.Stage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
@@ -49,7 +50,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.stageManager = new StageManager();
         this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
-        this.currStage = gameplayStage;
+        this.currStage = new GameplayStage(stageManager);//new GameplayStage(stageManager);
     }
 
     public Stage getCurrentStage() {
@@ -99,6 +100,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glViewport(0, 0, width, height);
         surfaceW = width;
         surfaceH = height;
+
         // Initialise or re-enter current stage appropriately
         if(!getCurrentStage().isInitialized()){
             getCurrentStage().setInitialized();

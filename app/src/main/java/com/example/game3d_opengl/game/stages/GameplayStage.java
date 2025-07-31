@@ -4,6 +4,7 @@ package com.example.game3d_opengl.game.stages;
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.sub;
 import static java.lang.Math.abs;
 
 import android.content.Context;
@@ -11,7 +12,7 @@ import android.content.res.AssetManager;
 import android.util.Log;
 
 import com.example.game3d_opengl.MyGLRenderer;
-import com.example.game3d_opengl.game.Stage;
+import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.rendering.Camera;
@@ -33,10 +34,9 @@ import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
  */
 public class GameplayStage extends Stage {
 
-    private final MyGLRenderer.StageManager stageManager;
 
     public GameplayStage(MyGLRenderer.StageManager stageManager){
-        this.stageManager = stageManager;
+        super(stageManager);
     }
 
     @Override
@@ -77,7 +77,7 @@ public class GameplayStage extends Stage {
         AssetManager assetManager = context.getAssets();
         Player.LOAD_PLAYER_ASSETS(assetManager);
         Potion.LOAD_POTION_ASSETS(assetManager);
-        player = new Player();
+        player = Player.createPlayer();
         float segWidth = 3.2f, segLength = 1.4f;
         this.terrain = new Terrain(2000,6,
                 V3(player.getX(), player.getY() - 3f, player.getZ()),
@@ -156,12 +156,7 @@ public class GameplayStage extends Stage {
 
     }
 
-    @Override
-    public void onClose() {
-        player.cleanupGPUResources();
-        Potion.cleanupSharedGPUResources();
-        terrain.cleanupGPUResources();
-    }
+
 
     @Override
     public void onSwitch() {
@@ -171,6 +166,22 @@ public class GameplayStage extends Stage {
     @Override
     public void onReturn() {
         System.out.println("RETURNING TO GAMEPLAY");
+    }
+
+    @Override
+    public void onPause() {
+
+    }
+
+    @Override
+    public void onResume() {
+
+    }
+    @Override
+    public void onClose() {
+        player.cleanupGPUResources();
+        Potion.cleanupSharedGPUResources();
+        terrain.cleanupGPUResources();
     }
 
     @Override

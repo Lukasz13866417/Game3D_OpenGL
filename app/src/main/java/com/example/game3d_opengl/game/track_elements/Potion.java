@@ -85,12 +85,12 @@ public class Potion extends Addon {
     }
 
     @Override
-    public void updateBeforeDraw(float dt) {
-        objYaw += dt * 0.16f;
+    public void updateBeforeDraw(float dtMillis) {
+        objYaw += dtMillis * 0.16f;
     }
 
     @Override
-    public void updateAfterDraw(float dt) {
+    public void updateAfterDraw(float dtMillis) {
     }
 
     @Override

@@ -23,13 +23,13 @@ public class TerrainLine extends TerrainStructure {
     protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols){
         /*for(int i=0;i<3;++i){
             brush.reserveRandomFittingHorizontal(2,new Addon[]{
-                    new DeathSpike(), new DeathSpike()
+                    DeathSpike.createDeathSpike(), DeathSpike.createDeathSpike()
             });
         }*/
         for(int i=0;i<1;++i) {
             Addon[] addons = new Addon[10];
             for (int j = 0; j < addons.length; ++j) {
-                addons[j] = new DeathSpike();
+                addons[j] = DeathSpike.createDeathSpike();
             }
             brush.reserveRandomFittingVertical(addons.length, addons);
         }

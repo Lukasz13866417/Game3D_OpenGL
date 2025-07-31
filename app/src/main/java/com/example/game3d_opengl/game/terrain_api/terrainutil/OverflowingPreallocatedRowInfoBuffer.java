@@ -87,11 +87,10 @@ public class OverflowingPreallocatedRowInfoBuffer {
      * Acts like a push-back; overwrites the oldest entry when the buffer is full.
      */
     public void add(long tileId,
-                    Vector3D farLeft,
-                    Vector3D eL,
-                    Vector3D eN,
                     Vector3D startL,
-                    Vector3D endR) {
+                    Vector3D endR,
+                    Vector3D prevStartL,
+                    Vector3D prevEndR) {
         int writeIdx;
         if (size < MAX_SIZE) {
             writeIdx = (head + size) % MAX_SIZE;
@@ -101,11 +100,6 @@ public class OverflowingPreallocatedRowInfoBuffer {
             head = (head + 1) % MAX_SIZE; // drop oldest
         }
         GridRowHelper helper = myBuffer[writeIdx];
-        helper.tileId = tileId;
-        helper.farLeft = farLeft;
-        helper.eL = eL;
-        helper.eN = eN;
-        helper.startL = startL;
-        helper.endR = endR;
+        helper.set(tileId, startL, endR, prevStartL, prevEndR);
     }
 }

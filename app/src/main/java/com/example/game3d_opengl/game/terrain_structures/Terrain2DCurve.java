@@ -32,7 +32,7 @@ public class Terrain2DCurve extends TerrainStructure {
         for(int i=0;i<2;++i){
             Addon[] addons = new Addon[3];
             for(int j = 0; j <addons.length; ++j){
-                addons[j] = new DeathSpike();
+                addons[j] = DeathSpike.createDeathSpike();
             }
             brush.reserveRandomFittingHorizontal(addons.length,addons);
         }

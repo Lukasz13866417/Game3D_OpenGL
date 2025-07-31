@@ -50,10 +50,21 @@ public class Player implements WorldActor {
         }
     }
 
-    public Player() {
-        this.object3D = playerBuilder.buildObject();
+    private Player(Object3D object3D) {
+        this.object3D = object3D;
         this.dir = new Vector3D(0, 0, -1f);
         this.move = new Vector3D(0, 0, 0);
+    }
+    
+    public static Object3D makeObject3D() {
+        if (playerBuilder == null) {
+            throw new IllegalStateException("Player assets not loaded. Call LOAD_PLAYER_ASSETS first.");
+        }
+        return playerBuilder.buildObject();
+    }
+    
+    public static Player createPlayer() {
+        return new Player(makeObject3D());
     }
 
     public synchronized Vector3D getDir() {
@@ -85,14 +96,14 @@ public class Player implements WorldActor {
     }
 
     private float fallSpeed = 0f;
-    private final float fallAcc = 1e-6f;//1e-5f;
+    private final float fallAcc = 1e-6f;
 
     @Override
-    public void updateBeforeDraw(float dt) {
+    public void updateBeforeDraw(float dtMillis) {
 
-        stickyRotationTime = max(0f, stickyRotationTime - dt);
+        stickyRotationTime = max(0f, stickyRotationTime - dtMillis);
         if (stickyRotationTime == 0 && stickyRotationAng != 0) {
-            float dYaw = minByAbs(signum(stickyRotationAng) * stickyRotationAngDecayRate * dt, stickyRotationAng);
+            float dYaw = minByAbs(signum(stickyRotationAng) * stickyRotationAngDecayRate * dtMillis, stickyRotationAng);
             object3D.objYaw -= dYaw;
             stickyRotationAng -= dYaw;
         }
@@ -148,20 +159,20 @@ public class Player implements WorldActor {
                 // build the slide vector along the triangle plane
                 move = u.mult(beta)
                         .add(w.mult(gamma))
-                        .withLen(playerSpeed * dt);
+                        .withLen(playerSpeed * dtMillis);
 
             }
 
         } else {
-            Vector3D dwl = dir.withLen(playerSpeed * dt);
+            Vector3D dwl = dir.withLen(playerSpeed * dtMillis);
             move = V3(dwl.x, move.y, dwl.z);
-            move = V3(move.x, move.y - fallSpeed * dt, move.z);
-            fallSpeed += fallAcc * dt;
+            move = V3(move.x, move.y - fallSpeed * dtMillis, move.z);
+            fallSpeed += fallAcc * dtMillis;
         }
         object3D.objX += move.x;
         object3D.objY += move.y;
         object3D.objZ += move.z;
-        object3D.objPitch -= dt * playerSpeed / (PI * PLAYER_HEIGHT) * 2 * PI;
+        object3D.objPitch -= dtMillis * playerSpeed / (PI * PLAYER_HEIGHT) * 2 * PI;
 
     }
 

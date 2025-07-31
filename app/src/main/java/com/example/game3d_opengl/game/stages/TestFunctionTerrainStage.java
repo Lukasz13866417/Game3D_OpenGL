@@ -8,16 +8,17 @@ import static java.lang.Math.sqrt;
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
-import com.example.game3d_opengl.game.Stage;
+import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain_structures.TerrainFunction;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 
-public class TestStage2 extends Stage {
+public class TestFunctionTerrainStage extends Stage {
 
     private Terrain terrain;
     private Camera camera;
-    public TestStage2(MyGLRenderer.StageManager stageManager) {
+    public TestFunctionTerrainStage(MyGLRenderer.StageManager stageManager) {
+        super(stageManager);
     }
 
 
@@ -86,6 +87,16 @@ public class TestStage2 extends Stage {
 
     @Override
     public void onReturn() {
+
+    }
+
+    @Override
+    public void onPause() {
+
+    }
+
+    @Override
+    public void onResume() {
 
     }
 

@@ -3,7 +3,7 @@ package com.example.game3d_opengl.game.stages;
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
-import com.example.game3d_opengl.game.Stage;
+import com.example.game3d_opengl.game.stage_api.Stage;
 
 /**
  * Extremely lightweight start screen. Shows nothing visually (black screen)
@@ -13,11 +13,10 @@ import com.example.game3d_opengl.game.Stage;
  */
 public class MenuStage extends Stage {
 
-    private final MyGLRenderer.StageManager stageManager;
     private boolean firstFrame = true;
 
     public MenuStage(MyGLRenderer.StageManager stageManager) {
-        this.stageManager = stageManager;
+        super(stageManager);
     }
 
     @Override
@@ -64,6 +63,16 @@ public class MenuStage extends Stage {
     @Override
     public void onReturn() {
         System.out.println("RETURNING TO MENU");
+    }
+
+    @Override
+    public void onPause() {
+
+    }
+
+    @Override
+    public void onResume() {
+
     }
 
     @Override

@@ -14,14 +14,19 @@ public class DeathSpike extends Addon {
     private final float height;
     private Object3D object3D;
 
-    public DeathSpike() {
+    private DeathSpike(float height, Object3D object3D) {
         super();
-        height = GameRandom.randFloat(0.225f, 0.5f, 5);
+        this.height = height;
+        this.object3D = object3D;
+    }
+    
+    public static DeathSpike createDeathSpike() {
+        float height = GameRandom.randFloat(0.225f, 0.5f, 5);
+        return new DeathSpike(height, null); // object3D will be set in onPlace
     }
 
-    @Override
-    protected void onPlace(Vector3D fieldNearLeft, Vector3D fieldNearRight,
-                           Vector3D fieldFarLeft, Vector3D fieldFarRight) {
+    private static Object3D makeObject3D(Vector3D fieldNearLeft, Vector3D fieldNearRight,
+                                        Vector3D fieldFarLeft, Vector3D fieldFarRight, float height) {
         Vector3D fieldMid = fieldFarLeft.add(fieldFarRight)
                 .add(fieldNearRight).add(fieldNearLeft).div(4);
         Vector3D out = getNormal(fieldNearLeft, fieldFarLeft, fieldFarRight).mult(-1);
@@ -34,7 +39,7 @@ public class DeathSpike extends Addon {
                 myFL.add(out.withLen(0.025f)), myFR.add(out.withLen(0.025f))
                 , fieldMid.add(out.withLen(height))
         );
-        object3D = new Object3D.Builder()
+        return new Object3D.Builder()
                 .angles(0, 0, 0)
                 .position(0, 0, 0)
                 .verts(verts)
@@ -49,6 +54,12 @@ public class DeathSpike extends Addon {
                 )
                 .edgeColor(CLR(1.0f, 1.0f, 1.0f, 1.0f))
                 .fillColor(CLR(0, 0, 0, 0)).buildObject();
+    }
+
+    @Override
+    protected void onPlace(Vector3D fieldNearLeft, Vector3D fieldNearRight,
+                           Vector3D fieldFarLeft, Vector3D fieldFarRight) {
+        this.object3D = makeObject3D(fieldNearLeft, fieldNearRight, fieldFarLeft, fieldFarRight, height);
     }
 
     @Override
