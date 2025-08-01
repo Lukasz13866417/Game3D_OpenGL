@@ -14,6 +14,7 @@ import android.util.Log;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
+import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.LineSet3D;
@@ -85,13 +86,12 @@ public class GameplayStage extends Stage {
                 segLength
         );
         terrain.enqueueStructure(new TerrainLine(100));
-        terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
-        terrain.enqueueStructure(new Terrain2DCurve(50, PI/3, 0.25f * PI/4));
-        terrain.enqueueStructure(new Terrain2DCurve(50, PI/12, -0.25f * PI/4));
+        terrain.enqueueStructure(new TerrainLine(100));
+        terrain.enqueueStructure(new TerrainStairs(50,3,0,-0.15f));
         terrain.enqueueStructure(new TerrainLine(100));
         terrain.enqueueStructure(new TerrainLine(100));
-        terrain.enqueueStructure(new TerrainCurve(100, -PI/2));
-        terrain.enqueueStructure(new TerrainSpiral(80, PI/12, 0.25f * PI/4));
+        terrain.enqueueStructure(new TerrainStairs(50,3,0,-0.15f));
+
         terrain.generateChunks(-1);
 
         System.out.println("GAMEPLAY STAGE INIT");
@@ -104,12 +104,11 @@ public class GameplayStage extends Stage {
         terrain.removeOldTerrainElements(player.getNearestTileId());
         if (terrain.getTileCount() < 400) {
             terrain.enqueueStructure(new TerrainLine(100));
-            terrain.enqueueStructure(new TerrainCurve(100, -PI / 2));
-            terrain.enqueueStructure(new Terrain2DCurve(50, 0, 0.5f * PI / 4));
-            terrain.enqueueStructure(new Terrain2DCurve(50, PI / 12, -0.5f * PI / 4));
+            terrain.enqueueStructure(new TerrainLine(100));
+            terrain.enqueueStructure(new TerrainStairs(50,3,0,-0.15f));
             terrain.enqueueStructure(new TerrainLine(100));
             terrain.enqueueStructure(new TerrainLine(100));
-            terrain.enqueueStructure(new TerrainCurve(100, -PI / 2));
+            terrain.enqueueStructure(new TerrainStairs(50,3,0,-0.15f));
         }
         if (terrain.getTileCount() < 300) {
             terrain.generateChunks(1);

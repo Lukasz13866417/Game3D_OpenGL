@@ -5,14 +5,21 @@ import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreatorWrapp
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
 
 public class LandscapeCommandsExecutor implements CommandExecutor {
+    // User-callable commands
+    public static final int CMD_LANDSCAPE_USER_FIRST = 1;
     public static final int CMD_SET_H_ANG = 1;
     public static final int CMD_SET_V_ANG = 2;
     public static final int CMD_ADD_H_ANG = 3;
     public static final int CMD_ADD_V_ANG = 4;
     public static final int CMD_ADD_SEG = 5;
     public static final int CMD_ADD_EMPTY_SEG = 6;
-    public static final int CMD_FINISH_STRUCTURE_LANDSCAPE = 7;
+    public static final int CMD_LIFT_UP = 7;
     public static final int CMD_START_STRUCTURE_LANDSCAPE = 8;
+    public static final int CMD_LANDSCAPE_USER_LAST = 8;
+
+    // Internal commands
+    public static final int CMD_FINISH_STRUCTURE_LANDSCAPE = 9;
+
     private final Terrain terrain;
 
     public LandscapeCommandsExecutor(Terrain terrain) {
@@ -44,6 +51,10 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 break;
             case CMD_ADD_EMPTY_SEG:
                 terrain.tileBuilder.addEmptySegment();
+                break;
+            case CMD_LIFT_UP:
+                float dy = buffer[offset + 2];
+                terrain.tileBuilder.liftUp(dy);
                 break;
             case CMD_START_STRUCTURE_LANDSCAPE:
                 boolean isChild = (int) (buffer[offset + 2]) != 0;
@@ -83,6 +94,7 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
 
     @Override
     public boolean canHandle(float v) {
-        return (int)v >= CMD_SET_H_ANG && (int)v <= CMD_START_STRUCTURE_LANDSCAPE;
+        int command = (int) v;
+        return command >= CMD_LANDSCAPE_USER_FIRST && command <= CMD_FINISH_STRUCTURE_LANDSCAPE;
     }
 }

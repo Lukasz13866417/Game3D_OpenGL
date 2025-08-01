@@ -49,6 +49,7 @@ public class TileBuilder {
     private LastTileInfo lastTileInfo;
 
     private boolean wasLastTileEmpty = false;
+    private float pendingLift = 0f;
 
     /**
      * Creates one additional tile, continuing from {@code lastTile}’s far edge.
@@ -60,13 +61,15 @@ public class TileBuilder {
 
         Vector3D l1 = lastTileInfo.farLeft;
         Vector3D r1 = lastTileInfo.farRight;
+        Vector3D near_l1 = lastTileInfo.nearLeft;
+        Vector3D near_r1 = lastTileInfo.nearRight;
 
         Vector3D axis = V3(0, -1, 0);
 
         Vector3D mid = l1.add(r1).div(2);
 
-        Vector3D line1 = l1.sub(lastTileInfo.nearLeft).setY(0),
-                line2 = r1.sub(lastTileInfo.nearRight).setY(0);
+        Vector3D line1 = l1.sub(near_l1).setY(0),
+                line2 = r1.sub(near_r1).setY(0);
         Vector3D baseLen = r1.sub(l1).div(2);
         float dLen = (float) (Math.sqrt(baseLen.sqlen()) * tan(dHorizontalAng));
 
@@ -103,13 +106,23 @@ public class TileBuilder {
     public void addEmptySegment() {
         Vector3D l1 = lastTileInfo.farLeft;
         Vector3D r1 = lastTileInfo.farRight;
+        Vector3D near_l1 = lastTileInfo.nearLeft;
+        Vector3D near_r1 = lastTileInfo.nearRight;
+
+        if (pendingLift != 0f) {
+            l1 = l1.add(0, pendingLift, 0);
+            r1 = r1.add(0, pendingLift, 0);
+            near_l1 = near_l1.add(0, pendingLift, 0);
+            near_r1 = near_r1.add(0, pendingLift, 0);
+            pendingLift = 0f;
+        }
 
         Vector3D axis = V3(0, -1, 0);
 
         Vector3D mid = l1.add(r1).div(2);
 
-        Vector3D line1 = l1.sub(lastTileInfo.nearLeft).setY(0),
-                line2 = r1.sub(lastTileInfo.nearRight).setY(0);
+        Vector3D line1 = l1.sub(near_l1).setY(0),
+                line2 = r1.sub(near_r1).setY(0);
         Vector3D baseLen = r1.sub(l1).div(2);
         float dLen = (float) (Math.sqrt(baseLen.sqlen()) * tan(dHorizontalAng));
 
@@ -134,6 +147,10 @@ public class TileBuilder {
 
         lastTileInfo = new LastTileInfo(newL1, newR1, l2, r2);
         wasLastTileEmpty = true;
+    }
+
+    public void liftUp(float dy) {
+        this.pendingLift = dy;
     }
 
 
@@ -322,6 +339,13 @@ public class TileBuilder {
 
         float slopeVal = (float) atan((fl.y - nl.y) /
                 sqrt((fl.x - nl.x) * (fl.x - nl.x) + (fl.z - nl.z) * (fl.z - nl.z)));
+
+        if (pendingLift != 0f) {
+            nl = nl.add(0, pendingLift, 0);
+            nr = nr.add(0, pendingLift, 0);
+            fl = fl.add(0, pendingLift, 0);
+            fr = fr.add(0, pendingLift, 0);
+        }
 
         Tile tile = Tile.createTile(nl, nr, fl, fr, slopeVal, nextId++);
         tiles.pushBack(tile);

@@ -10,12 +10,17 @@ import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
 
 public class AddonsCommandsExecutor implements CommandExecutor {
+    // User-callable commands
+    public static final int CMD_ADDONS_USER_FIRST = 33;
     public static final int CMD_RESERVE_VERTICAL = 33;
     public static final int CMD_RESERVE_HORIZONTAL = 34;
     public static final int CMD_RESERVE_RANDOM_VERTICAL = 35;
     public static final int CMD_RESERVE_RANDOM_HORIZONTAL = 36;
-    public static final int CMD_FINISH_STRUCTURE_ADDONS = 37;
-    public static final int CMD_START_STRUCTURE_ADDONS = 38;
+    public static final int CMD_START_STRUCTURE_ADDONS = 37;
+    public static final int CMD_ADDONS_USER_LAST = 37;
+
+    // Internal commands
+    public static final int CMD_FINISH_STRUCTURE_ADDONS = 38;
 
     private final Terrain terrain;
 
@@ -100,6 +105,7 @@ public class AddonsCommandsExecutor implements CommandExecutor {
 
     @Override
     public boolean canHandle(float v) {
-        return (int)v >= CMD_RESERVE_VERTICAL && (int)v <= CMD_START_STRUCTURE_ADDONS;
+        int command = (int) v;
+        return command >= CMD_ADDONS_USER_FIRST && command <= CMD_FINISH_STRUCTURE_ADDONS;
     }
 }

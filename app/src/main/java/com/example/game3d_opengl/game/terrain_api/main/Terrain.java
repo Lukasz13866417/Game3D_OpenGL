@@ -9,6 +9,7 @@ import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsE
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_SEG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_EMPTY_SEG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_V_ANG;
+import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_LIFT_UP;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_H_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
@@ -101,6 +102,10 @@ public class Terrain {
         public void addEmptySegment() {
             // Just store the command code, no arg
             commandBuffer.addCommand(CMD_ADD_EMPTY_SEG);
+        }
+
+        public void liftUp(float dy) {
+            commandBuffer.addCommand(CMD_LIFT_UP, dy);
         }
 
         public void addChild(TerrainStructure child) {
@@ -269,19 +274,19 @@ public class Terrain {
     private class GeneralExecutor implements CommandExecutor {
         @Override
         public void execute(float[] buffer, int offset, int length) {
-            //int code = (int) (buffer[offset]);
-            //printCommand(buffer, offset);
-            if (landscapeCommandExecutor.canHandle(buffer[offset])) {
+            int code = (int) buffer[offset];
+            if (landscapeCommandExecutor.canHandle(code)) {
                 landscapeCommandExecutor.execute(buffer, offset, length);
-            } else {
+            } else if (addonsCommandExecutor.canHandle(code)) {
                 addonsCommandExecutor.execute(buffer, offset, length);
+            } else {
+                throw new IllegalArgumentException("Unhandled command code in GeneralExecutor: " + code);
             }
         }
 
         @Override
         public boolean canHandle(float v) {
-            return true;
+            return landscapeCommandExecutor.canHandle(v) || addonsCommandExecutor.canHandle(v);
         }
     }
-
 }
