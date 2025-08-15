@@ -47,10 +47,10 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 terrain.tileBuilder.addVerticalAngle(deltaV);
                 break;
             case CMD_ADD_SEG:
-                terrain.tileBuilder.addSegment();
+                terrain.tileBuilder.addSegment(false);
                 break;
             case CMD_ADD_EMPTY_SEG:
-                terrain.tileBuilder.addEmptySegment();
+                terrain.tileBuilder.addSegment(true);
                 break;
             case CMD_LIFT_UP:
                 float dy = buffer[offset + 2];

@@ -7,10 +7,6 @@ import com.example.game3d_opengl.rendering.object3d.Polygon3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
-import java.util.Collections;
-import java.util.Set;
-import java.util.WeakHashMap;
-
 public class Tile implements TerrainElement {
     private final long id;
 
@@ -22,6 +18,12 @@ public class Tile implements TerrainElement {
      * The slope of this tile. Computed once from its geometry.
      */
     public final float slope;
+
+    public boolean isEmptySegment() {
+        return isEmptySegment;
+    }
+
+    private final boolean isEmptySegment;
 
     /**
      * All four corners of this tile:
@@ -44,7 +46,7 @@ public class Tile implements TerrainElement {
      * Constructs a Tile using 4 corners plus slope.
      * The Polygon3D is created separately via factory method.
      */
-    private Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, Polygon3D polygon3D) {
+    private Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, Polygon3D polygon3D, boolean isEmptySegment) {
         this.nearLeft = nl;
         this.nearRight = nr;
         this.farLeft = fl;
@@ -52,6 +54,7 @@ public class Tile implements TerrainElement {
         this.slope = slope;
         this.id = l;
         this.polygon3D = polygon3D;
+        this.isEmptySegment = isEmptySegment;
 
         this.triangles = new Vector3D[][]{
             new Vector3D[]{this.nearLeft,this.nearRight,this.farRight},
@@ -77,9 +80,9 @@ public class Tile implements TerrainElement {
                 defaultColor);
     }
     
-    public static Tile createTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l) {
+    public static Tile createTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, boolean isFake) {
         Polygon3D polygon = makePolygon3D(nl, nr, fl, fr);
-        return new Tile(nl, nr, fl, fr, slope, l, polygon);
+        return new Tile(nl, nr, fl, fr, slope, l, polygon, isFake);
     }
 
     /**
@@ -114,7 +117,9 @@ public class Tile implements TerrainElement {
      */
     @Override
     public void draw(float[] mvpMatrix) {
-        polygon3D.draw(mvpMatrix);
+        if(!isEmptySegment) {
+            polygon3D.draw(mvpMatrix);
+        }
     }
 
     @Override

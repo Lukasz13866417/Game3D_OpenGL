@@ -72,6 +72,9 @@ public class Player implements WorldActor {
     }
 
     public boolean collidesTile(Tile tile) {
+        if(tile.isEmptySegment()){
+            return false;
+        }
         Vector3D n1 = getNormal(tile.triangles[0]);
         Vector3D n2 = getNormal(tile.triangles[1]);
         float d1 = rayTriangleDistance(

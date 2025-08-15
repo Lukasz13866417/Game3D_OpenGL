@@ -57,13 +57,13 @@ public class TestGridRowsStage extends Stage {
                 V3(0, -0.5f, -3f),
                 2f, 1f, 1.5f
         );
-        for (int i = 0; i < 3; ++i) tileBuilder.addSegment();
+        for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);
         tileBuilder.addHorizontalAngle(PI/20);
-        tileBuilder.addSegment();
-        tileBuilder.addEmptySegment();
-        for (int i = 0; i < 2; ++i) tileBuilder.addSegment();
+        tileBuilder.addSegment(false);
+        tileBuilder.addSegment(true);
+        for (int i = 0; i < 2; ++i) tileBuilder.addSegment(false);
         //tileBuilder.addHorizontalAngle(PI/20);
-        //for (int i = 0; i < 3; ++i) tileBuilder.addSegment();
+        //for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);
 
         // line sets for debugging
         grid = new LineSet3D(
