@@ -9,13 +9,19 @@ import com.example.game3d_opengl.game.track_elements.Potion;
 public class TerrainStairs extends TerrainStructure {
 
     private final float dAngHor, jump, tilesPerStair, cntStairs;
+    private final int emptyBetween;
 
     public TerrainStairs(int tilesPerStair, int cntStairs, float dAngHor, float jump) {
+        this(tilesPerStair, cntStairs, 0, dAngHor, jump);
+    }
+
+    public TerrainStairs(int tilesPerStair, int cntStairs, int emptyBetween, float dAngHor, float jump) {
         super(tilesPerStair*cntStairs);
         this.dAngHor = dAngHor;
         this.jump = jump;
         this.tilesPerStair = tilesPerStair;
         this.cntStairs = cntStairs;
+        this.emptyBetween = emptyBetween;
     }
 
     @Override
@@ -25,6 +31,12 @@ public class TerrainStairs extends TerrainStructure {
             for(int j=0;j<tilesPerStair;++j) {
                 brush.addHorizontalAng(angHorPerTile);
                 brush.addSegment();
+            }
+            // add empty tiles between levels (not after the last level)
+            if (i < cntStairs - 1) {
+                for (int e = 0; e < emptyBetween; ++e) {
+                    brush.addEmptySegment();
+                }
             }
             brush.liftUp(jump);
         }

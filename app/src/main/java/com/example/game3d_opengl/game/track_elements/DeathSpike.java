@@ -29,7 +29,7 @@ public class DeathSpike extends Addon {
                                         Vector3D fieldFarLeft, Vector3D fieldFarRight, float height) {
         Vector3D fieldMid = fieldFarLeft.add(fieldFarRight)
                 .add(fieldNearRight).add(fieldNearLeft).div(4);
-        Vector3D out = getNormal(fieldNearLeft, fieldFarLeft, fieldFarRight).mult(-1);
+        Vector3D out = getNormal(fieldNearLeft, fieldFarLeft, fieldFarRight);
         Vector3D myNL = fieldMid.add(fieldNearLeft.sub(fieldMid).mult(0.8f));
         Vector3D myNR = fieldMid.add(fieldFarLeft.sub(fieldMid).mult(0.8f));
         Vector3D myFL = fieldMid.add(fieldNearRight.sub(fieldMid).mult(0.8f));

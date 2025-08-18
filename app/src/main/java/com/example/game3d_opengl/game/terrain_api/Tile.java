@@ -38,7 +38,7 @@ public class Tile implements TerrainElement {
     /**
      * Polygon wrapper that handles the vertex buffer, shaders, and rendering for this tile.
      */
-    private Polygon3D polygon3D;
+    private final Polygon3D polygon3D;
     // Reusable color instance to avoid per-frame allocations
     private final FColor cachedColor = CLR(1,1,1,1);
 
@@ -107,7 +107,12 @@ public class Tile implements TerrainElement {
         cachedColor.rgba[2] = finalB;
         cachedColor.rgba[3] = 1.0f;
 
-        polygon3D.setFillAndOutline(cachedColor, cachedColor);
+        if(!isEmptySegment) {
+            polygon3D.setFillAndOutline(cachedColor, cachedColor/*new FColor(0,1,0)*/);
+        }else{
+            // for debug
+            polygon3D.setFillAndOutline(new FColor(0,0,0,0), new FColor(0,1,0));
+        }
     }
 
     /**

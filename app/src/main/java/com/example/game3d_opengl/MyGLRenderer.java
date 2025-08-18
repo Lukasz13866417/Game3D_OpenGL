@@ -52,7 +52,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.stageManager = new StageManager();
         this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
-        this.currStage = new AddonPlacementTestStage(stageManager);//new GameplayStage(stageManager);
+        this.currStage =  /*new TestGridRowsStage(stageManager);*/ /* new AddonPlacementTestStage(stageManager);*/ new GameplayStage(stageManager);
     }
 
     public Stage getCurrentStage() {
