@@ -9,6 +9,7 @@ import android.content.Context;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.rendering.Camera;
+import com.example.game3d_opengl.rendering.FourPoints3D;
 import com.example.game3d_opengl.rendering.LineSet3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -20,12 +21,13 @@ public class TestGridRowsStage extends Stage {
 
     private Camera camera;
     private TileBuilder tileBuilder;
-    private LineSet3D grid, left, right;
+    private FourPoints3D[] grid;
+    private LineSet3D left, right;
 
     // Camera position and movement
     private float camX = 0f;
-    private float camY = 10f;    // height above ground
-    private float camZ = -6.5f;   // initial distance from origin
+    private float camY = 15f;    // height above ground
+    private float camZ = -7.5f;   // initial distance from origin
     private float moveSpeed = 0.00f; // movement per frame
 
     public TestGridRowsStage(MyGLRenderer.StageManager stageManager) {
@@ -33,13 +35,18 @@ public class TestGridRowsStage extends Stage {
     }
 
     @Override
-    public void onTouchDown(float x, float y) {}
-    @Override
-    public void onTouchUp(float x, float y) {}
-    @Override
-    public void onTouchMove(float x1, float y1, float x2, float y2) {}
+    public void onTouchDown(float x, float y) {
+    }
 
-     @Override
+    @Override
+    public void onTouchUp(float x, float y) {
+    }
+
+    @Override
+    public void onTouchMove(float x1, float y1, float x2, float y2) {
+    }
+
+    @Override
     public void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
         Camera.setGlobalScreenSize(screenWidth, screenHeight);
@@ -55,29 +62,40 @@ public class TestGridRowsStage extends Stage {
         tileBuilder = new TileBuilder(
                 200, 2,
                 V3(0, -0.5f, -3f),
-                2f, 1f, 1.5f
+                2f, 0.5f, 0.75f
         );
         for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);
-        tileBuilder.addHorizontalAngle(PI/20);
+       // tileBuilder.addHorizontalAngle(PI / 20);
         tileBuilder.addSegment(false);
         tileBuilder.addSegment(true);
-        for (int i = 0; i < 2; ++i) tileBuilder.addSegment(false);
+        tileBuilder.addSegment(false);
+        for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);
+        tileBuilder.addSegment(true);
+        tileBuilder.addSegment(false);
+        tileBuilder.addSegment(false);
+        tileBuilder.addHorizontalAngle(PI / 20);
+        tileBuilder.addSegment(false);
+        tileBuilder.addSegment(false);
+        tileBuilder.addSegment(false);
+
         //tileBuilder.addHorizontalAngle(PI/20);
         //for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);
 
-        // line sets for debugging
-        grid = new LineSet3D(
-                IntStream.rangeClosed(0, tileBuilder.getCurrRowCount() - 2)
-                        .boxed()
-                        .flatMap(r -> IntStream.rangeClosed(0,2)
-                                .mapToObj(c -> tileBuilder.getGridPointDebug(r, c).addY(0.01f)))
-                        .toArray(Vector3D[]::new),
-                new int[][]{},
-                FColor.CLR(1,1,1), FColor.CLR(0,1,0)
-        );
-        left  = new LineSet3D(tileBuilder.leftSideToArrayDebug(),  new int[][]{}, FColor.CLR(1,1,1), FColor.CLR(1,0,1));
-        right = new LineSet3D(tileBuilder.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1,1,1), FColor.CLR(0,0,1));
-
+        // grid rectangles as FourPoints3D
+        int rows = Math.max(0, tileBuilder.getCurrRowCount() - 1);
+        final int nCols = 2; // matches TileBuilder creation above
+        grid = new FourPoints3D[rows * nCols];
+        int idx = 0;
+        for (int r = 1; r <= rows; r++) {
+            for (int c = 1; c <= nCols; c++) {
+                Vector3D[] field = tileBuilder.getField(r, c); // [TL, TR, BL, BR]
+                // reorder to clockwise: TL, TR, BR, BL
+                Vector3D[] cw = new Vector3D[]{field[0], field[1], field[3], field[2]};
+                grid[idx++] = new FourPoints3D(cw);
+            }
+        }
+        left = new LineSet3D(tileBuilder.leftSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(1, 0, 1));
+        right = new LineSet3D(tileBuilder.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(0, 0, 1));
 
 
     }
@@ -98,7 +116,11 @@ public class TestGridRowsStage extends Stage {
             tileBuilder.getTile(i).setTileColor(CLR(1, 0, 0, 1));
             tileBuilder.getTile(i).draw(camera.getViewProjectionMatrix());
         }
-        grid.draw(camera.getViewProjectionMatrix());
+        if (grid != null) {
+            for (FourPoints3D fp : grid) {
+         //       fp.draw(camera.getViewProjectionMatrix());
+            }
+        }
         left.draw(camera.getViewProjectionMatrix());
         right.draw(camera.getViewProjectionMatrix());
 

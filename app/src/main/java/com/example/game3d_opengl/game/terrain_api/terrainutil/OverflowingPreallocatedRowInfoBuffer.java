@@ -1,7 +1,6 @@
 package com.example.game3d_opengl.game.terrain_api.terrainutil;
 
-import com.example.game3d_opengl.game.terrain_api.main.TileBuilder;
-import com.example.game3d_opengl.game.terrain_api.main.TileBuilder.GridRowHelper;
+import com.example.game3d_opengl.game.terrain_api.main.TileBuilder.GridRowInfo;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
@@ -15,19 +14,19 @@ public class OverflowingPreallocatedRowInfoBuffer {
     private static final int MAX_SIZE = 100_000;
     private static final int MAX_BUFFER_COUNT = 2;
 
-    private static final GridRowHelper[][] BUFFERS = new GridRowHelper[MAX_BUFFER_COUNT][MAX_SIZE];
+    private static final GridRowInfo[][] BUFFERS = new GridRowInfo[MAX_BUFFER_COUNT][MAX_SIZE];
     private static final boolean[] IS_TAKEN = new boolean[MAX_BUFFER_COUNT];
 
     static {
         // Pre-instantiate every GridRowHelper so they can be reused without allocation.
         for (int i = 0; i < MAX_BUFFER_COUNT; i++) {
             for (int j = 0; j < MAX_SIZE; j++) {
-                BUFFERS[i][j] = new GridRowHelper();
+                BUFFERS[i][j] = new GridRowInfo();
             }
         }
     }
 
-    private final GridRowHelper[] myBuffer;
+    private final GridRowInfo[] myBuffer;
     private final int mySlot;
 
     // Circular indices
@@ -60,7 +59,7 @@ public class OverflowingPreallocatedRowInfoBuffer {
         return size;
     }
 
-    public GridRowHelper get(int i) {
+    public GridRowInfo get(int i) {
         if (i < 0 || i >= size) {
             throw new IndexOutOfBoundsException("Index: " + i + ", Size: " + size);
         }
@@ -72,12 +71,12 @@ public class OverflowingPreallocatedRowInfoBuffer {
             throw new IllegalStateException("Cannot pop from an empty buffer.");
         }
         int idx = (head + size - 1) % MAX_SIZE;
-        GridRowHelper res = myBuffer[idx];
+        GridRowInfo res = myBuffer[idx];
         size--;
     }
 
-    public GridRowHelper pop(){
-        GridRowHelper res = get(size()-1);
+    public GridRowInfo pop(){
+        GridRowInfo res = get(size()-1);
         removeLast();
         return res;
     }
@@ -104,7 +103,7 @@ public class OverflowingPreallocatedRowInfoBuffer {
             writeIdx = head;
             head = (head + 1) % MAX_SIZE; // drop oldest
         }
-        GridRowHelper helper = myBuffer[writeIdx];
+        GridRowInfo helper = myBuffer[writeIdx];
         helper.set(tileId, L1, L2, L3, R1, R2, R3, LS, RS, LS_last, RS_last);
     }
 }

@@ -107,7 +107,7 @@ public class Tile implements TerrainElement {
         cachedColor.rgba[2] = finalB;
         cachedColor.rgba[3] = 1.0f;
 
-        polygon3D.setFillAndOutline(cachedColor, cachedColor);
+        polygon3D.setFillAndOutline(cachedColor, new FColor(0,1,0));
     }
 
     /**

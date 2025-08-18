@@ -71,7 +71,6 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
         if (size == 0) {
             throw new IllegalStateException("Cannot pop from an empty buffer.");
         }
-        int idx = (head + size - 1) % MAX_SIZE;
         size--;
     }
 
