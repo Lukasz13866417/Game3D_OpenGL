@@ -28,7 +28,7 @@ public class GridCreator implements BaseGridCreator {
             parent.content.reserveHorizontal(row + parentRowOffset, col, length);
         }
         vertical.reserve(row, col, length);
-        for (int r = row; r < row + length; r++) {
+        for (int r = row; r < row + length; ++r) {
             horizontal.reserve(r, col, 1);
         }
         return new GridSegment(row, col, length);
@@ -40,7 +40,7 @@ public class GridCreator implements BaseGridCreator {
             parent.content.reserveHorizontal(row + parentRowOffset, col, length);
         }
         horizontal.reserve(row, col, length);
-        for (int c = col; c < col + length; c++) {
+        for (int c = col; c < col + length; ++c) {
             vertical.reserve(row, c, 1);
         }
         return new GridSegment(row, col, length);
@@ -51,7 +51,7 @@ public class GridCreator implements BaseGridCreator {
         if (parent != null && parent.content != null) {
             parent.content.reserveHorizontal(res.row + parentRowOffset, res.col, res.length);
         }
-        for (int r = res.row; r < res.row + length; r++) {
+        for (int r = res.row; r < res.row + length; ++r) {
             horizontal.reserve(r, res.col, 1);
         }
         return res;
@@ -62,7 +62,7 @@ public class GridCreator implements BaseGridCreator {
         if (parent != null && parent.content != null) {
             parent.content.reserveVertical(res.row + parentRowOffset, res.col, res.length);
         }
-        for (int c = res.col; c < res.col + length; c++) {
+        for (int c = res.col; c < res.col + length; ++c) {
             vertical.reserve(res.row, c, 1);
         }
         return res;

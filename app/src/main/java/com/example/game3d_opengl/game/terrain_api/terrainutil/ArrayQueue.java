@@ -1,5 +1,7 @@
 package com.example.game3d_opengl.game.terrain_api.terrainutil;
 
+import androidx.annotation.NonNull;
+
 import java.util.ArrayDeque;
 import java.util.NoSuchElementException;
 
@@ -33,6 +35,7 @@ public class ArrayQueue<T> {
         deque.clear();
     }
 
+    @NonNull
     @Override
     public String toString() {
         return deque.toString();

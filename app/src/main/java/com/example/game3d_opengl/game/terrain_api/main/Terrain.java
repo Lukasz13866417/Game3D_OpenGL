@@ -13,14 +13,14 @@ import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsE
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_H_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
-import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
-import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.add;
 
 import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.ArrayQueue;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.ArrayStack;
+import com.example.game3d_opengl.game.terrain_api.terrainutil.IntArrayQueue;
+import com.example.game3d_opengl.game.terrain_api.terrainutil.IntArrayStack;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.FixedMaxSizeDeque;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
@@ -157,12 +157,12 @@ public class Terrain {
     final ArrayStack<GridCreatorWrapper> gridCreatorWrapperStack;
     final ArrayQueue<GridCreatorWrapper> gridCreatorWrapperQueue;
 
-    final ArrayQueue<Integer> rowOffsetQueue;
+    final IntArrayQueue rowOffsetQueue;
 
 
     final ArrayQueue<Addon> addonQueue;
 
-    final ArrayStack<Integer> rowCountStack;
+    final IntArrayStack rowCountStack;
 
 
     // structures waiting for command interpretation
@@ -208,8 +208,8 @@ public class Terrain {
         // For addon grid commands
         this.addonsCommandExecutor = new AddonsCommandsExecutor(this);
 
-        this.rowOffsetQueue = new ArrayQueue<>();
-        this.rowCountStack = new ArrayStack<>();
+        this.rowOffsetQueue = new IntArrayQueue(100_000);
+        this.rowCountStack = new IntArrayStack(100_000);
         this.gridCreatorWrapperStack = new ArrayStack<>();
         this.gridCreatorWrapperQueue = new ArrayQueue<>();
         this.addonQueue = new ArrayQueue<>();
