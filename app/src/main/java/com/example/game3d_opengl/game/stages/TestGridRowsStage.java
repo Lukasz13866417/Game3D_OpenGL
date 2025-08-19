@@ -101,25 +101,10 @@ public class TestGridRowsStage extends Stage {
                 V3(0, -0.5f, -3f),
                 2f, 0.5f, 0.75f
         );
-        for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);
-       // tileBuilder.addHorizontalAngle(PI / 20);
-        tileBuilder.addSegment(false);
+        for (int i = 0; i < 6 ; ++i) tileBuilder.addSegment(false);
         tileBuilder.addSegment(true);
         tileBuilder.addSegment(true);
-        tileBuilder.addSegment(false);
-        for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);
-        tileBuilder.addSegment(true);
-        tileBuilder.addHorizontalAngle(PI / 20);
-        tileBuilder.addSegment(true);
-        tileBuilder.addSegment(true);
-        tileBuilder.liftUp(0.1f);
-        tileBuilder.addHorizontalAngle(PI / 20);
-        tileBuilder.addSegment(false);
-        tileBuilder.addSegment(false);
-        tileBuilder.addHorizontalAngle(PI / 20);
-        tileBuilder.addSegment(false);
-        tileBuilder.addSegment(false);
-        tileBuilder.addSegment(false);
+        for (int i = 0; i < 6 ; ++i) tileBuilder.addSegment(false);
 
         //tileBuilder.addHorizontalAngle(PI/20);
         //for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);

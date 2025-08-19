@@ -89,7 +89,9 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
      * Overwrite / initialise the next element of the buffer with provided values.
      * Acts like a push-back; overwrites the oldest entry when the buffer is full.
      */
-    public void add(int leftCnt, int rightCnt,
+    public void add(int leftAddedCnt, int rightAddedCnt,
+                    int rowsAddedCnt,
+                    int nextRowLeftInd, int nextRowRightInd,
                     float leftoverL, float leftoverR,
                     Vector3D nl, Vector3D nr) {
         int writeIdx;
@@ -101,6 +103,6 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
             head = (head + 1) % MAX_SIZE; // drop oldest
         }
         SegmentHistory helper = myBuffer[writeIdx];
-        helper.set(leftCnt, rightCnt, leftoverL, leftoverR, nl, nr);
+        helper.set(leftAddedCnt, rightAddedCnt, rowsAddedCnt, nextRowLeftInd, nextRowRightInd, leftoverL, leftoverR, nl, nr);
     }
 }

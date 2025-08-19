@@ -2,7 +2,6 @@ package com.example.game3d_opengl.game.terrain_api.main;
 
 import static com.example.game3d_opengl.rendering.util3d.GameMath.EPSILON;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.rotateAroundAxis;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.rotateAroundTwoPoints;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.tan;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
@@ -27,7 +26,6 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  */
 public class TileBuilder {
 
-    private boolean wasLastTileEmpty = false;
     private float pendingLift = 0f;
 
     /**
@@ -41,46 +39,47 @@ public class TileBuilder {
         Vector3D l1 = lastTile.farLeft;
         Vector3D r1 = lastTile.farRight;
         Vector3D near_l1 = lastTile.nearLeft;
-        Vector3D near_r1 = lastTile.nearRight;
 
         Vector3D axis = V3(0, -1, 0);
 
-        Vector3D mid = l1.add(r1).div(2);
-
-        Vector3D line1 = l1.sub(near_l1).setY(0),
-                line2 = r1.sub(near_r1).setY(0);
-        Vector3D baseLen = r1.sub(l1);//.div(2);
+        Vector3D line1 = l1.sub(near_l1).setY(0);
+        Vector3D baseLen = r1.sub(l1);
         float dLen = (float) (Math.sqrt(baseLen.sqlen()) * tan(dHorizontalAng));
 
         Vector3D newL1 = l1.sub(line1.withLen(dLen));
-        Vector3D newR1 = r1;//r1.add(line2.withLen(dLen));
+        //r1.add(line2.withLen(dLen));
 
-        assert abs(newL1.y - newR1.y) < 0.01f;
+        assert abs(newL1.y - r1.y) < 0.01f;
 
         dHorizontalAng = 0.0f;
 
         Vector3D dir = rotateAroundTwoPoints(
                 V3(0, 0, 0),
-                newR1.sub(newL1),
+                r1.sub(newL1),
                 axis,
                 PI / 2 + currVerticalAng).withLen(segLength);
 
         Vector3D l2 = newL1.add(dir);
-        Vector3D r2 = newR1.add(dir);
+        Vector3D r2 = r1.add(dir);
 
         // Update the last tile's far edge by replacing it with [newL1,newR1].
         Tile oldLast = removeLastTile();
-        wasLastTileEmpty = oldLast.isEmptySegment();
-        addTile(oldLast.nearLeft, oldLast.nearRight, newL1, newR1, wasLastTileEmpty);
+
+        if(tiles.isEmpty()){ // re-adding guardian - oldLast.isEmptySegment() -> true
+            // so oldLast.isLiftedUp() -> false, and isLiftedUp doesn't matter
+            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), false, false);
+        }else{
+            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), tiles.getLast().isEmptySegment(), oldLast.isLiftedUp());
+        }
         oldLast.cleanupGPUResources();
 
+        boolean isLiftedUp = (abs(pendingLift) > EPSILON);
         // Add the new segment tile.
         addTile(newL1.addY(pendingLift),
-                newR1.addY(pendingLift),
+                r1.addY(pendingLift),
                 l2.addY(pendingLift),
-                r2.addY(pendingLift), isEmpty);
+                r2.addY(pendingLift), isEmpty, oldLast.isEmptySegment(), isLiftedUp);
         pendingLift = 0;
-        wasLastTileEmpty = isEmpty;
     }
 
     public void liftUp(float dy) {
@@ -110,6 +109,7 @@ public class TileBuilder {
         segmentHistoryBuffer.free();
     }
 
+
     public TileBuilder(int maxSegments, int nCols,
                        Vector3D startMid,
                        float segWidth, float segLength,
@@ -136,7 +136,7 @@ public class TileBuilder {
                 startRight,
                 startLeft.sub(0, 0, 0.01f),   // farLeft = nearLeft shifted a bit so len>0
                 startRight.sub(0, 0, 0.01f),  // farRight
-                true);
+                true, false, false);
 
     }
 
@@ -235,15 +235,15 @@ public class TileBuilder {
     /**
      * Helper: builds a new tile and fully integrates it with row/buffer tracking.
      */
-    private void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, boolean isEmptySegment) {
+    private void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, boolean isEmptySegment, boolean wasPreviousEmpty, boolean isLiftedUp) {
 
         float slopeVal = (float) atan((fl.y - nl.y) /
                 sqrt((fl.x - nl.x) * (fl.x - nl.x) + (fl.z - nl.z) * (fl.z - nl.z)));
 
-        Tile tile = Tile.createTile(nl, nr, fl, fr, slopeVal, nextId++, isEmptySegment);
+        Tile tile = Tile.createTile(nl, nr, fl, fr, slopeVal, nextId++, isEmptySegment, isLiftedUp);
         tiles.pushBack(tile);
 
-        generateRowsForTile(tile);
+        generateRowsForTile(tile, wasPreviousEmpty);
 
         lastTile = tile;
     }
@@ -263,16 +263,16 @@ public class TileBuilder {
         Tile oldLast = tiles.popLast();
 
         SegmentHistory history = segmentHistoryBuffer.pop();
-        for (int i = 0; i < history.leftCnt; ++i) leftSideBuffer.pop();
-        for (int i = 0; i < history.rightCnt; ++i) rightSideBuffer.pop();
-        for (int i = 0; i < min(history.leftCnt, history.rightCnt); ++i) rowInfoBuffer.pop();
+        for (int i = 0; i < history.leftAddedCnt; ++i) leftSideBuffer.pop();
+        for (int i = 0; i < history.rightAddedCnt; ++i) rightSideBuffer.pop();
+        for (int i = 0; i < history.rowsAddedCnt; ++i) rowInfoBuffer.removeLast();
 
 
         lastTile = tiles.peekLast();
         return oldLast;
     }
 
-    private void generateRowsForTile(Tile tile) {
+    private void generateRowsForTile(Tile tile, boolean wasPreviousEmpty) {
         Vector3D nl = tile.nearLeft;
         Vector3D nr = tile.nearRight;
         Vector3D fl = tile.farLeft;
@@ -280,18 +280,35 @@ public class TileBuilder {
 
         if (tile.isEmptySegment()) {
             segmentHistoryBuffer.add(
-                    0, 0, 0, 0, nl, nr
+                    0, 0,
+                    0,
+                    // segment history objects corresponding to empty segments should never be used.
+                    // hopefully these values will crash the program whenever this rule is broken
+                    -1000000000, -1000000000,
+                    0, 0,
+                    nl, nr
             );
             return;
         }
 
         SegmentHistory lastHistory = segmentHistoryBuffer.get(segmentHistoryBuffer.size() - 1);
 
-        if (wasLastTileEmpty) {
+
+        int cntL = 0, cntR = 0, cntRows = 0;
+        int lastLeftSideSize = leftSideBuffer.size(), lastRightSideSize = rightSideBuffer.size();
+
+        if (wasPreviousEmpty || tile.isLiftedUp()) {
             // First real tile – add bridging row along its near edge so the grid starts flush.
             leftSideBuffer.addPos(nl.x, nl.y, nl.z);
             rightSideBuffer.addPos(nr.x, nr.y, nr.z);
+            ++cntL;
+            ++cntR;
         }
+
+        int nextRowLeft = (wasPreviousEmpty || tile.isLiftedUp())
+                ? leftSideBuffer.size() : lastHistory.nextRowLeftInd;
+        int nextRowRight = (wasPreviousEmpty || tile.isLiftedUp())
+                ? rightSideBuffer.size() : lastHistory.nextRowRightInd;
 
         Vector3D eL = fl.sub(nl);
         Vector3D eR = fr.sub(nr);
@@ -299,17 +316,10 @@ public class TileBuilder {
         float lenL = (float) sqrt(eL.sqlen());
         float lenR = (float) sqrt(eR.sqlen());
 
-        int cntL = 0, cntR = 0;
-
-
-        int lastLeftInd = leftSideBuffer.size();
-        int lastRightInd = rightSideBuffer.size();
-
 
         // distance from tile.near edge to first potential row position
         float firstDistL = (rowSpacing - lastHistory.leftoverL);
         if (abs(firstDistL - rowSpacing) < 1e-6f) firstDistL = rowSpacing; // leftoverL == 0
-
         for (float d = firstDistL; d <= lenL + 10f * EPSILON; d += rowSpacing) {
             float fraction = d / lenL;
             Vector3D leftP = nl.add(eL.mult(fraction));
@@ -320,7 +330,6 @@ public class TileBuilder {
 
         float firstDistR = (rowSpacing - lastHistory.leftoverR);
         if (abs(firstDistR - rowSpacing) < 1e-6f) firstDistR = rowSpacing; // leftoverR == 0
-
         for (float d = firstDistR; d <= lenR + 10f * EPSILON; d += rowSpacing) {
             float fraction = d / lenR;
             Vector3D rightP = nr.add(eR.mult(fraction));
@@ -329,46 +338,44 @@ public class TileBuilder {
             ++cntR;
         }
 
-
-
-        int startingPosInd = min(lastRightInd - (cntR > 0 ? 0 : 1),lastLeftInd - (cntL > 0 ? 0 : 1));
-        int lastLeftDiff = lastHistory.leftCnt - lastHistory.rightCnt;
-
-        int cntRows = min(cntL + max(0,lastLeftDiff), cntR + max(0,-lastLeftDiff));
-        for (int i = 0; i < cntRows; ++i) {
+        for (; nextRowLeft < leftSideBuffer.size() && nextRowRight < rightSideBuffer.size();
+             ++nextRowLeft, ++nextRowRight) {
             Vector3D leftP = V3(
-                    leftSideBuffer.getX(startingPosInd + i),
-                    leftSideBuffer.getY(startingPosInd + i),
-                    leftSideBuffer.getZ(startingPosInd + i)
+                    leftSideBuffer.getX(nextRowLeft),
+                    leftSideBuffer.getY(nextRowLeft),
+                    leftSideBuffer.getZ(nextRowLeft)
             );
             Vector3D rightP = V3(
-                    rightSideBuffer.getX(startingPosInd + i),
-                    rightSideBuffer.getY(startingPosInd + i),
-                    rightSideBuffer.getZ(startingPosInd + i)
+                    rightSideBuffer.getX(nextRowRight),
+                    rightSideBuffer.getY(nextRowRight),
+                    rightSideBuffer.getZ(nextRowRight)
             );
             Vector3D lastLeftP = V3(
-                    leftSideBuffer.getX(startingPosInd + i - 1),
-                    leftSideBuffer.getY(startingPosInd + i - 1),
-                    leftSideBuffer.getZ(startingPosInd + i - 1)
+                    leftSideBuffer.getX(nextRowLeft - 1),
+                    leftSideBuffer.getY(nextRowLeft - 1),
+                    leftSideBuffer.getZ(nextRowLeft - 1)
             );
             Vector3D lastRightP = V3(
-                    rightSideBuffer.getX(startingPosInd + i - 1),
-                    rightSideBuffer.getY(startingPosInd + i - 1),
-                    rightSideBuffer.getZ(startingPosInd + i - 1)
+                    rightSideBuffer.getX(nextRowRight - 1),
+                    rightSideBuffer.getY(nextRowRight - 1),
+                    rightSideBuffer.getZ(nextRowRight - 1)
             );
             rowInfoBuffer.add(tile.getID(),
                     lastHistory.nl, nl, fl,
                     lastHistory.nr, nr, fr,
                     leftP, rightP,
                     lastLeftP, lastRightP);
+            ++cntRows;
         }
 
-        System.out.println();
 
         float currLeftoverL = (lastHistory.leftoverL + lenL) % rowSpacing;
         float currLeftoverR = (lastHistory.leftoverR + lenR) % rowSpacing;
 
-        segmentHistoryBuffer.add(cntL, cntR, currLeftoverL, currLeftoverR, nl, nr);
+        segmentHistoryBuffer.add(cntL, cntR, cntRows,
+                nextRowLeft,
+                nextRowRight,
+                currLeftoverL, currLeftoverR, nl, nr);
 
     }
 
@@ -390,18 +397,26 @@ public class TileBuilder {
     }
 
     public static class SegmentHistory {
-        public int leftCnt = 0, rightCnt = 0;
+
+        public int leftAddedCnt = 0, rightAddedCnt = 0, rowsAddedCnt = 0;
+        public int nextRowLeftInd = 0, nextRowRightInd = 0;
         public float leftoverL, leftoverR;
         public Vector3D nl = V3(0, 0, 0), nr = V3(0, 0, 0);
+
 
         public SegmentHistory() {
         }
 
-        public void set(int leftCnt, int rightCnt,
+        public void set(int leftAddedCnt, int rightAddedCnt,
+                        int rowsAddedCnt,
+                        int nextRowLeftInd, int nextRowRightInd,
                         float leftoverL, float leftoverR,
                         Vector3D nl, Vector3D nr) {
-            this.leftCnt = leftCnt;
-            this.rightCnt = rightCnt;
+            this.leftAddedCnt = leftAddedCnt;
+            this.rightAddedCnt = rightAddedCnt;
+            this.rowsAddedCnt = rowsAddedCnt;
+            this.nextRowLeftInd = nextRowLeftInd;
+            this.nextRowRightInd = nextRowRightInd;
             this.leftoverL = leftoverL;
             this.leftoverR = leftoverR;
             this.nl = nl;

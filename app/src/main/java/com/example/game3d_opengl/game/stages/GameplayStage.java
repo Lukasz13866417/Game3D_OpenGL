@@ -87,10 +87,10 @@ public class GameplayStage extends Stage {
         );
         terrain.enqueueStructure(new TerrainLine(100));
         terrain.enqueueStructure(new TerrainLine(100));
-        terrain.enqueueStructure(new TerrainStairs(50,3,0,-0.15f));
+        terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
         terrain.enqueueStructure(new TerrainLine(100));
         terrain.enqueueStructure(new TerrainLine(100));
-        terrain.enqueueStructure(new TerrainStairs(50,3,0,-0.15f));
+        terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
 
         terrain.generateChunks(-1);
 
@@ -105,10 +105,11 @@ public class GameplayStage extends Stage {
         if (terrain.getTileCount() < 400) {
             terrain.enqueueStructure(new TerrainLine(100));
             terrain.enqueueStructure(new TerrainLine(100));
-            terrain.enqueueStructure(new TerrainStairs(50,3,0,-0.15f));
+            terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
             terrain.enqueueStructure(new TerrainLine(100));
             terrain.enqueueStructure(new TerrainLine(100));
-            terrain.enqueueStructure(new TerrainStairs(50,3,0,-0.15f));
+            terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
+
         }
         if (terrain.getTileCount() < 300) {
             terrain.generateChunks(1);

@@ -23,7 +23,9 @@ public class Tile implements TerrainElement {
         return isEmptySegment;
     }
 
-    private final boolean isEmptySegment;
+    public boolean isLiftedUp() { return isLiftedUp; }
+
+    private final boolean isEmptySegment, isLiftedUp;
 
     /**
      * All four corners of this tile:
@@ -46,7 +48,7 @@ public class Tile implements TerrainElement {
      * Constructs a Tile using 4 corners plus slope.
      * The Polygon3D is created separately via factory method.
      */
-    private Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, Polygon3D polygon3D, boolean isEmptySegment) {
+    private Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, Polygon3D polygon3D, boolean isEmptySegment, boolean isLiftedUp) {
         this.nearLeft = nl;
         this.nearRight = nr;
         this.farLeft = fl;
@@ -55,6 +57,7 @@ public class Tile implements TerrainElement {
         this.id = l;
         this.polygon3D = polygon3D;
         this.isEmptySegment = isEmptySegment;
+        this.isLiftedUp = isLiftedUp;
 
         this.triangles = new Vector3D[][]{
             new Vector3D[]{this.nearLeft,this.nearRight,this.farRight},
@@ -80,9 +83,9 @@ public class Tile implements TerrainElement {
                 defaultColor);
     }
     
-    public static Tile createTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, boolean isFake) {
+    public static Tile createTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, boolean isEmpty, boolean isLiftedUp) {
         Polygon3D polygon = makePolygon3D(nl, nr, fl, fr);
-        return new Tile(nl, nr, fl, fr, slope, l, polygon, isFake);
+        return new Tile(nl, nr, fl, fr, slope, l, polygon, isEmpty, isLiftedUp);
     }
 
     /**
