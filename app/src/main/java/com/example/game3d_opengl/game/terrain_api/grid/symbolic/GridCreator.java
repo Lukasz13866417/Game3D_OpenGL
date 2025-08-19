@@ -2,7 +2,7 @@ package com.example.game3d_opengl.game.terrain_api.grid.symbolic;
 
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.PartialSegmentHandler;
 
-public class GridCreator {
+public class GridCreator implements BaseGridCreator {
 
     private final int nRows, nCols;
     private final PartialSegmentHandler vertical, horizontal;
@@ -22,7 +22,8 @@ public class GridCreator {
         this(nRows, nCols, null, 0);
     }
 
-    public void reserveVertical(int row, int col, int length) {
+    @Override
+    public GridSegment reserveVertical(int row, int col, int length) {
         if (parent != null && parent.content != null) {
             parent.content.reserveHorizontal(row + parentRowOffset, col, length);
         }
@@ -30,9 +31,11 @@ public class GridCreator {
         for (int r = row; r < row + length; r++) {
             horizontal.reserve(r, col, 1);
         }
+        return new GridSegment(row, col, length);
     }
 
-    public void reserveHorizontal(int row, int col, int length) {
+    @Override
+    public GridSegment reserveHorizontal(int row, int col, int length) {
         if (parent != null && parent.content != null) {
             parent.content.reserveHorizontal(row + parentRowOffset, col, length);
         }
@@ -40,6 +43,7 @@ public class GridCreator {
         for (int c = col; c < col + length; c++) {
             vertical.reserve(row, c, 1);
         }
+        return new GridSegment(row, col, length);
     }
 
     public GridSegment reserveRandomFittingVertical(int length) {
@@ -64,15 +68,18 @@ public class GridCreator {
         return res;
     }
 
+    @Override
     public void destroy(){
         vertical.flush();
         horizontal.flush();
     }
 
+    @Override
     public void printGrid(){
         vertical.printGrid();
     }
 
+    @Override
     public void printMetaData(){
         System.out.println("GRID METADATA: ");
         System.out.println("rows: "+nRows+" cols: "+nCols);

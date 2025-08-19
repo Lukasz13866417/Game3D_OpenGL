@@ -67,7 +67,7 @@ public class Player implements WorldActor {
         return new Player(makeObject3D());
     }
 
-    public synchronized Vector3D getDir() {
+    public Vector3D getDir() {
         return dir;
     }
 

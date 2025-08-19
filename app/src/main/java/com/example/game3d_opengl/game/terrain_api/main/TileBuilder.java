@@ -21,15 +21,70 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 /**
  * Builds a deque of terrain tiles and, in parallel, keeps three buffers
  * – left edge points, right edge points and per-row metadata – that are always
- * size-synchronised.  Row placement is driven by a single “centre-line”
+ * size-synchronised.  Row placement is driven by a single "centre-line"
  * distance counter so it remains consistent even when the tile turns.
  */
 public class TileBuilder {
 
+    /*––––––––––––  CONFIG & STATE  ––––––––––––*/
+    private final float rowSpacing;                 // desired spacing between logical rows
+    private final float segLength;                  // preferred tile length (used by generators)
+    private final int nCols;                      // grid columns – passed to GridCreator
+
+    /*––––––––––––  BUFFERS  ––––––––––––*/
+    private final OverflowingPreallocatedCoordinateBuffer leftSideBuffer;
+    private final OverflowingPreallocatedCoordinateBuffer rightSideBuffer;
+    private final OverflowingPreallocatedRowInfoBuffer rowInfoBuffer;
+    private final OverflowingPreallocatedSegmentHistoryBuffer segmentHistoryBuffer;
+
+    private final FixedMaxSizeDeque<Tile> tiles;    // includes the guardian
+    private Tile lastTile;                          // newest tile (back of deque)
+
+    /*–––––––––––– Information about the state of the geometry ––––––––––––*/
+    private float dHorizontalAng = 0f, currHorizontalAng = 0f, currVerticalAng = 0f;
     private float pendingLift = 0f;
+    private long nextId = 0L;
+
+    // ============================================================================
+    // PUBLIC CONSTRUCTOR
+    // ============================================================================
+
+    public TileBuilder(int maxSegments, int nCols,
+                       Vector3D startMid,
+                       float segWidth, float segLength,
+                       float rowSpacing) {
+
+        this.rowSpacing = rowSpacing;
+        this.segLength = segLength;
+        this.nCols = nCols;
+
+        /*–––– data structures ––––*/
+        this.leftSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
+        this.rightSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
+        this.rowInfoBuffer = new OverflowingPreallocatedRowInfoBuffer();
+
+        this.tiles = new FixedMaxSizeDeque<>(maxSegments + 1);
+        this.segmentHistoryBuffer = new OverflowingPreallocatedSegmentHistoryBuffer();
+
+
+        /*–––– guardian tile (length close to 0) ––––*/
+        Vector3D startLeft = V3(startMid.sub(segWidth / 2, 0, 0));
+        Vector3D startRight = V3(startMid.add(segWidth / 2, 0, 0));
+
+        addTile(startLeft,
+                startRight,
+                startLeft.sub(0, 0, 0.01f),   // farLeft = nearLeft shifted a bit so len>0
+                startRight.sub(0, 0, 0.01f),  // farRight
+                true, false, false);
+
+    }
+
+    // ============================================================================
+    // PUBLIC METHODS (THE API)
+    // ============================================================================
 
     /**
-     * Creates one additional tile, continuing from {@code lastTile}’s far edge.
+     * Creates one additional tile, continuing from {@code lastTile}'s far edge.
      */
     public void addSegment(boolean isEmpty) {
         if (tiles.size() == tiles.getMaxSize()) {
@@ -47,7 +102,6 @@ public class TileBuilder {
         float dLen = (float) (Math.sqrt(baseLen.sqlen()) * tan(dHorizontalAng));
 
         Vector3D newL1 = l1.sub(line1.withLen(dLen));
-        //r1.add(line2.withLen(dLen));
 
         assert abs(newL1.y - r1.y) < 0.01f;
 
@@ -88,60 +142,6 @@ public class TileBuilder {
         this.pendingLift += dy;
     }
 
-
-    public void removeOldTiles(long playerTileId) {
-        // If first tile is far from player, this it has been visited a long time ago
-        // In that case, it can be removed because we are sure it wont be displayed anymore.
-        while (tiles.size() > 1 && (playerTileId - tiles.getFirst().getID() > 50L)) {
-            tiles.popFirst().cleanupGPUResources();
-        }
-    }
-
-    public int getCurrRowCount() {
-        return rowInfoBuffer.size() + 1;
-    }
-
-    public void cleanup() {
-        while (!tiles.isEmpty()) {
-            tiles.popFirst().cleanupGPUResources();
-        }
-        leftSideBuffer.free();
-        rightSideBuffer.free();
-        rowInfoBuffer.free();
-        segmentHistoryBuffer.free();
-    }
-
-
-    public TileBuilder(int maxSegments, int nCols,
-                       Vector3D startMid,
-                       float segWidth, float segLength,
-                       float rowSpacing) {
-
-        this.rowSpacing = rowSpacing;
-        this.segLength = segLength;
-        this.nCols = nCols;
-
-        /*–––– data structures ––––*/
-        this.leftSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
-        this.rightSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
-        this.rowInfoBuffer = new OverflowingPreallocatedRowInfoBuffer();
-
-        this.tiles = new FixedMaxSizeDeque<>(maxSegments + 1);
-        this.segmentHistoryBuffer = new OverflowingPreallocatedSegmentHistoryBuffer();
-
-
-        /*–––– guardian tile (length ≈ 0) ––––*/
-        Vector3D startLeft = V3(startMid.sub(segWidth / 2, 0, 0));
-        Vector3D startRight = V3(startMid.add(segWidth / 2, 0, 0));
-
-        addTile(startLeft,
-                startRight,
-                startLeft.sub(0, 0, 0.01f),   // farLeft = nearLeft shifted a bit so len>0
-                startRight.sub(0, 0, 0.01f),  // farRight
-                true, false, false);
-
-    }
-
     public void addVerticalAngle(float angle) {
         currVerticalAng += angle;
     }
@@ -158,6 +158,32 @@ public class TileBuilder {
 
     public void setVerticalAngle(float angle) {
         currVerticalAng = angle;
+    }
+
+    public void removeOldTiles(long playerTileId) {
+        // If first tile is far from player, this it has been visited a long time ago
+        // In that case, it can be removed because we are sure it wont be displayed anymore.
+        while (tiles.size() > 1 && (playerTileId - tiles.getFirst().getID() > 50L)) {
+            tiles.popFirst().cleanupGPUResources();
+        }
+    }
+
+    public void cleanup() {
+        while (!tiles.isEmpty()) {
+            tiles.popFirst().cleanupGPUResources();
+        }
+        leftSideBuffer.free();
+        rightSideBuffer.free();
+        rowInfoBuffer.free();
+        segmentHistoryBuffer.free();
+    }
+
+    // ============================================================================
+    // GETTERS AND SETTERS
+    // ============================================================================
+
+    public int getCurrRowCount() {
+        return rowInfoBuffer.size() + 1;
     }
 
     public int getTileCount() {
@@ -186,6 +212,10 @@ public class TileBuilder {
         };
     }
 
+    // ============================================================================
+    // DEBUG AND UTILITY METHODS
+    // ============================================================================
+
     public Vector3D[] leftSideToArrayDebug() {
         int total = leftSideBuffer.size();
         if (total <= 1) return new Vector3D[0]; // should not happen, but be safe
@@ -206,33 +236,9 @@ public class TileBuilder {
         return res;
     }
 
-    public void printRowInfoToArrayDebug() {
-        GridRowInfo[] res = new GridRowInfo[rowInfoBuffer.size()];
-        for (int i = 0; i < res.length; i++) {
-            System.out.println(rowInfoBuffer.get(i));
-        }
-    }
-
-
-    private long nextId = 0L;
-
-    /*––––––––––––  CONFIG & STATE  ––––––––––––*/
-
-    private final float rowSpacing;                 // desired spacing between logical rows
-    private final float segLength;                  // preferred tile length (used by generators)
-    private final int nCols;                      // grid columns – passed to GridCreator
-
-    /*––––––––––––  BUFFERS  ––––––––––––*/
-
-    private final OverflowingPreallocatedCoordinateBuffer leftSideBuffer;
-    private final OverflowingPreallocatedCoordinateBuffer rightSideBuffer;
-    private final OverflowingPreallocatedRowInfoBuffer rowInfoBuffer;
-    private final OverflowingPreallocatedSegmentHistoryBuffer segmentHistoryBuffer;
-
-    private final FixedMaxSizeDeque<Tile> tiles;    // includes the guardian
-    private Tile lastTile;                          // newest tile (back of deque)
-
-    private float dHorizontalAng = 0f, currHorizontalAng = 0f, currVerticalAng = 0f;
+    // ============================================================================
+    // PACKAGE-PRIVATE AND PRIVATE METHODS
+    // ============================================================================
 
     /**
      * Helper: builds a new tile and fully integrates it with row/buffer tracking.
@@ -397,6 +403,10 @@ public class TileBuilder {
         }
         return res;
     }
+
+    // ============================================================================
+    // INNER CLASSES
+    // ============================================================================
 
     public static class SegmentHistory {
 
