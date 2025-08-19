@@ -3,6 +3,8 @@ package com.example.game3d_opengl.game.terrain_api;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 
+import androidx.annotation.NonNull;
+
 import com.example.game3d_opengl.rendering.object3d.Polygon3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -23,9 +25,8 @@ public class Tile implements TerrainElement {
         return isEmptySegment;
     }
 
-    public boolean isLiftedUp() { return isLiftedUp; }
 
-    private final boolean isEmptySegment, isLiftedUp;
+    private final boolean isEmptySegment;
 
     /**
      * All four corners of this tile:
@@ -48,7 +49,7 @@ public class Tile implements TerrainElement {
      * Constructs a Tile using 4 corners plus slope.
      * The Polygon3D is created separately via factory method.
      */
-    private Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, Polygon3D polygon3D, boolean isEmptySegment, boolean isLiftedUp) {
+    private Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, Polygon3D polygon3D, boolean isEmptySegment) {
         this.nearLeft = nl;
         this.nearRight = nr;
         this.farLeft = fl;
@@ -57,7 +58,6 @@ public class Tile implements TerrainElement {
         this.id = l;
         this.polygon3D = polygon3D;
         this.isEmptySegment = isEmptySegment;
-        this.isLiftedUp = isLiftedUp;
 
         this.triangles = new Vector3D[][]{
             new Vector3D[]{this.nearLeft,this.nearRight,this.farRight},
@@ -66,7 +66,7 @@ public class Tile implements TerrainElement {
     }
 
     public static Polygon3D makePolygon3D(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr) {
-        // Build an array of perimeter coords: nearLeft -> nearRight -> farRight -> farLeft
+        // Build an array of perimeter cords: nearLeft -> nearRight -> farRight -> farLeft
         // The center will be computed automatically by Polygon3D
         float[] perimeterCoords = new float[]{
                 nl.x, nl.y, nl.z,
@@ -83,9 +83,9 @@ public class Tile implements TerrainElement {
                 defaultColor);
     }
     
-    public static Tile createTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, boolean isEmpty, boolean isLiftedUp) {
+    public static Tile createTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, float slope, long l, boolean isEmpty) {
         Polygon3D polygon = makePolygon3D(nl, nr, fl, fr);
-        return new Tile(nl, nr, fl, fr, slope, l, polygon, isEmpty, isLiftedUp);
+        return new Tile(nl, nr, fl, fr, slope, l, polygon, isEmpty);
     }
 
     /**
@@ -130,6 +130,7 @@ public class Tile implements TerrainElement {
         }
     }
 
+    @NonNull
     @Override
     public String toString() {
         return "TILE["

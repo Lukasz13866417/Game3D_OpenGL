@@ -91,6 +91,7 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
      */
     public void add(int leftAddedCnt, int rightAddedCnt,
                     int rowsAddedCnt,
+                    boolean isLiftedUp,
                     int nextRowLeftInd, int nextRowRightInd,
                     float leftoverL, float leftoverR,
                     Vector3D nl, Vector3D nr) {
@@ -103,6 +104,6 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
             head = (head + 1) % MAX_SIZE; // drop oldest
         }
         SegmentHistory helper = myBuffer[writeIdx];
-        helper.set(leftAddedCnt, rightAddedCnt, rowsAddedCnt, nextRowLeftInd, nextRowRightInd, leftoverL, leftoverR, nl, nr);
+        helper.set(leftAddedCnt, rightAddedCnt, rowsAddedCnt, isLiftedUp, nextRowLeftInd, nextRowRightInd, leftoverL, leftoverR, nl, nr);
     }
 }

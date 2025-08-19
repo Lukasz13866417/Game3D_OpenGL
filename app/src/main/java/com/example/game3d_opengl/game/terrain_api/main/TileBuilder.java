@@ -62,23 +62,25 @@ public class TileBuilder {
         Vector3D l2 = newL1.add(dir);
         Vector3D r2 = r1.add(dir);
 
+
         // Update the last tile's far edge by replacing it with [newL1,newR1].
+        SegmentHistory lastHistory = segmentHistoryBuffer.get(segmentHistoryBuffer.size()-1);
+        boolean wasLastLiftedUp = lastHistory.isLiftedUp;
         Tile oldLast = removeLastTile();
 
         if(tiles.isEmpty()){ // re-adding guardian - oldLast.isEmptySegment() -> true
             // so oldLast.isLiftedUp() -> false, and isLiftedUp doesn't matter
             addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), false, false);
         }else{
-            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), tiles.getLast().isEmptySegment(), oldLast.isLiftedUp());
+            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), tiles.getLast().isEmptySegment(), wasLastLiftedUp);
         }
         oldLast.cleanupGPUResources();
 
-        boolean isLiftedUp = (abs(pendingLift) > EPSILON);
         // Add the new segment tile.
         addTile(newL1.addY(pendingLift),
                 r1.addY(pendingLift),
                 l2.addY(pendingLift),
-                r2.addY(pendingLift), isEmpty, oldLast.isEmptySegment(), isLiftedUp);
+                r2.addY(pendingLift), isEmpty, oldLast.isEmptySegment(), (abs(pendingLift) > EPSILON));
         pendingLift = 0;
     }
 
@@ -240,10 +242,10 @@ public class TileBuilder {
         float slopeVal = (float) atan((fl.y - nl.y) /
                 sqrt((fl.x - nl.x) * (fl.x - nl.x) + (fl.z - nl.z) * (fl.z - nl.z)));
 
-        Tile tile = Tile.createTile(nl, nr, fl, fr, slopeVal, nextId++, isEmptySegment, isLiftedUp);
+        Tile tile = Tile.createTile(nl, nr, fl, fr, slopeVal, nextId++, isEmptySegment);
         tiles.pushBack(tile);
 
-        generateRowsForTile(tile, wasPreviousEmpty);
+        generateRowsForTile(tile, wasPreviousEmpty, isLiftedUp);
 
         lastTile = tile;
     }
@@ -272,7 +274,7 @@ public class TileBuilder {
         return oldLast;
     }
 
-    private void generateRowsForTile(Tile tile, boolean wasPreviousEmpty) {
+    private void generateRowsForTile(Tile tile, boolean wasPreviousEmpty, boolean isLiftedUp) {
         Vector3D nl = tile.nearLeft;
         Vector3D nr = tile.nearRight;
         Vector3D fl = tile.farLeft;
@@ -282,6 +284,7 @@ public class TileBuilder {
             segmentHistoryBuffer.add(
                     0, 0,
                     0,
+                    false,
                     // segment history objects corresponding to empty segments should never be used.
                     // hopefully these values will crash the program whenever this rule is broken
                     -1000000000, -1000000000,
@@ -297,7 +300,7 @@ public class TileBuilder {
         int cntL = 0, cntR = 0, cntRows = 0;
         int lastLeftSideSize = leftSideBuffer.size(), lastRightSideSize = rightSideBuffer.size();
 
-        if (wasPreviousEmpty || tile.isLiftedUp()) {
+        if (wasPreviousEmpty || lastHistory.isLiftedUp) {
             // First real tile – add bridging row along its near edge so the grid starts flush.
             leftSideBuffer.addPos(nl.x, nl.y, nl.z);
             rightSideBuffer.addPos(nr.x, nr.y, nr.z);
@@ -305,9 +308,9 @@ public class TileBuilder {
             ++cntR;
         }
 
-        int nextRowLeft = (wasPreviousEmpty || tile.isLiftedUp())
+        int nextRowLeft = (wasPreviousEmpty || lastHistory.isLiftedUp)
                 ? leftSideBuffer.size() : lastHistory.nextRowLeftInd;
-        int nextRowRight = (wasPreviousEmpty || tile.isLiftedUp())
+        int nextRowRight = (wasPreviousEmpty || lastHistory.isLiftedUp)
                 ? rightSideBuffer.size() : lastHistory.nextRowRightInd;
 
         Vector3D eL = fl.sub(nl);
@@ -361,8 +364,6 @@ public class TileBuilder {
                     rightSideBuffer.getZ(nextRowRight - 1)
             );
             rowInfoBuffer.add(tile.getID(),
-                    lastHistory.nl, nl, fl,
-                    lastHistory.nr, nr, fr,
                     leftP, rightP,
                     lastLeftP, lastRightP);
             ++cntRows;
@@ -373,6 +374,7 @@ public class TileBuilder {
         float currLeftoverR = (lastHistory.leftoverR + lenR) % rowSpacing;
 
         segmentHistoryBuffer.add(cntL, cntR, cntRows,
+                isLiftedUp,
                 nextRowLeft,
                 nextRowRight,
                 currLeftoverL, currLeftoverR, nl, nr);
@@ -399,6 +401,7 @@ public class TileBuilder {
     public static class SegmentHistory {
 
         public int leftAddedCnt = 0, rightAddedCnt = 0, rowsAddedCnt = 0;
+        public boolean isLiftedUp = false;
         public int nextRowLeftInd = 0, nextRowRightInd = 0;
         public float leftoverL, leftoverR;
         public Vector3D nl = V3(0, 0, 0), nr = V3(0, 0, 0);
@@ -409,12 +412,14 @@ public class TileBuilder {
 
         public void set(int leftAddedCnt, int rightAddedCnt,
                         int rowsAddedCnt,
+                        boolean isLiftedUp,
                         int nextRowLeftInd, int nextRowRightInd,
                         float leftoverL, float leftoverR,
                         Vector3D nl, Vector3D nr) {
             this.leftAddedCnt = leftAddedCnt;
             this.rightAddedCnt = rightAddedCnt;
             this.rowsAddedCnt = rowsAddedCnt;
+            this.isLiftedUp = isLiftedUp;
             this.nextRowLeftInd = nextRowLeftInd;
             this.nextRowRightInd = nextRowRightInd;
             this.leftoverL = leftoverL;
@@ -426,8 +431,6 @@ public class TileBuilder {
 
     public static class GridRowInfo {
         public long tileId;
-        public Vector3D L1 = V3(0, 0, 0), L2 = V3(0, 0, 0), L3 = V3(0, 0, 0),
-                R1 = V3(0, 0, 0), R2 = V3(0, 0, 0), R3 = V3(0, 0, 0);
         public Vector3D LS = V3(0, 0, 0), RS = V3(0, 0, 0);
         public Vector3D LS_last = V3(0, 0, 0), RS_last = V3(0, 0, 0);
 
@@ -436,17 +439,9 @@ public class TileBuilder {
         }
 
         public void set(long tileId,
-                        Vector3D L1, Vector3D L2, Vector3D L3,
-                        Vector3D R1, Vector3D R2, Vector3D R3,
                         Vector3D LS, Vector3D RS,
                         Vector3D LS_last, Vector3D RS_last) {
             this.tileId = tileId;
-            this.L1 = L1;
-            this.L2 = L2;
-            this.L3 = L3;
-            this.R1 = R1;
-            this.R2 = R2;
-            this.R3 = R3;
             this.LS = LS;
             this.RS = RS;
             this.LS_last = LS_last;
