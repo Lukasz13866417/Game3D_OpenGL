@@ -1,0 +1,74 @@
+package com.example.game3d_opengl.game.terrain_structures;
+
+import com.example.game3d_opengl.game.terrain_api.addon.Addon;
+import com.example.game3d_opengl.game.terrain_api.main.BasicTerrainStructure;
+import com.example.game3d_opengl.game.terrain_api.main.Terrain;
+import com.example.game3d_opengl.game.track_elements.DeathSpike;
+import com.example.game3d_opengl.rendering.util3d.GameRandom;
+
+public class BasicTerrainLine extends BasicTerrainStructure {
+
+    public BasicTerrainLine(int tilesToMake) {
+        super(tilesToMake);
+    }
+
+    @Override
+    protected void generateTiles(Terrain.TileBrush brush) {
+        for (int i = 0; i < tilesToMake; ++i) {
+            brush.addSegment();
+        }
+    }
+
+    @Override
+    protected void generateAddons(Terrain.BasicGridBrush brush, int nRows, int nCols) {
+        if (nRows <= 0 || nCols <= 0) return;
+
+        int variant = GameRandom.randInt(0, 2);
+        switch (variant) {
+            case 0:
+                placeCenterVerticalStripe(brush, nRows, nCols);
+                break;
+            case 1:
+                placeTwoVerticalStripes(brush, nRows, nCols);
+                break;
+            case 2:
+                placeMiddleHorizontalBand(brush, nRows, nCols);
+                break;
+        }
+    }
+
+    private void placeCenterVerticalStripe(Terrain.BasicGridBrush brush, int nRows, int nCols) {
+        int col = Math.max(0, Math.min(nCols - 1, nCols / 2));
+        int length = Math.min(nRows, 10);
+        Addon[] addons = makeSpikes(length);
+        brush.reserveVertical(0, col, length, addons);
+    }
+
+    private void placeTwoVerticalStripes(Terrain.BasicGridBrush brush, int nRows, int nCols) {
+        int colL = Math.max(0, nCols / 3);
+        int colR = Math.max(0, Math.min(nCols - 1, (2 * nCols) / 3));
+        int length = Math.min(nRows, 6);
+        Addon[] left = makeSpikes(length);
+        Addon[] right = makeSpikes(length);
+        brush.reserveVertical(0, colL, length, left);
+        brush.reserveVertical(0, colR, length, right);
+    }
+
+    private void placeMiddleHorizontalBand(Terrain.BasicGridBrush brush, int nRows, int nCols) {
+        int row = Math.max(0, nRows / 2);
+        int length = Math.max(1, Math.min(nCols, Math.max(3, nCols / 2)));
+        int startCol = Math.max(0, Math.min(nCols - length, (nCols - length) / 2));
+        Addon[] addons = makeSpikes(length);
+        brush.reserveHorizontal(row, startCol, length, addons);
+    }
+
+    private Addon[] makeSpikes(int length) {
+        Addon[] addons = new Addon[length];
+        for (int j = 0; j < addons.length; ++j) {
+            addons[j] = DeathSpike.createDeathSpike();
+        }
+        return addons;
+    }
+}
+
+

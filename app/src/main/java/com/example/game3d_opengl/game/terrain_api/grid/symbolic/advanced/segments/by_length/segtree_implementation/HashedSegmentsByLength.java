@@ -1,8 +1,8 @@
-package com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.by_length.segtree_implementation;
+package com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.by_length.segtree_implementation;
 
 
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
-import com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.by_length.SegmentsByLength;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.by_length.SegmentsByLength;
 
 public abstract class HashedSegmentsByLength implements SegmentsByLength {
 

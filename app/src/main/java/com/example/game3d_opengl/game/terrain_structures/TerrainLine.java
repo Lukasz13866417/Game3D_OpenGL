@@ -1,11 +1,12 @@
 package com.example.game3d_opengl.game.terrain_structures;
 
+import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;
+import com.example.game3d_opengl.game.terrain_api.main.BaseTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 
-public class TerrainLine extends TerrainStructure {
+public class TerrainLine extends AdvancedTerrainStructure {
 
     public TerrainLine(int tilesToMake) {
         super(tilesToMake);
@@ -20,7 +21,7 @@ public class TerrainLine extends TerrainStructure {
     }
 
     @Override
-    protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols){
+    protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols){
         /*for(int i=0;i<3;++i){
             brush.reserveRandomFittingHorizontal(2,new Addon[]{
                     DeathSpike.createDeathSpike(), DeathSpike.createDeathSpike()

@@ -37,7 +37,7 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.Preallo
  */
 public class Terrain {
 
-    public void cleanupGPUResources(){
+    public void cleanupGPUResources() {
         commandBuffer.free();
         tileBuilder.cleanup();
         gridCreatorWrapperQueue.clear();
@@ -47,13 +47,13 @@ public class Terrain {
         structureStack.clear();
         waitingStructuresQueue.clear();
         childStructuresQueue.clear();
-        for(Addon addon : addons){
+        for (Addon addon : addons) {
             addon.cleanupGPUResources();
         }
         addons.clear();
     }
 
-    final TileBuilder tileBuilder;
+    public final TileBuilder tileBuilder;
 
     public int getTileCount() {
         return tileBuilder.getTileCount();
@@ -64,10 +64,10 @@ public class Terrain {
     }
 
     public void resetGPUResources() {
-        for(int i=0;i<tileBuilder.getTileCount();++i){
+        for (int i = 0; i < tileBuilder.getTileCount(); ++i) {
             tileBuilder.getTile(i).resetGPUResources();
         }
-        for(Addon addon : addons){
+        for (Addon addon : addons) {
             addon.resetGPUResources();
         }
     }
@@ -108,7 +108,7 @@ public class Terrain {
             commandBuffer.addCommand(CMD_LIFT_UP, dy);
         }
 
-        public void addChild(TerrainStructure child) {
+        public void addChild(BaseTerrainStructure child) {
             childStructuresQueue.enqueue(child);
             commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE, 1);
             child.generateTiles(this);
@@ -117,11 +117,47 @@ public class Terrain {
     }
 
     /**
-     * API for terrain structures for putting addons on the landscape, using a grid
+     * API for terrain structures for putting addons on the landscape, using a grid.
      */
-    public class GridBrush {
+    public abstract static class BaseGridBrush {
+        public abstract void reserveVertical(int row, int col, int length, Addon[] addons);
+
+        public abstract void reserveHorizontal(int row, int col, int length, Addon[] addons);
+    }
+
+    /**
+     * Basic version of the API.
+     * It doesn't check for situations where multiple addons occupy the same grid square.
+     */
+    public class BasicGridBrush extends BaseGridBrush {
         public void reserveVertical(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
+            commandBuffer.addCommand(CMD_RESERVE_VERTICAL, row, col, length);
+            for (Addon addon : addons) {
+                addonQueue.enqueue(addon);
+            }
+        }
+
+        public void reserveHorizontal(int row, int col, int length, Addon[] addons) {
+            assert addons.length == length : "Addon count doesn't match segment length";
+            commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL, row, col, length);
+            for (Addon addon : addons) {
+                addonQueue.enqueue(addon);
+            }
+        }
+
+    }
+
+    /**
+     * Slower but more powerful version.
+     * It checks for situations where multiple addons occupy the same grid square.
+     * Use this as the "root" terrain structure to prevent such situations.
+     * It also provides randomized queries (reserveRandomFittingHorizontal/Vertical).
+     */
+    public class AdvancedGridBrush extends BaseGridBrush {
+        public void reserveVertical(int row, int col, int length, Addon[] addons) {
+            assert addons.length == length : "Addon count doesn't match segment length";
+            System.out.println("Enqueue RV "+row+","+col+","+length);
             commandBuffer.addCommand(CMD_RESERVE_VERTICAL, row, col, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
@@ -166,15 +202,16 @@ public class Terrain {
 
 
     // structures waiting for command interpretation
-    final ArrayStack<TerrainStructure> structureStack;
+    final ArrayStack<BaseTerrainStructure<?>> structureStack;
 
     // structures waiting for command generation
-    final ArrayQueue<TerrainStructure> waitingStructuresQueue;
-    final ArrayQueue<TerrainStructure> childStructuresQueue;
+    final ArrayQueue<BaseTerrainStructure<?>> waitingStructuresQueue;
+    final ArrayQueue<BaseTerrainStructure<?>> childStructuresQueue;
 
 
     final TileBrush tileBrush;
-    final GridBrush gridBrush;
+    final AdvancedGridBrush advancedGridBrush;
+    final BasicGridBrush basicGridBrush;
 
     /**
      * Deque to hold all tiles (including the guardian).
@@ -217,7 +254,9 @@ public class Terrain {
         this.waitingStructuresQueue = new ArrayQueue<>();
         this.childStructuresQueue = new ArrayQueue<>();
 
-        this.gridBrush = new GridBrush();
+        this.advancedGridBrush = new AdvancedGridBrush();
+        this.basicGridBrush = new BasicGridBrush();
+
         this.tileBrush = new TileBrush();
 
     }
@@ -229,7 +268,7 @@ public class Terrain {
     }
 
     public void removeOldTerrainElements(long playerTileId) {
-        
+
         tileBuilder.removeOldTiles(playerTileId);
         removeOldAddons(playerTileId);
     }
@@ -242,10 +281,9 @@ public class Terrain {
         return addons.get(i);
     }
 
-    public void enqueueStructure(TerrainStructure what) {
+    public void enqueueStructure(BaseTerrainStructure what) {
         waitingStructuresQueue.enqueue(what);
     }
-
 
     public void generateChunks(int nChunks) {
         while (nChunks != 0) {

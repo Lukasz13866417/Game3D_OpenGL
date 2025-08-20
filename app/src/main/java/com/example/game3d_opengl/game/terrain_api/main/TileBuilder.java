@@ -183,7 +183,7 @@ public class TileBuilder {
     // ============================================================================
 
     public int getCurrRowCount() {
-        return rowInfoBuffer.size() + 1;
+        return rowInfoBuffer.size();
     }
 
     public int getTileCount() {

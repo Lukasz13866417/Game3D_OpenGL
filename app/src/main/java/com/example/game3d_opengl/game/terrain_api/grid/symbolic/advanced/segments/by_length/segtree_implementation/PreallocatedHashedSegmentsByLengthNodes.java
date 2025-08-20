@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.by_length.segtree_implementation;
+package com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.by_length.segtree_implementation;
 
 
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;

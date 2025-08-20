@@ -1,14 +1,13 @@
 package com.example.game3d_opengl.game.terrain_structures;
 
-import android.graphics.Point;
-
+import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;
+import com.example.game3d_opengl.game.terrain_api.main.BaseTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 import com.example.game3d_opengl.game.track_elements.Potion;
 
-public class TerrainCurve extends TerrainStructure {
+public class TerrainCurve extends AdvancedTerrainStructure {
 
     private final float dAngHor;
 
@@ -27,7 +26,7 @@ public class TerrainCurve extends TerrainStructure {
     }
 
     @Override
-    protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
+    protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
         for (int i = 0; i < 2; ++i) {
             Addon[] addons = new Addon[5];
             for (int j = 0; j < addons.length; ++j) {

@@ -1,8 +1,8 @@
-package com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments;
+package com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments;
 
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
-import com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.by_length.SegmentsByLength;
-import com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.by_length.segtree_implementation.PreallocatedHashedSegmentsByLengthNodes;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.by_length.SegmentsByLength;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.by_length.segtree_implementation.PreallocatedHashedSegmentsByLengthNodes;
 
 import java.util.Random;
 
@@ -35,6 +35,7 @@ public class PartialSegmentHandler {
     }
 
     public void reserve(int row, int col, int length) {
+        System.out.println("PSH: "+row+","+col+","+length);
         GridSegment[] reserve = segmentsByEndPosition.reserve(row, col, length);
         segmentsByLength.delete(reserve[0].row, reserve[0].col, reserve[0].length);
         if (reserve[1] != null) {

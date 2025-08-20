@@ -1,11 +1,12 @@
 package com.example.game3d_opengl.game.terrain_structures;
 
+import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;
+import com.example.game3d_opengl.game.terrain_api.main.BaseTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 
-public class Terrain2DCurve extends TerrainStructure {
+public class Terrain2DCurve extends AdvancedTerrainStructure {
 
     private final float dAngHor, dAngVer;
 
@@ -28,7 +29,7 @@ public class Terrain2DCurve extends TerrainStructure {
     }
 
     @Override
-    protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
+    protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
         for(int i=0;i<2;++i){
             Addon[] addons = new Addon[3];
             for(int j = 0; j <addons.length; ++j){
