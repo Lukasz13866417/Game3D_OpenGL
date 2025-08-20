@@ -27,7 +27,6 @@ public class AdvancedGridCreator implements BaseGridCreator {
 
     @Override
     public GridSegment reserveVertical(int row, int col, int length) {
-        System.out.println("GC: "+row+","+col+","+length);
         if (parent != null && parent.content != null) {
             parent.content.reserveVertical(row + parentRowOffset, col, length);
         }
