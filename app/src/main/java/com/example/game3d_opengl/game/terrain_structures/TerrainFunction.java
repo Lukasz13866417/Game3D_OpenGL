@@ -1,10 +1,9 @@
 package com.example.game3d_opengl.game.terrain_structures;
 
+import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;
-import com.example.game3d_opengl.game.terrain_api.addon.Addon;
-import com.example.game3d_opengl.game.terrain_api.main.Terrain.GridBrush;
-import com.example.game3d_opengl.game.terrain_api.main.Terrain.TileBrush;
+import com.example.game3d_opengl.game.terrain_api.main.BaseTerrainStructure;
+import com.example.game3d_opengl.game.terrain_api.main.Terrain.AdvancedGridBrush;
 
 import java.util.function.Function;
 
@@ -13,7 +12,7 @@ import java.util.function.Function;
  * The function is sampled across the number of tiles, and its values are
  * used to set (or increment) the vertical angle of each segment.
  */
-public class TerrainFunction extends TerrainStructure {
+public class TerrainFunction extends AdvancedTerrainStructure {
 
     private final Function<Float, Float> function;
     private final float xStart;
@@ -59,7 +58,7 @@ public class TerrainFunction extends TerrainStructure {
     }
 
     @Override
-    protected void generateAddons(GridBrush brush, int nRows, int nCols) {
+    protected void generateAddons(AdvancedGridBrush brush, int nRows, int nCols) {
        
     }
 }

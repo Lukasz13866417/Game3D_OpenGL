@@ -1,7 +1,8 @@
 package com.example.game3d_opengl.game.terrain_structures;
 
+import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;
+import com.example.game3d_opengl.game.terrain_api.main.BaseTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 
@@ -9,7 +10,7 @@ import com.example.game3d_opengl.game.track_elements.DeathSpike;
  * A test terrain structure that alternates between regular tiles and empty segments
  * to verify that addons are not placed in empty segments.
  */
-public class EmptySegmentTestStructure extends TerrainStructure {
+public class EmptySegmentTestStructure extends AdvancedTerrainStructure {
 
     public EmptySegmentTestStructure(int tilesToMake) {
         super(tilesToMake);
@@ -35,7 +36,7 @@ public class EmptySegmentTestStructure extends TerrainStructure {
     }
 
     @Override
-    protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
+    protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
         // Try to place addons - they should be prevented from appearing in empty segments
         Addon[] addons = new Addon[3];
         for (int j = 0; j < addons.length; j++) {

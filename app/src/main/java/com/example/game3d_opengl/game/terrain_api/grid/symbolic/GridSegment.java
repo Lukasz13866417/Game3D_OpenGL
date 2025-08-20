@@ -1,5 +1,7 @@
 package com.example.game3d_opengl.game.terrain_api.grid.symbolic;
 
+import androidx.annotation.NonNull;
+
 public class GridSegment {
     public final int row, col, length;
     public GridSegment(int row, int col, int length) {
@@ -8,6 +10,7 @@ public class GridSegment {
         this.length = length;
     }
 
+    @NonNull
     @Override
     public String toString() {
         return "(r" + row + ", c" + col + ", l" + length + ")";

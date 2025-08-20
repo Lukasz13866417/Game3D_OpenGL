@@ -1,11 +1,9 @@
 package com.example.game3d_opengl.game.terrain_api.main;
 
-import android.util.Pair;
-
-import com.example.game3d_opengl.game.terrain_api.Tile;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.BaseGridCreator;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
-import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreator;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.AdvancedGridCreator;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
 
@@ -34,6 +32,7 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         int code = (int) buffer[offset];
         switch (code) {
             case CMD_RESERVE_VERTICAL:
+                Util.printCommand(buffer,offset);
                 handleReserveVertical(buffer, offset);
                 break;
             case CMD_RESERVE_HORIZONTAL:
@@ -58,12 +57,12 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         int row = (int) buffer[offset + 2];
         int col = (int) buffer[offset + 3];
         int segLength = (int) buffer[offset + 4];
-        GridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
+        BaseGridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
         latest.reserveVertical(row, col, segLength);
-        processAddons(row, col, segLength, latest, false);
+        processAddons(row, col, segLength, false);
     }
 
-    private void processAddons(int baseRow, int baseCol, int length, GridCreator creator, boolean horizontal) {
+    private void processAddons(int baseRow, int baseCol, int length,  boolean horizontal) {
         int rOffset = terrain.rowOffsetQueue.peek();
         for (int i = 0; i < length; ++i) {
             Addon addon = terrain.addonQueue.dequeue();
@@ -84,23 +83,25 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         int row = (int) buffer[offset + 2];
         int col = (int) buffer[offset + 3];
         int segLength = (int) buffer[offset + 4];
-        GridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
+        BaseGridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
         latest.reserveHorizontal(row, col, segLength);
-        processAddons(row, col, segLength, latest, true);
+        processAddons(row, col, segLength, true);
     }
 
     private void handleReserveRandomVertical(float[] buffer, int offset) {
         int segLength = (int) buffer[offset + 2];
-        GridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
+        assert terrain.gridCreatorWrapperQueue.peek().content instanceof AdvancedGridCreator;
+        AdvancedGridCreator latest = (AdvancedGridCreator) terrain.gridCreatorWrapperQueue.peek().content;
         GridSegment found = latest.reserveRandomFittingVertical(segLength);
-        processAddons(found.row, found.col, segLength, latest, false);
+        processAddons(found.row, found.col, segLength, false);
     }
 
     private void handleReserveRandomHorizontal(float[] buffer, int offset) {
         int segLength = (int) buffer[offset + 2];
-        GridCreator latest = terrain.gridCreatorWrapperQueue.peek().content;
+        assert terrain.gridCreatorWrapperQueue.peek().content instanceof AdvancedGridCreator;
+        AdvancedGridCreator latest = (AdvancedGridCreator) terrain.gridCreatorWrapperQueue.peek().content;
         GridSegment found = latest.reserveRandomFittingHorizontal(segLength);
-        processAddons(found.row, found.col, segLength, latest, true);
+        processAddons(found.row, found.col, segLength, true);
     }
 
     @Override

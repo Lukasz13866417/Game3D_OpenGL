@@ -1,15 +1,18 @@
-package com.example.game3d_opengl.game.terrain_api.grid.symbolic;
+package com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced;
 
-import com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments.PartialSegmentHandler;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.BaseGridCreator;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreatorWrapper;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.PartialSegmentHandler;
 
-public class GridCreator implements BaseGridCreator {
+public class AdvancedGridCreator implements BaseGridCreator {
 
     private final int nRows, nCols;
     private final PartialSegmentHandler vertical, horizontal;
     private final GridCreatorWrapper parent;
     private final int parentRowOffset;
 
-    public GridCreator(int nRows, int nCols, GridCreatorWrapper parentGrid, int parentRowOffset) {
+    public AdvancedGridCreator(int nRows, int nCols, GridCreatorWrapper parentGrid, int parentRowOffset) {
         this.nRows = nRows;
         this.nCols = nCols;
         this.horizontal = new PartialSegmentHandler(nRows, nCols, false);
@@ -18,14 +21,15 @@ public class GridCreator implements BaseGridCreator {
         this.parent = parentGrid;
     }
 
-    public GridCreator(int nRows, int nCols) {
+    public AdvancedGridCreator(int nRows, int nCols) {
         this(nRows, nCols, null, 0);
     }
 
     @Override
     public GridSegment reserveVertical(int row, int col, int length) {
+        System.out.println("GC: "+row+","+col+","+length);
         if (parent != null && parent.content != null) {
-            parent.content.reserveHorizontal(row + parentRowOffset, col, length);
+            parent.content.reserveVertical(row + parentRowOffset, col, length);
         }
         vertical.reserve(row, col, length);
         for (int r = row; r < row + length; ++r) {
@@ -49,7 +53,7 @@ public class GridCreator implements BaseGridCreator {
     public GridSegment reserveRandomFittingVertical(int length) {
         GridSegment res = vertical.reserveRandomFitting(length);
         if (parent != null && parent.content != null) {
-            parent.content.reserveHorizontal(res.row + parentRowOffset, res.col, res.length);
+            parent.content.reserveVertical(res.row + parentRowOffset, res.col, res.length);
         }
         for (int r = res.row; r < res.row + length; ++r) {
             horizontal.reserve(r, res.col, 1);
@@ -60,7 +64,7 @@ public class GridCreator implements BaseGridCreator {
     public GridSegment reserveRandomFittingHorizontal(int length) {
         GridSegment res = horizontal.reserveRandomFitting(length);
         if (parent != null && parent.content != null) {
-            parent.content.reserveVertical(res.row + parentRowOffset, res.col, res.length);
+            parent.content.reserveHorizontal(res.row + parentRowOffset, res.col, res.length);
         }
         for (int c = res.col; c < res.col + length; ++c) {
             vertical.reserve(res.row, c, 1);
@@ -83,10 +87,11 @@ public class GridCreator implements BaseGridCreator {
     public void printMetaData(){
         System.out.println("GRID METADATA: ");
         System.out.println("rows: "+nRows+" cols: "+nCols);
-        GridCreator p = parent != null ? parent.content : null;
-        System.out.println("Parent: "+p);
-        if(p != null) {
-            p.printMetaData();
+        if (parent != null && parent.content != null) {
+            System.out.println("Parent: "+ parent.content.getClass().getSimpleName());
+            parent.content.printMetaData();
+        } else {
+            System.out.println("Parent: null");
         }
     }
 

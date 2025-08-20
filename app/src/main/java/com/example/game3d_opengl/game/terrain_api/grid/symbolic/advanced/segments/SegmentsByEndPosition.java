@@ -1,14 +1,16 @@
-package com.example.game3d_opengl.game.terrain_api.grid.symbolic.segments;
+package com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments;
 
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
 
+import java.util.Arrays;
 import java.util.TreeSet;
 
 public class SegmentsByEndPosition {
 
     private final boolean vertical;
     final TreeSet<GridSegment> tree;
-    private int nRows, nCols;
+    private final int nRows;
+    private final int nCols;
 
     public SegmentsByEndPosition(int nRows, int nCols, boolean vertical) {
         this.nRows = nRows;
@@ -35,7 +37,7 @@ public class SegmentsByEndPosition {
     public GridSegment[] reserve(int row, int col, int length) {
 
         GridSegment candidate = bestFit(row, col);
-
+        assert candidate != null;
         int cStart = vertical ? candidate.row : candidate.col, start = vertical ? row : col;
         int cLength = candidate.length;
         int cOther = vertical ? candidate.col : candidate.row, other = vertical ? col : row;
@@ -95,6 +97,7 @@ public class SegmentsByEndPosition {
 
     void printGrid(){
         char[][] grid = new char[nRows][nCols];
+        System.out.println("Rows: "+nRows+" | "+"Cols: "+nCols);
         for(int r=0;r<nRows;r++){
             for(int c=0;c<nCols;c++){
                 grid[r][c] = '#';
@@ -111,7 +114,7 @@ public class SegmentsByEndPosition {
             }
         }
         for(int r=0;r<nRows;r++){
-            System.out.println(grid[r]);
+            System.out.println(r+" "+ Arrays.toString(grid[r]));
         }
     }
 

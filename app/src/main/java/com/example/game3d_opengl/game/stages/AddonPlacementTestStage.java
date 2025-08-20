@@ -10,15 +10,13 @@ import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
+import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_api.main.TerrainStructure;
-import com.example.game3d_opengl.game.terrain_api.main.TileBuilder;
+import com.example.game3d_opengl.game.terrain_api.main.BaseTerrainStructure;
 import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.rendering.LineSet3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
-import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 public class AddonPlacementTestStage extends Stage {
 
@@ -101,7 +99,7 @@ public class AddonPlacementTestStage extends Stage {
                 segWidth,
                 segLength
         );
-        terrain.enqueueStructure(new TerrainStructure(100) {
+        terrain.enqueueStructure(new AdvancedTerrainStructure(100) {
             @Override
             protected void generateTiles(Terrain.TileBrush brush) {
                 for(int i=0;i<tilesToMake;++i){
@@ -110,8 +108,8 @@ public class AddonPlacementTestStage extends Stage {
             }
 
             @Override
-            protected void generateAddons(Terrain.GridBrush brush, int nRows, int nCols) {
-                for(int i=1;i<nRows;++i){
+            protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
+                for(int i=1;i<=nRows;++i){
                     for(int j=1;j<=nCols;++j){
                         Addon[] addons = new Addon[1];
                         for (int k = 0; k < addons.length; ++k) {

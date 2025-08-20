@@ -1,7 +1,8 @@
 package com.example.game3d_opengl.game.terrain_api.main;
 
-import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreator;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.AdvancedGridCreator;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreatorWrapper;
+import com.example.game3d_opengl.game.terrain_api.grid.symbolic.basic.BasicGridCreator;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
 
 public class LandscapeCommandsExecutor implements CommandExecutor {
@@ -58,7 +59,7 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 break;
             case CMD_START_STRUCTURE_LANDSCAPE:
                 boolean isChild = (int) (buffer[offset + 2]) != 0;
-                TerrainStructure what;
+                BaseTerrainStructure<?> what;
                 if(!isChild){
                     what = terrain.waitingStructuresQueue.dequeue();
                 }else{
@@ -73,18 +74,25 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 terrain.rowCountStack.push(terrain.tileBuilder.getCurrRowCount());
                 break;
             case CMD_FINISH_STRUCTURE_LANDSCAPE:
-                TerrainStructure thatStructure = terrain.structureStack.pop();
+                BaseTerrainStructure<?> thatStructure = terrain.structureStack.pop();
                 int startRowCount = terrain.rowCountStack.pop();
                 GridCreatorWrapper myGridCreatorWrapper = terrain.gridCreatorWrapperStack.pop();
                 GridCreatorWrapper parentGridCreatorWrapper = terrain.gridCreatorWrapperStack.peek();
                 int nRowsAdded = terrain.tileBuilder.getCurrRowCount() - startRowCount;
-                myGridCreatorWrapper.content = new GridCreator(
-                        nRowsAdded-1, terrain.nCols, parentGridCreatorWrapper,
-                        startRowCount
-                );
+                if(thatStructure instanceof AdvancedTerrainStructure) {
+                    myGridCreatorWrapper.content = new AdvancedGridCreator(
+                            nRowsAdded, terrain.nCols, parentGridCreatorWrapper,
+                            startRowCount
+                    );
+                }else{
+                    myGridCreatorWrapper.content = new BasicGridCreator(
+                            nRowsAdded, terrain.nCols, parentGridCreatorWrapper,
+                            startRowCount
+                    );
+                }
                 terrain.gridCreatorWrapperQueue.enqueue(myGridCreatorWrapper);
                 terrain.rowOffsetQueue.enqueue(startRowCount);
-                thatStructure.generateAddons(terrain.gridBrush, nRowsAdded, terrain.nCols);
+                thatStructure.generateAddons(terrain, nRowsAdded, terrain.nCols);
                 terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS);
                 break;
             default:
