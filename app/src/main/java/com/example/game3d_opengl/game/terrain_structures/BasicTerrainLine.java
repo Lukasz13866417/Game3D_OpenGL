@@ -38,26 +38,26 @@ public class BasicTerrainLine extends BasicTerrainStructure {
     }
 
     private void placeCenterVerticalStripe(Terrain.BasicGridBrush brush, int nRows, int nCols) {
-        int col = Math.max(0, Math.min(nCols - 1, nCols / 2));
+        int col = Math.max(1, Math.min(nCols, (nCols + 1) / 2));
         int length = Math.min(nRows, 10);
         Addon[] addons = makeSpikes(length);
-        brush.reserveVertical(0, col, length, addons);
+        brush.reserveVertical(1, col, length, addons);
     }
 
     private void placeTwoVerticalStripes(Terrain.BasicGridBrush brush, int nRows, int nCols) {
-        int colL = Math.max(0, nCols / 3);
-        int colR = Math.max(0, Math.min(nCols - 1, (2 * nCols) / 3));
+        int colL = Math.max(1, Math.min(nCols, nCols / 3 + 1));
+        int colR = Math.max(1, Math.min(nCols, (2 * nCols) / 3 + 1));
         int length = Math.min(nRows, 6);
         Addon[] left = makeSpikes(length);
         Addon[] right = makeSpikes(length);
-        brush.reserveVertical(0, colL, length, left);
-        brush.reserveVertical(0, colR, length, right);
+        brush.reserveVertical(1, colL, length, left);
+        brush.reserveVertical(1, colR, length, right);
     }
 
     private void placeMiddleHorizontalBand(Terrain.BasicGridBrush brush, int nRows, int nCols) {
-        int row = Math.max(0, nRows / 2);
+        int row = Math.max(1, Math.min(nRows, (nRows + 1) / 2));
         int length = Math.max(1, Math.min(nCols, Math.max(3, nCols / 2)));
-        int startCol = Math.max(0, Math.min(nCols - length, (nCols - length) / 2));
+        int startCol = Math.max(1, Math.min(nCols - length + 1, (nCols - length) / 2 + 1));
         Addon[] addons = makeSpikes(length);
         brush.reserveHorizontal(row, startCol, length, addons);
     }

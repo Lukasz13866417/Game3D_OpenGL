@@ -46,25 +46,25 @@ public class BasicTerrain2DCurve extends BasicTerrainStructure {
 
     private void placeCenterShort(Terrain.BasicGridBrush brush, int nRows, int nCols) {
         int length = Math.min(3, nRows);
-        int col = Math.max(0, Math.min(nCols - 1, nCols / 2));
+        int col = Math.max(1, Math.min(nCols, (nCols + 1) / 2));
         Addon[] addons = makeSpikes(length);
-        brush.reserveVertical(0, col, length, addons);
+        brush.reserveVertical(1, col, length, addons);
     }
 
     private void placeLeftRight(Terrain.BasicGridBrush brush, int nRows, int nCols) {
         int length = Math.min(2, nRows);
-        int left = Math.max(0, nCols / 4);
-        int right = Math.max(0, Math.min(nCols - 1, (3 * nCols) / 4));
+        int left = Math.max(1, Math.min(nCols, nCols / 4 + 1));
+        int right = Math.max(1, Math.min(nCols, (3 * nCols) / 4 + 1));
         Addon[] a = makeSpikes(length);
         Addon[] b = makeSpikes(length);
-        brush.reserveVertical(0, left, length, a);
-        brush.reserveVertical(0, right, length, b);
+        brush.reserveVertical(1, left, length, a);
+        brush.reserveVertical(1, right, length, b);
     }
 
     private void placeHorizontalRow(Terrain.BasicGridBrush brush, int nRows, int nCols) {
-        int row = Math.max(0, nRows / 3);
+        int row = Math.max(1, Math.min(nRows, nRows / 3 + 1));
         int length = Math.min(3, nCols);
-        int startCol = Math.max(0, Math.min(nCols - length, nCols / 3));
+        int startCol = Math.max(1, Math.min(nCols - length + 1, nCols / 3 + 1));
         Addon[] addons = makeSpikes(length);
         brush.reserveHorizontal(row, startCol, length, addons);
     }

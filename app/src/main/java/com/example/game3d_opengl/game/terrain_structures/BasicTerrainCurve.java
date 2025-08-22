@@ -43,27 +43,27 @@ public class BasicTerrainCurve extends BasicTerrainStructure {
     }
 
     private void placeStartVerticalSet(Terrain.BasicGridBrush brush, int nRows, int nCols) {
-        int col = Math.max(0, Math.min(nCols - 1, nCols / 3));
+        int col = Math.max(1, Math.min(nCols, nCols / 3 + 1));
         int length = Math.min(nRows, 5);
         Addon[] addons = new Addon[length];
         for (int j = 0; j < addons.length; ++j) addons[j] = DeathSpike.createDeathSpike();
-        brush.reserveVertical(0, col, length, addons);
+        brush.reserveVertical(1, col, length, addons);
     }
 
     private void placeEndPotion(Terrain.BasicGridBrush brush, int nRows, int nCols) {
         Potion[] potions = new Potion[1];
         potions[0] = new Potion();
-        int row = Math.max(0, nRows - 1);
-        int col2 = Math.max(0, Math.min(nCols - 1, (2 * nCols) / 3));
+        int row = Math.max(1, nRows);
+        int col2 = Math.max(1, Math.min(nCols, (2 * nCols) / 3 + 1));
         brush.reserveHorizontal(row, col2, 1, potions);
     }
 
     private void placeAlternatingColumns(Terrain.BasicGridBrush brush, int nRows, int nCols) {
         int length = Math.min(nRows, 4);
-        for (int c = 0; c < nCols; c += 2) {
+        for (int c = 1; c <= nCols; c += 2) {
             Addon[] addons = new Addon[length];
             for (int j = 0; j < addons.length; ++j) addons[j] = DeathSpike.createDeathSpike();
-            brush.reserveVertical(0, c, length, addons);
+            brush.reserveVertical(1, c, length, addons);
         }
     }
 }

@@ -6,15 +6,20 @@ import javax.microedition.khronos.opengles.GL10;
 import android.content.Context;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.util.Log;
 
 import com.example.game3d_opengl.game.stages.AddonPlacementTestStage;
 import com.example.game3d_opengl.game.stages.EmptySegmentTestStage;
 import com.example.game3d_opengl.game.stages.GameplayStage;
 import com.example.game3d_opengl.game.stages.MenuStage;
 import com.example.game3d_opengl.game.stage_api.Stage;
+import com.example.game3d_opengl.game.stages.PolygonTestStage;
 import com.example.game3d_opengl.game.stages.TestGridRowsStage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
+
+    private static final long TARGET_FRAME_NS = 9_000_000L;
+    private static final float SLOW_FRAME_THRESHOLD_MS = 12.0f; // log if frame slower than this
 
     private final Context androidContext;
     private int surfaceW = 0, surfaceH = 0;
@@ -52,7 +57,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.stageManager = new StageManager();
         this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
-        this.currStage =  /*new TestGridRowsStage(stageManager);*/  new AddonPlacementTestStage(stageManager);/* new GameplayStage(stageManager);*/
+        this.currStage =  /*new TestGridRowsStage(stageManager);*/  /*new AddonPlacementTestStage(stageManager); */new GameplayStage(stageManager); /*new PolygonTestStage(stageManager);*/
     }
 
     public Stage getCurrentStage() {
@@ -88,9 +93,30 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         if (lastFrameTime == -1) {
             lastFrameTime = System.nanoTime();
         }
+
+        // FPS cap: ensure at least target ns between frames
         long now = System.nanoTime();
-        float deltaTime = (now - lastFrameTime) / 1000000f;
+        long elapsed = now - lastFrameTime;
+        if (elapsed < TARGET_FRAME_NS) {
+            long sleepNs = TARGET_FRAME_NS - elapsed;
+            long sleepMs = sleepNs / 1_000_000L;
+            int extraNs = (int) (sleepNs % 1_000_000L);
+            try {
+                if (sleepMs > 0 || extraNs > 0) {
+                    Thread.sleep(sleepMs, extraNs);
+                }
+            } catch (InterruptedException ignored) {}
+            now = System.nanoTime();
+            elapsed = now - lastFrameTime;
+        }
+        float deltaTime = elapsed / 1_000_000f; // pass actual time since last frame (ms)
         lastFrameTime = now;
+
+        // Slow frame logging
+        if (deltaTime > SLOW_FRAME_THRESHOLD_MS) {
+            Log.w("Perf", "perf: SLOW FRAME " + (int) deltaTime + " ms");
+        }
+
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         if (!currStage.isPaused()) {
             currStage.updateThenDraw(deltaTime);

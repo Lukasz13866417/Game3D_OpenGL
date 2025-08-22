@@ -26,7 +26,6 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.PreallocatedCommandBuffer;
 
-
 /**
  * Terrain with a fixed-size deque of tiles. We keep a `lastTile` pointer
  * to always build from the newest tile, even as older ones remain in the deque.
@@ -34,9 +33,26 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.Preallo
  * These commands are at some point (which is chosen by user) "interpreted" by CommandExecutors.
  * This gives the user control over what part of the generation process should be actually completed
  * in a given frame (single generateChunks(cnt) call).
+ * The terrain system uses a command-based architecture where:
+ * 1. Terrain structures generate commands (e.g., "add segment", "set angle")
+ * 2. Commands are stored in a buffer
+ * 3. Commands are executed in chunks to control frame time
+ * 4. This allows for complex terrain generation without blocking the main thread
  */
 public class Terrain {
 
+    // Constants for magic numbers
+    private static final int DEFAULT_QUEUE_CAPACITY = 100_000;
+
+    // Error messages
+    private static final String ERROR_INVALID_TILE_INDEX = "Invalid tile index: ";
+    private static final String ERROR_INVALID_ADDON_INDEX = "Invalid addon index: ";
+
+    /**
+     * Cleans up all GPU resources used by the terrain system.
+     * This includes VBOs, IBOs, and other OpenGL objects.
+     * Should be called when the OpenGL context is being destroyed.
+     */
     public void cleanupGPUResources() {
         commandBuffer.free();
         tileBuilder.cleanup();
@@ -53,16 +69,39 @@ public class Terrain {
         addons.clear();
     }
 
+    /**
+     * The tile builder responsible for creating and managing individual tiles.
+     * Handles the geometry generation and GPU resource management for tiles.
+     */
     public final TileBuilder tileBuilder;
 
+    /**
+     * Gets the total number of tiles currently in the terrain.
+     * 
+     * @return the number of tiles
+     */
     public int getTileCount() {
         return tileBuilder.getTileCount();
     }
 
+    /**
+     * Gets a tile at the specified index.
+     * 
+     * @param i the tile index
+     * @return the tile at the specified index
+     * @throws IndexOutOfBoundsException if the index is invalid
+     */
     public Tile getTile(int i) {
+        if (i < 0 || i >= tileBuilder.getTileCount()) {
+            throw new IndexOutOfBoundsException(ERROR_INVALID_TILE_INDEX + i);
+        }
         return tileBuilder.getTile(i);
     }
 
+    /**
+     * Resets all GPU resources after a context loss.
+     * Recreates VBOs and IBOs for all tiles and addons.
+     */
     public void resetGPUResources() {
         for (int i = 0; i < tileBuilder.getTileCount(); ++i) {
             tileBuilder.getTile(i).resetGPUResources();
@@ -73,42 +112,95 @@ public class Terrain {
     }
 
     /**
-     * API for terrain structures for creating landscape (tiles).
-     **/
+     * API for terrain structures to create landscape (tiles).
+     * The TileBrush provides methods to build terrain geometry by adding
+     * commands to the command buffer. These commands are executed later
+     * to generate the actual terrain.
+     */
     public class TileBrush {
         // Each command is stored as [commandCode, arg].
         // For commands with no arg (e.g. addSegment), we only store the code.
+
+        /**
+         * Sets the horizontal angle for the next tile.
+         * This controls the left/right orientation of the terrain.
+         * 
+         * @param ang the horizontal angle in radians
+         */
+        @SuppressWarnings("unused")
         public void setHorizontalAng(float ang) {
             commandBuffer.addCommand(CMD_SET_H_ANG, ang);
         }
 
+        /**
+         * Sets the vertical angle for the next tile.
+         * This controls the up/down slope of the terrain.
+         * 
+         * @param ang the vertical angle in radians
+         */
+        @SuppressWarnings("unused")
         public void setVerticalAng(float ang) {
             commandBuffer.addCommand(CMD_SET_V_ANG, ang);
         }
 
+        /**
+         * Adds to the current vertical angle.
+         * This creates a gradual slope change.
+         * 
+         * @param ang the angle increment in radians
+         */
+        @SuppressWarnings("unused")
         public void addVerticalAng(float ang) {
             commandBuffer.addCommand(CMD_ADD_V_ANG, ang);
         }
 
+        /**
+         * Adds to the current horizontal angle.
+         * This creates a gradual turn in the terrain.
+         * 
+         * @param ang the angle increment in radians
+         */
+        @SuppressWarnings("unused")
         public void addHorizontalAng(float ang) {
             commandBuffer.addCommand(CMD_ADD_H_ANG, ang);
         }
 
+        /**
+         * Adds a new terrain segment with the current angle settings.
+         * This creates a tile at the current position and orientation.
+         */
         public void addSegment() {
             // Just store the command code, no arg
             commandBuffer.addCommand(CMD_ADD_SEG);
         }
 
+        /**
+         * Adds an empty segment (no physical geometry).
+         * Used for spacing and creating gaps in the terrain.
+         */
         public void addEmptySegment() {
             // Just store the command code, no arg
             commandBuffer.addCommand(CMD_ADD_EMPTY_SEG);
         }
 
+        /**
+         * Lifts the terrain up by the specified amount.
+         * This creates elevation changes in the terrain.
+         * 
+         * @param dy the vertical offset in world units
+         */
         public void liftUp(float dy) {
             commandBuffer.addCommand(CMD_LIFT_UP, dy);
         }
 
-        public void addChild(BaseTerrainStructure child) {
+        /**
+         * Adds a child terrain structure to be generated after the current one.
+         * Child structures are useful for creating complex terrain features
+         * that depend on the parent structure's geometry.
+         * 
+         * @param child the child terrain structure to add
+         */
+        public void addChild(BaseTerrainStructure<?> child) {
             childStructuresQueue.enqueue(child);
             commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE, 1);
             child.generateTiles(this);
@@ -117,20 +209,51 @@ public class Terrain {
     }
 
     /**
-     * API for terrain structures for putting addons on the landscape, using a grid.
+     * Base class for grid brushes used by terrain structures.
+     * Grid brushes handle the placement of addons (objects) on the terrain.
+     * They provide an abstraction layer for different addon placement strategies.
      */
     public abstract static class BaseGridBrush {
+        /**
+         * Reserves a vertical strip of grid cells for addon placement.
+         * 
+         * @param row the starting row
+         * @param col the column
+         * @param length the number of cells to reserve
+         * @param addons the addons to place
+         */
         public abstract void reserveVertical(int row, int col, int length, Addon[] addons);
 
+        /**
+         * Reserves a horizontal strip of grid cells for addon placement.
+         * 
+         * @param row the row
+         * @param col the starting column
+         * @param length the number of cells to reserve
+         * @param addons the addons to place
+         */
         public abstract void reserveHorizontal(int row, int col, int length, Addon[] addons);
     }
 
     /**
-     * Basic version of the API.
+     * Basic version of the grid brush API.
      * It doesn't check for situations where multiple addons occupy the same grid square.
+     * This is faster but may result in overlapping addons.
      */
     public class BasicGridBrush extends BaseGridBrush {
+        /**
+         * Reserves a vertical strip without collision checking.
+         * 
+         * @param row the starting row
+         * @param col the column
+         * @param length the number of cells to reserve
+         * @param addons the addons to place
+         */
         public void reserveVertical(int row, int col, int length, Addon[] addons) {
+            assert row>0;
+            assert col>0;
+            assert col<=nCols;
+            assert length>0;
             assert addons.length == length : "Addon count doesn't match segment length";
             commandBuffer.addCommand(CMD_RESERVE_VERTICAL, row, col, length);
             for (Addon addon : addons) {
@@ -138,115 +261,172 @@ public class Terrain {
             }
         }
 
+        /**
+         * Reserves a horizontal strip without collision checking.
+         * 
+         * @param row the row
+         * @param col the starting column
+         * @param length the number of cells to reserve
+         * @param addons the addons to place
+         */
         public void reserveHorizontal(int row, int col, int length, Addon[] addons) {
+            assert row>0;
+            assert col>0;
+            assert col<=nCols;
+            assert length>0;
             assert addons.length == length : "Addon count doesn't match segment length";
             commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL, row, col, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
             }
         }
-
     }
 
     /**
-     * Slower but more powerful version.
+     * Slower but more powerful version of the grid brush.
      * It checks for situations where multiple addons occupy the same grid square.
      * Use this as the "root" terrain structure to prevent such situations.
      * It also provides randomized queries (reserveRandomFittingHorizontal/Vertical).
      */
     public class AdvancedGridBrush extends BaseGridBrush {
+        /**
+         * Reserves a vertical strip with collision checking.
+         * 
+         * @param row the starting row
+         * @param col the column
+         * @param length the number of cells to reserve
+         * @param addons the addons to place
+         */
         public void reserveVertical(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            System.out.println("Enqueue RV "+row+","+col+","+length);
+            assert row>0;
+            assert col>0;
+            assert col<=nCols;
+            assert length>0;
             commandBuffer.addCommand(CMD_RESERVE_VERTICAL, row, col, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
             }
         }
 
+        /**
+         * Reserves a horizontal strip with collision checking.
+         * 
+         * @param row the row
+         * @param col the starting column
+         * @param length the number of cells to reserve
+         * @param addons the addons to place
+         */
         public void reserveHorizontal(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
+            assert row>0;
+            assert col>0;
+            assert col<=nCols;
+            assert length>0;
             commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL, row, col, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
             }
         }
 
+        /**
+         * Reserves a random horizontal strip that fits the specified length.
+         * The system will find an available location automatically.
+         * 
+         * @param length the number of cells to reserve
+         * @param addons the addons to place
+         */
         public void reserveRandomFittingHorizontal(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
+            assert length>0;
             commandBuffer.addCommand(CMD_RESERVE_RANDOM_HORIZONTAL, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
             }
         }
 
+        /**
+         * Reserves a random vertical strip that fits the specified length.
+         * The system will find an available location automatically.
+         * 
+         * @param length the number of cells to reserve
+         * @param addons the addons to place
+         */
         public void reserveRandomFittingVertical(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
+            assert length>0;
             commandBuffer.addCommand(CMD_RESERVE_RANDOM_VERTICAL, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
             }
         }
-
     }
 
+    // Data structures for managing terrain generation state
     final ArrayStack<GridCreatorWrapper> gridCreatorWrapperStack;
     final ArrayQueue<GridCreatorWrapper> gridCreatorWrapperQueue;
-
     final IntArrayQueue rowOffsetQueue;
-
-
     final ArrayQueue<Addon> addonQueue;
-
     final IntArrayStack rowCountStack;
-
-
-    // structures waiting for command interpretation
+    
+    // Structures waiting for command interpretation
     final ArrayStack<BaseTerrainStructure<?>> structureStack;
-
-    // structures waiting for command generation
+    
+    // Structures waiting for command generation
     final ArrayQueue<BaseTerrainStructure<?>> waitingStructuresQueue;
     final ArrayQueue<BaseTerrainStructure<?>> childStructuresQueue;
 
-
+    // Core terrain components
     final TileBrush tileBrush;
     final AdvancedGridBrush advancedGridBrush;
     final BasicGridBrush basicGridBrush;
 
     /**
-     * Deque to hold all tiles (including the guardian).
+     * Deque to hold all addons (objects placed on the terrain).
+     * Addons are managed separately from tiles and can be added/removed dynamically.
      */
     final FixedMaxSizeDeque<Addon> addons;
 
+    /**
+     * The number of columns in the terrain grid.
+     * This determines the width of terrain segments.
+     */
     final int nCols;
 
+    // Command execution system
     private final GeneralExecutor generalExecutor;
-
     private final LandscapeCommandsExecutor landscapeCommandExecutor;
-
     private final AddonsCommandsExecutor addonsCommandExecutor;
 
+    /**
+     * Creates a new terrain system with the specified parameters.
+     * 
+     * @param maxSegments the maximum number of terrain segments
+     * @param nCols the number of columns in the terrain grid
+     * @param startMid the starting position for terrain generation
+     * @param segWidth the width of each terrain segment
+     * @param segLength the length of each terrain segment
+     */
     public Terrain(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength) {
-
         this.nCols = nCols;
-        this.tileBuilder = new TileBuilder(maxSegments, nCols,
-                startMid,
-                segWidth, segLength, 1f
-        );
+        
+        // Initialize the tile builder with the specified parameters
+        this.tileBuilder = new TileBuilder(maxSegments, nCols, startMid, segWidth, segLength, 1f);
 
+        // Initialize the addons collection
         this.addons = new FixedMaxSizeDeque<>(maxSegments + 1);
 
+        // Initialize the command buffer for terrain generation
         this.commandBuffer = new PreallocatedCommandBuffer();
 
-        // General Executor decides which of two other executors should execute some command.
+        // Initialize the command execution system
         this.generalExecutor = new GeneralExecutor();
-        // For landscape commands
         this.landscapeCommandExecutor = new LandscapeCommandsExecutor(this);
-        // For addon grid commands
         this.addonsCommandExecutor = new AddonsCommandsExecutor(this);
 
-        this.rowOffsetQueue = new IntArrayQueue(100_000);
-        this.rowCountStack = new IntArrayStack(100_000);
+        // Initialize data structures with appropriate capacities
+        this.rowOffsetQueue = new IntArrayQueue(DEFAULT_QUEUE_CAPACITY);
+        this.rowCountStack = new IntArrayStack(DEFAULT_QUEUE_CAPACITY);
         this.gridCreatorWrapperStack = new ArrayStack<>();
         this.gridCreatorWrapperQueue = new ArrayQueue<>();
         this.addonQueue = new ArrayQueue<>();
@@ -254,37 +434,76 @@ public class Terrain {
         this.waitingStructuresQueue = new ArrayQueue<>();
         this.childStructuresQueue = new ArrayQueue<>();
 
+        // Initialize the grid brushes
         this.advancedGridBrush = new AdvancedGridBrush();
         this.basicGridBrush = new BasicGridBrush();
 
+        // Initialize the tile brush
         this.tileBrush = new TileBrush();
-
     }
 
+    /**
+     * Removes old addons that are far behind the player.
+     * This helps manage memory usage and maintain performance.
+     * 
+     * @param playerTileId the current player's tile ID
+     */
     private void removeOldAddons(long playerTileId) {
         while (!addons.isEmpty() && addons.getFirst().isGoneBy(playerTileId)) {
             addons.popFirst().cleanupGPUResources();
         }
     }
 
+    /**
+     * Removes old terrain elements (tiles and addons) that are far behind the player.
+     * This is called each frame to maintain a reasonable terrain size.
+     * 
+     * @param playerTileId the current player's tile ID
+     */
     public void removeOldTerrainElements(long playerTileId) {
-
         tileBuilder.removeOldTiles(playerTileId);
         removeOldAddons(playerTileId);
     }
 
+    /**
+     * Gets the number of addons currently in the terrain.
+     * 
+     * @return the number of addons
+     */
     public int getAddonCount() {
         return addons.size();
     }
 
+    /**
+     * Gets an addon at the specified index.
+     * 
+     * @param i the addon index
+     * @return the addon at the specified index
+     * @throws IndexOutOfBoundsException if the index is invalid
+     */
     public Addon getAddon(int i) {
+        if (i < 0 || i >= addons.size()) {
+            throw new IndexOutOfBoundsException(ERROR_INVALID_ADDON_INDEX + i);
+        }
         return addons.get(i);
     }
 
-    public void enqueueStructure(BaseTerrainStructure what) {
+    /**
+     * Adds a terrain structure to the waiting queue.
+     * The structure will be processed during the next generation cycle.
+     * 
+     * @param what the terrain structure to add
+     */
+    public void enqueueStructure(BaseTerrainStructure<?> what) {
         waitingStructuresQueue.enqueue(what);
     }
 
+    /**
+     * Generates terrain chunks by executing pending commands.
+     * The number of chunks generated is limited to control frame time.
+     * 
+     * @param nChunks the number of chunks to generate, or -1 for all pending
+     */
     public void generateChunks(int nChunks) {
         while (nChunks != 0) {
             if (!commandBuffer.hasAnyCommands()) {
@@ -302,12 +521,15 @@ public class Terrain {
         }
     }
 
+    /**
+     * The command buffer that stores all pending terrain generation commands.
+     */
     final PreallocatedCommandBuffer commandBuffer;
 
-
     /**
-     * Based on command code, tells one of the executors to execute a command.
-     * It simply dispatches commands to appropriate executors.
+     * General executor that dispatches commands to appropriate specialized executors.
+     * It simply routes commands based on their type to either the landscape
+     * or addons command executor.
      */
     private class GeneralExecutor implements CommandExecutor {
         @Override

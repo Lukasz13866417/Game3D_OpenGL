@@ -1,5 +1,6 @@
 package com.example.game3d_opengl.game.terrain_api.terrainutil;
 
+import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.game.terrain_api.main.TileBuilder.GridRowInfo;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
@@ -91,9 +92,9 @@ public class OverflowingPreallocatedRowInfoBuffer {
      * Overwrite / initialise the next element of the buffer with provided values.
      * Acts like a push-back; overwrites the oldest entry when the buffer is full.
      */
-    public void add(long tileId,
+    public void add(long tileID,
                     Vector3D LS, Vector3D RS,
-                    Vector3D LS_last, Vector3D RS_last){
+                    Vector3D LS_last, Vector3D RS_last) {
         int writeIdx;
         if (size < MAX_SIZE) {
             writeIdx = (head + size) % MAX_SIZE;
@@ -103,6 +104,6 @@ public class OverflowingPreallocatedRowInfoBuffer {
             head = (head + 1) % MAX_SIZE; // drop oldest
         }
         GridRowInfo helper = myBuffer[writeIdx];
-        helper.set(tileId, LS, RS, LS_last, RS_last);
+        helper.set(tileID, LS, RS, LS_last, RS_last);
     }
 }

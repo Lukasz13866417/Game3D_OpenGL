@@ -21,7 +21,7 @@ import java.nio.FloatBuffer;
  */
 public class AbsoluteObject3D {
 
-    private final Polygon3D[] facePolys;
+    private final Polygon3D<?,?,?>[] facePolys;
     private int sharedVBO;
     private final FloatBuffer sharedVertexData;
     private final float[] mvpMatrix = new float[16];
@@ -37,7 +37,7 @@ public class AbsoluteObject3D {
      * @param vpMatrix The combined view-projection matrix from the camera.
      */
     public void draw(float[] vpMatrix) {
-        for (Polygon3D poly : facePolys) {
+        for (Polygon3D<?,?,?> poly : facePolys) {
             poly.draw(vpMatrix);
         }
     }
@@ -52,7 +52,7 @@ public class AbsoluteObject3D {
         // Combine the model and view-projection matrices
         Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
 
-        for (Polygon3D poly : facePolys) {
+        for (Polygon3D<?,?,?> poly : facePolys) {
             poly.draw(mvpMatrix);
         }
     }
@@ -72,7 +72,7 @@ public class AbsoluteObject3D {
                             GLES20.GL_STATIC_DRAW);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
 
-        for (Polygon3D poly : facePolys) {
+        for (Polygon3D<?,?,?> poly : facePolys) {
             poly.setVBO(sharedVBO);
             poly.reload();
         }
@@ -83,7 +83,7 @@ public class AbsoluteObject3D {
      */
     public void cleanup(){
         GLES20.glDeleteBuffers(1, new int[]{sharedVBO}, 0);
-        for(Polygon3D poly : facePolys){
+        for(Polygon3D<?,?,?> poly : facePolys){
             poly.cleanup();
         }
     }
@@ -98,7 +98,7 @@ public class AbsoluteObject3D {
         
         protected int vboId;
         protected FloatBuffer vertexData;
-        protected Polygon3D[] polygons;
+        protected Polygon3D<?,?,?>[] polygons;
 
         protected abstract B self();
 
@@ -184,13 +184,11 @@ public class AbsoluteObject3D {
                 System.arraycopy(face, 0, expandedFaceIndices, 0, face.length);
                 expandedFaceIndices[face.length] = centerIndex;
 
-                polygons[i] = Polygon3D.createWithExistingBuffer(
-                        vboId,
-                        expandedFaceIndices,
-                        face.length,
-                        fillColor,
-                        edgeColor
-                );
+                polygons[i] = new BasicPolygon3D.Builder()
+                        .fillColor(fillColor)
+                        .edgeColor(edgeColor)
+                        .fromExistingBuffer(vboId, expandedFaceIndices, face.length)
+                        .build();
             }
         }
 
