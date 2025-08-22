@@ -32,7 +32,6 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         int code = (int) buffer[offset];
         switch (code) {
             case CMD_RESERVE_VERTICAL:
-                Util.printCommand(buffer,offset);
                 handleReserveVertical(buffer, offset);
                 break;
             case CMD_RESERVE_HORIZONTAL:
@@ -66,8 +65,6 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         int rOffset = terrain.rowOffsetQueue.peek();
         for (int i = 0; i < length; ++i) {
             Addon addon = terrain.addonQueue.dequeue();
-             
-            
             int row = horizontal ? baseRow : baseRow + i;
             row += rOffset;
             long tileId = terrain.tileBuilder.getTileIdForRow(row);

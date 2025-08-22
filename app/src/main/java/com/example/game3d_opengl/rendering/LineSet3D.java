@@ -1,6 +1,6 @@
 package com.example.game3d_opengl.rendering;
 
-import static com.example.game3d_opengl.rendering.util3d.GLUtil.loadShader;
+import static com.example.game3d_opengl.rendering.object3d.ShaderPair.loadShader;
 
 import android.opengl.GLES20;
 

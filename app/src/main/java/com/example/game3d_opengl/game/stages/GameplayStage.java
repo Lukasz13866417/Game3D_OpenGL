@@ -13,7 +13,8 @@ import android.util.Log;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
-import com.example.game3d_opengl.game.terrain_structures.BasicTerrainLine;
+import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
+import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.game.track_elements.Potion;
@@ -86,12 +87,13 @@ public class GameplayStage extends Stage {
                 segWidth,
                 segLength
         );
-        terrain.enqueueStructure(new BasicTerrainLine(100));
-        terrain.enqueueStructure(new BasicTerrainLine(100));
+        terrain.enqueueStructure(new TerrainLine(100));
+        terrain.enqueueStructure(new TerrainLine(100));
         terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
-        terrain.enqueueStructure(new BasicTerrainLine(100));
-        terrain.enqueueStructure(new BasicTerrainLine(100));
+        terrain.enqueueStructure(new TerrainLine(100));
+        terrain.enqueueStructure(new TerrainLine(100));
         terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
+
 
         terrain.generateChunks(-1);
 
@@ -104,11 +106,11 @@ public class GameplayStage extends Stage {
 
         terrain.removeOldTerrainElements(player.getNearestTileId());
         if (terrain.getTileCount() < 400) {
-            terrain.enqueueStructure(new BasicTerrainLine(100));
-            terrain.enqueueStructure(new BasicTerrainLine(100));
+            terrain.enqueueStructure(new TerrainLine(100));
+            terrain.enqueueStructure(new TerrainLine(100));
             terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
-            terrain.enqueueStructure(new BasicTerrainLine(100));
-            terrain.enqueueStructure(new BasicTerrainLine(100));
+            terrain.enqueueStructure(new TerrainLine(100));
+            terrain.enqueueStructure(new TerrainLine(100));
             terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
 
         }
@@ -187,7 +189,7 @@ public class GameplayStage extends Stage {
 
     @Override
     public void resetGPUResources() {
-        Polygon3D.resetProgram();
+        // Polygon3D.resetProgram(); TODO
         LineSet3D.resetProgram();
         Potion.resetSharedResources();
         player.resetGPUResources();

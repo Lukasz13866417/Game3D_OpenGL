@@ -66,7 +66,6 @@ public class TileBuilder {
         this.tiles = new FixedMaxSizeDeque<>(maxSegments + 1);
         this.segmentHistoryBuffer = new OverflowingPreallocatedSegmentHistoryBuffer();
 
-
         /*–––– guardian tile (length close to 0) ––––*/
         Vector3D startLeft = V3(startMid.sub(segWidth / 2, 0, 0));
         Vector3D startRight = V3(startMid.add(segWidth / 2, 0, 0));
@@ -197,9 +196,9 @@ public class TileBuilder {
     public long getTileIdForRow(int row) {
         if (row <= 0) {
             // Guardian row or invalid – fall back to first real row.
-            return rowInfoBuffer.get(0).tileId;
+            return rowInfoBuffer.get(0).tileID;
         }
-        return rowInfoBuffer.get(row - 1).tileId;
+        return rowInfoBuffer.get(row - 1).tileID;
     }
 
     public Vector3D[] getField(int row, int col) {
@@ -271,8 +270,12 @@ public class TileBuilder {
         Tile oldLast = tiles.popLast();
 
         SegmentHistory history = segmentHistoryBuffer.pop();
-        for (int i = 0; i < history.leftAddedCnt; ++i) leftSideBuffer.pop();
-        for (int i = 0; i < history.rightAddedCnt; ++i) rightSideBuffer.pop();
+        for (int i = 0; i < history.leftAddedCnt; ++i) {
+            leftSideBuffer.pop();
+        }
+        for (int i = 0; i < history.rightAddedCnt; ++i) {
+            rightSideBuffer.pop();
+        }
         for (int i = 0; i < history.rowsAddedCnt; ++i) rowInfoBuffer.removeLast();
 
 
@@ -369,8 +372,7 @@ public class TileBuilder {
                     rightSideBuffer.getY(nextRowRight - 1),
                     rightSideBuffer.getZ(nextRowRight - 1)
             );
-            rowInfoBuffer.add(tile.getID(),
-                    leftP, rightP,
+            rowInfoBuffer.add(tile.getID(),leftP, rightP,
                     lastLeftP, lastRightP);
             ++cntRows;
         }
@@ -440,18 +442,18 @@ public class TileBuilder {
     }
 
     public static class GridRowInfo {
-        public long tileId;
+
+        public long tileID = -1;
         public Vector3D LS = V3(0, 0, 0), RS = V3(0, 0, 0);
         public Vector3D LS_last = V3(0, 0, 0), RS_last = V3(0, 0, 0);
-
 
         public GridRowInfo() {
         }
 
-        public void set(long tileId,
+        public void set(long tileID,
                         Vector3D LS, Vector3D RS,
                         Vector3D LS_last, Vector3D RS_last) {
-            this.tileId = tileId;
+            this.tileID = tileID;
             this.LS = LS;
             this.RS = RS;
             this.LS_last = LS_last;
