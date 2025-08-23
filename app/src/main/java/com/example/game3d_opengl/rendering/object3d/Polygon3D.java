@@ -379,7 +379,7 @@ public abstract class Polygon3D<VS extends ShaderArgValues,
         int outlineCount = indexCount - 2; // skip center and closure duplicate
         GLES20.glDrawElements(GLES20.GL_LINE_LOOP, outlineCount, GLES20.GL_UNSIGNED_SHORT, 2);
 
-        shaders.cleanupAfterDraw();
+        shaders.disableVertexAttribs();
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);

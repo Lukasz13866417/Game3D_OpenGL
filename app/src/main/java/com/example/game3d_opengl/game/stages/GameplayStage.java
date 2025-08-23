@@ -144,7 +144,7 @@ public class GameplayStage extends Stage {
             Tile tile = terrain.getTile(i);
             Vector3D tc = tile.farLeft.add(tile.farRight).add(tile.nearLeft).add(tile.nearRight)
                     .div(4);
-            if(tc.sub(V3(player.getX(), player.getY(), player.getZ())).sqlen() < 250*250) {
+            if(tc.sub(V3(player.getX(), player.getY(), player.getZ())).sqlen() < 100*100) {
                 tile.setTileColor(colorTheme);
                 tile.draw(camera.getViewProjectionMatrix());
             }
@@ -190,7 +190,7 @@ public class GameplayStage extends Stage {
 
     @Override
     public void resetGPUResources() {
-        BasicShaderPair.sharedShader.resetProgram();
+        BasicShaderPair.sharedShader.reloadProgram();
         LineSet3D.resetProgram();
         Potion.resetSharedResources();
         player.resetGPUResources();

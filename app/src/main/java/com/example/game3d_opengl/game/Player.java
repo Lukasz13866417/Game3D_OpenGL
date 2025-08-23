@@ -3,8 +3,6 @@ package com.example.game3d_opengl.game;
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.getNormal;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.isPointInTriangle;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.pointAndPlanePosition;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.rayTriangleDistance;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.rotY;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
@@ -436,19 +434,15 @@ public class Player implements WorldActor {
         }
     }
 
-    // Position and rotation getters (delegated to Object3D)
     public float getX() { return object3D != null ? object3D.objX : 0f; }
     public float getY() { return object3D != null ? object3D.objY : 0f; }
     public float getZ() { return object3D != null ? object3D.objZ : 0f; }
-    public float getYaw() { return object3D != null ? object3D.objYaw : 0f; }
-    public float getPitch() { return object3D != null ? object3D.objPitch : 0f; }
-    public float getRoll() { return object3D != null ? object3D.objRoll : 0f; }
 
     // Static fields
     private static Object3D.Builder playerBuilder;
     
     // Instance fields
-    private Object3D object3D;
+    private final Object3D object3D;
     private Vector3D dir;
     private Vector3D move;
 

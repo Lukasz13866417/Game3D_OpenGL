@@ -1,6 +1,5 @@
 package com.example.game3d_opengl.rendering.object3d;
 
-
 import android.opengl.GLES20;
 
 /**
@@ -10,19 +9,23 @@ import android.opengl.GLES20;
 public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
                                 FragmentShaderArgValues extends ShaderArgValues> {
 
+    // 1) Constants and static fields
 
-    private static final int SHADER_PROGRAM_INITIAL_VALUE = 0;
-
+    // 2) Instance fields
     private int programHandle;
     private final String vsSource;
     private final String fsSource;
+    private VertexShaderArgValues va = null;
+    private FragmentShaderArgValues fa = null;
+
+    // 3) Constructors
     protected ShaderPair(int programHandle, String vsSource, String fsSource) {
         this.programHandle = programHandle;
         this.vsSource = vsSource;
         this.fsSource = fsSource;
     }
 
-    // ===== Builder base class =====
+    // Nested builder
     public static abstract class BaseBuilder<S extends ShaderPair<?,?>, B extends BaseBuilder<S,B>> {
         protected String vsSource;
         protected String fsSource;
@@ -48,83 +51,22 @@ public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
         public final S build() {
             int handle = (existingProgramHandle != null)
                     ? existingProgramHandle
-                    : createPrograms(vsSource, fsSource);
+                    : createProgram(vsSource, fsSource);
             S pair = create(handle, vsSource, fsSource);
             pair.setupAttribLocations();
             return pair;
         }
     }
 
-    // ===== factory hook =====
-    @FunctionalInterface
-    public interface Creator<T extends ShaderPair<?,?>> {
-        T create(int programHandle, String vs, String fs);
-    }
-
-    public static <T extends ShaderPair<?,?>> T create(
-            String vs, String fs, Creator<T> maker) {
-        int handle = createProgram(vs, fs);      // compile + link here
-        return maker.create(handle, vs, fs);     // subclass ctor receives handle
-    }
-
-    private static int createProgram(String vs, String fs) {
-        int v = loadShader(GLES20.GL_VERTEX_SHADER, vs);
-        int f = loadShader(GLES20.GL_FRAGMENT_SHADER, fs);
-        int p = GLES20.glCreateProgram();
-        GLES20.glAttachShader(p, v);
-        GLES20.glAttachShader(p, f);
-        GLES20.glLinkProgram(p);
-        int[] ok = new int[1];
-        GLES20.glGetProgramiv(p, GLES20.GL_LINK_STATUS, ok, 0);
-        if (ok[0] == 0) {
-            String log = GLES20.glGetProgramInfoLog(p);
-            GLES20.glDeleteProgram(p);
-            GLES20.glDeleteShader(v);
-            GLES20.glDeleteShader(f);
-            throw new RuntimeException("Program link error:\n" + log);
-        }
-        GLES20.glDeleteShader(v);
-        GLES20.glDeleteShader(f);
-        return p;
-    }
-
-    /**
-     * Resets the shader program when GL context is recreated.
-     * This is a package-private method that allows Object3D to reset the program
-     * after context recreation.
-     */
-    public void resetProgram() {
-        if (programHandle != SHADER_PROGRAM_INITIAL_VALUE) {
-            if (android.opengl.GLES20.glIsProgram(programHandle)) {
-                android.opengl.GLES20.glDeleteProgram(programHandle);
-            }
-            programHandle = SHADER_PROGRAM_INITIAL_VALUE;
-        }
-    }
-
-    protected abstract void setupAttribLocations();
-
-
-    private VertexShaderArgValues va = null;
-    private FragmentShaderArgValues fa = null;
-
-    public void setArgValues(VertexShaderArgValues va, FragmentShaderArgValues fa){
+    // 4) Public methods (API)
+    public final void setArgValues(VertexShaderArgValues va, FragmentShaderArgValues fa){
         this.va = va;
         this.fa = fa;
     }
 
-
-    protected int getProgramHandle(){
-        return programHandle;
-    }
-
     public final void transferArgsToGPU(){
-        transferArgsToGPU(va,fa);
+        transferArgsToGPU(va, fa);
     }
-
-    protected abstract void transferArgsToGPU(VertexShaderArgValues va, FragmentShaderArgValues fa);
-
-    protected abstract void cleanupAfterDraw();
 
     /**
      * Enable and set up all vertex attribute pointers from the currently bound VBOs.
@@ -132,24 +74,37 @@ public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
      */
     public abstract void enableAndPointVertexAttribs();
 
+    /**
+     * Disable previously enabled vertex attribute arrays. Intended to be called once after
+     * a batch of draws that shared the same attribute layout.
+     */
+    public abstract void disableVertexAttribs();
+
     public final void setAsCurrentProgram(){
         GLES20.glUseProgram(programHandle);
     }
 
-    // I want the user to keep track of the program state, instead of constantly checking.
+    /**
+     * Recreate the program from the original sources. Call after context loss.
+     */
     public void reloadProgram(){
-        // optional: clean previous if still valid
         if (getProgramHandle() != 0 && GLES20.glIsProgram(getProgramHandle())) {
-            // safe even if context was lost; glIsProgram will be false
             GLES20.glDeleteProgram(getProgramHandle());
         }
-        programHandle = createPrograms(vsSource, fsSource);
-        setupAttribLocations(); // subclasses refresh locations
+        programHandle = createProgram(vsSource, fsSource);
+        setupAttribLocations();
         assert programHandle != 0;
     }
 
-    private static int createPrograms(String vertexShaderCode, String fragmentShaderCode) {
-        // Compile & link
+    protected abstract void setupAttribLocations();
+
+    protected abstract void transferArgsToGPU(VertexShaderArgValues va, FragmentShaderArgValues fa);
+
+    protected int getProgramHandle(){
+        return programHandle;
+    }
+
+    private static int createProgram(String vertexShaderCode, String fragmentShaderCode) {
         int vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode);
         int fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode);
 
@@ -158,7 +113,6 @@ public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
         GLES20.glAttachShader(programId, fragmentShader);
         GLES20.glLinkProgram(programId);
 
-        // Optional: check link status
         int[] linkStatus = new int[1];
         GLES20.glGetProgramiv(programId, GLES20.GL_LINK_STATUS, linkStatus, 0);
         if (linkStatus[0] == 0) {
@@ -166,6 +120,10 @@ public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
             GLES20.glDeleteProgram(programId);
             throw new RuntimeException("Program link error:\n" + errorMsg);
         }
+
+        // shaders can be flagged for deletion once linked
+        GLES20.glDeleteShader(vertexShader);
+        GLES20.glDeleteShader(fragmentShader);
         return programId;
     }
 
@@ -183,5 +141,4 @@ public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
         }
         return shader;
     }
-
 }

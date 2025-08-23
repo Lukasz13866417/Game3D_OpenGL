@@ -2,18 +2,16 @@ package com.example.game3d_opengl.rendering.object3d;
 
 import android.opengl.GLES20;
 
-import static com.example.game3d_opengl.rendering.object3d.ShaderPair.loadShader;
-
 public final class BasicShaderPair extends ShaderPair<BasicShaderArgs.VS, BasicShaderArgs.FS> {
-
-    private int uMVP, uColor, aPos;
-
+    // 1) Constants and static fields
     public static final BasicShaderPair sharedShader = BasicShaderPair.createDefault();
 
+    // 2) Instance fields
+    private int uMVP, uColor, aPos;
+
+    // 3) Constructors
     public BasicShaderPair(int programHandle, String vs, String fs) {
         super(programHandle, vs, fs);
-        GLES20.glUseProgram(programHandle);
-
     }
 
     public static BasicShaderPair createDefault() {
@@ -22,6 +20,19 @@ public final class BasicShaderPair extends ShaderPair<BasicShaderArgs.VS, BasicS
         return new Builder().fromSource(vs, fs).build();
     }
 
+    // 4) Public methods (API)
+    @Override
+    public void enableAndPointVertexAttribs() {
+        GLES20.glEnableVertexAttribArray(aPos);
+        GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 3 * 4, 0);
+    }
+
+    @Override
+    public void disableVertexAttribs() {
+        GLES20.glDisableVertexAttribArray(aPos);
+    }
+
+    // 5) Protected methods
     @Override
     protected void setupAttribLocations() {
         this.uMVP = GLES20.glGetUniformLocation(getProgramHandle(), "uMVPMatrix");
@@ -35,26 +46,9 @@ public final class BasicShaderPair extends ShaderPair<BasicShaderArgs.VS, BasicS
         GLES20.glUniform4fv(uColor, 1, fragmentArgs.color.rgba, 0);
     }
 
-    @Override
-    protected void cleanupAfterDraw() {
-        GLES20.glDisableVertexAttribArray(aPos);
-    }
+    // 6) Private methods
 
-    @Override
-    public void enableAndPointVertexAttribs() {
-        // Bound VBO must be ARRAY_BUFFER
-        GLES20.glEnableVertexAttribArray(aPos);
-        GLES20.glVertexAttribPointer(
-                aPos,
-                3,
-                GLES20.GL_FLOAT,
-                false,
-                3 * 4,
-                0
-        );
-    }
-
-
+    // Nested types
     public static final class Builder extends ShaderPair.BaseBuilder<BasicShaderPair, Builder> {
         @Override
         protected Builder self() { return this; }
