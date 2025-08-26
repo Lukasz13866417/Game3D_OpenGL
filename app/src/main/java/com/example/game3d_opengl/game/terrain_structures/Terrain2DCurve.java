@@ -1,5 +1,7 @@
 package com.example.game3d_opengl.game.terrain_structures;
 
+import static java.lang.Math.min;
+
 import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_api.main.BaseTerrainStructure;
@@ -30,8 +32,8 @@ public class Terrain2DCurve extends AdvancedTerrainStructure {
 
     @Override
     protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
-        for(int i=0;i<2;++i){
-            Addon[] addons = new Addon[3];
+        for(int i=0;i<min(2,nRows);++i){
+            Addon[] addons = new Addon[min(3,nCols)];
             for(int j = 0; j <addons.length; ++j){
                 addons[j] = DeathSpike.createDeathSpike();
             }

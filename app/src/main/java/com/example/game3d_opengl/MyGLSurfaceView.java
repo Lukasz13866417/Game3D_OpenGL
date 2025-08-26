@@ -22,7 +22,7 @@ public class MyGLSurfaceView extends GLSurfaceView {
                     EGL10.EGL_GREEN_SIZE, 8,
                     EGL10.EGL_BLUE_SIZE, 8,
                     EGL10.EGL_ALPHA_SIZE, 8,
-                    EGL10.EGL_DEPTH_SIZE, 16,
+                    EGL10.EGL_DEPTH_SIZE, 24,
                     EGL10.EGL_RENDERABLE_TYPE, 4,
                     EGL10.EGL_SAMPLE_BUFFERS, 1,
                     EGL10.EGL_SAMPLES, 4,

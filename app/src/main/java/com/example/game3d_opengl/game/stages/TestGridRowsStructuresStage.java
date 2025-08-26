@@ -1,6 +1,5 @@
 package com.example.game3d_opengl.game.stages;
 
-import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
@@ -9,32 +8,41 @@ import android.opengl.Matrix;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
+import com.example.game3d_opengl.game.terrain_api.main.Tile;
+import com.example.game3d_opengl.game.terrain_api.main.Terrain;
+import com.example.game3d_opengl.game.terrain_structures.Terrain2DCurve;
+import com.example.game3d_opengl.game.terrain_structures.TerrainEmptySegments;
+import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
+import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
+import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.FourPoints3D;
 import com.example.game3d_opengl.rendering.LineSet3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
-import com.example.game3d_opengl.game.terrain_api.main.TileBuilder;
 
-import java.util.stream.IntStream;
-
-public class TestGridRowsStage extends Stage {
+/**
+ * Mirrors TestGridRowsStage visually but uses Terrain + TerrainStructures
+ * instead of direct TileBuilder usage. It renders tiles and can be rotated
+ * with the same gesture logic.
+ */
+public class TestGridRowsStructuresStage extends Stage {
 
     private Camera camera;
-    private TileBuilder tileBuilder;
+    private Terrain terrain;
     private FourPoints3D[] grid;
     private LineSet3D left, right;
 
-    // Camera position and movement
-    private float camX = 0f;
+    // Camera position and movement (copied from TestGridRowsStage)
+    private float camX = -2f;
     private float camY = 15f;    // height above ground
-    private float camZ = -7.5f;   // initial distance from origin
+    private float camZ = -7.5f;  // initial distance from origin
     private float moveSpeed = 0.00f; // movement per frame
     private float worldRoll = 0f;    // radians, rotate world around Z-axis
     private static final float ROLL_SENSITIVITY = 0.005f;      // radians per pixel
     private static final float HEIGHT_SENSITIVITY = 0.02f;    // world units per pixel
     private static final float MIN_CAM_Y = 2.0f;
-    private static final float MAX_CAM_Y = 80.0f;
+    private static final float MAX_CAM_Y = 280.0f;
 
     // Gesture handling: lock dominant axis per swipe
     private enum SwipeAxis { NONE, HORIZONTAL, VERTICAL }
@@ -42,7 +50,7 @@ public class TestGridRowsStage extends Stage {
     private float touchStartX = 0f, touchStartY = 0f;
     private float lastTouchX = 0f, lastTouchY = 0f;
 
-    public TestGridRowsStage(MyGLRenderer.StageManager stageManager) {
+    public TestGridRowsStructuresStage(MyGLRenderer.StageManager stageManager) {
         super(stageManager);
     }
 
@@ -95,100 +103,85 @@ public class TestGridRowsStage extends Stage {
         );
         camera.setProjectionAsScreen();
 
-        // build terrain
-        tileBuilder = new TileBuilder(
-                200, 2,
+
+        float segWidth = 0.8f, segLength = 0.4f;
+        this.terrain = new Terrain(2000,6,
                 V3(0, -0.5f, -3f),
-                2f, 0.5f, 0.75f
+                segWidth,
+                segLength,
+                0.25f
         );
-        //for (int i = 0; i < 6 ; ++i) {tileBuilder.addSegment(false); }
-        //tileBuilder.addSegment(true);
-        //tileBuilder.addSegment(true);
-        for (int i = 0; i < 6 ; ++i) {tileBuilder.addSegment(false); tileBuilder.addHorizontalAngle(PI/60);}
+        terrain.enqueueStructure(new TerrainSpiral(50,PI/2,PI/20));
+        terrain.enqueueStructure(new TerrainSpiral(50,-PI/2,PI/20));
 
-        //tileBuilder.addHorizontalAngle(PI/20);
-        //for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);
+        terrain.generateChunks(-1);
 
-        // grid rectangles as FourPoints3D
-        int rows = Math.max(0, tileBuilder.getCurrRowCount());
-        final int nCols = 2; // matches TileBuilder creation above
+        // Build grid and debug side lines
+        int rows = Math.max(0, terrain.tileBuilder.getCurrRowCount());
+        final int nCols = 6; // matches Terrain creation above
         grid = new FourPoints3D[rows * nCols];
         int idx = 0;
         for (int r = 1; r <= rows; r++) {
             for (int c = 1; c <= nCols; c++) {
-                Vector3D[] field = tileBuilder.getField(r, c); // [TL, TR, BL, BR]
-                // reorder to clockwise: TL, TR, BR, BL
+                Vector3D[] field = terrain.tileBuilder.getField(r, c); // [TL, TR, BL, BR]
                 Vector3D[] cw = new Vector3D[]{field[0], field[1], field[3], field[2]};
                 grid[idx++] = new FourPoints3D(cw);
             }
         }
-        left = new LineSet3D(tileBuilder.leftSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(1, 0, 1));
-        right = new LineSet3D(tileBuilder.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(0, 0, 1));
-
-
-
+        left = new LineSet3D(terrain.tileBuilder.leftSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(1, 0, 1));
+        right = new LineSet3D(terrain.tileBuilder.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(0, 0, 1));
     }
 
     @Override
     public void updateThenDraw(float dt) {
-        // move camera forward each frame
         camZ -= moveSpeed;
-        // static camera looking straight down; world roll is applied via VP matrix
+        // Update camera each frame to reflect camY zoom and maintain top-down look
         camera.set(
                 camX, camY, camZ,
                 camX, 0f, camZ,
                 0f, 0f, -1f
         );
-
-        // Build rotated VP once per frame
         float[] vp = camera.getViewProjectionMatrix();
         float[] rot = new float[16];
         float[] vpRot = new float[16];
         Matrix.setRotateM(rot, 0, (float) Math.toDegrees(worldRoll), 0f, 0f, -1f);
         Matrix.multiplyMM(vpRot, 0, vp, 0, rot, 0); // P*V*Rz
 
-        // draw terrain with world roll applied (rotate around Z axis)
-        for (int i = 0; i < tileBuilder.getTileCount(); ++i) {
-            tileBuilder.getTile(i).setTileColor(CLR(1, 0, 0, 1));
-            tileBuilder.getTile(i).draw(vpRot);
+        for (int i = 0; i < terrain.getTileCount(); ++i) {
+            Tile tile = terrain.getTile(i);
+            tile.setTileColor(new FColor(1, 0, 0));
+            tile.draw(vpRot);
         }
+        for (int i = 0; i < terrain.getAddonCount(); ++i) {
+            terrain.getAddon(i).draw(vpRot);
+        }
+
         if (grid != null) {
             for (FourPoints3D fp : grid) {
-               fp.draw(vpRot); // enable when grid is drawn
+                fp.draw(vpRot);
             }
         }
-        left.draw(vpRot);
-        right.draw(vpRot);
-
+        if (left != null) left.draw(vpRot);
+        if (right != null) right.draw(vpRot);
     }
 
     @Override
-    public void onClose() {
-
-    }
+    public void onClose() { }
 
     @Override
-    public void onSwitch() {
-
-    }
+    public void onSwitch() { }
 
     @Override
-    public void onReturn() {
-
-    }
+    public void onReturn() { }
 
     @Override
-    public void onPause() {
-
-    }
+    public void resetGPUResources() { }
 
     @Override
-    public void onResume() {
-
-    }
+    protected void onPause() { }
 
     @Override
-    public void resetGPUResources() {
-
-    }
+    protected void onResume() { }
 }
+
+

@@ -16,20 +16,15 @@ import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
 import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
-import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.LineSet3D;
 import com.example.game3d_opengl.rendering.object3d.BasicShaderPair;
-import com.example.game3d_opengl.rendering.object3d.Polygon3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_api.Tile;
-import com.example.game3d_opengl.game.terrain_structures.Terrain2DCurve;
-import com.example.game3d_opengl.game.terrain_structures.TerrainCurve;
-import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
+import com.example.game3d_opengl.game.terrain_api.main.Tile;
 
 /**
  * Demonstration of a gameplay stage that:
@@ -86,15 +81,14 @@ public class GameplayStage extends Stage {
         this.terrain = new Terrain(2000,6,
                 V3(player.getX(), player.getY() - 3f, player.getZ()),
                 segWidth,
-                segLength
+                segLength,
+                1f
         );
-        terrain.enqueueStructure(new TerrainLine(100));
-        terrain.enqueueStructure(new TerrainLine(100));
+        terrain.enqueueStructure(new TerrainLine( 30));
+        terrain.enqueueStructure(new TerrainStairs(100,4,2, PI/6,-1f));
+        terrain.enqueueStructure(new TerrainSpiral(100,PI/2,PI/20));
+        terrain.enqueueStructure(new TerrainSpiral(100,-PI/2,PI/20));
         terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
-        terrain.enqueueStructure(new TerrainLine(100));
-        terrain.enqueueStructure(new TerrainLine(100));
-        terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
-
 
         terrain.generateChunks(-1);
 
@@ -107,11 +101,10 @@ public class GameplayStage extends Stage {
 
         terrain.removeOldTerrainElements(player.getNearestTileId());
         if (terrain.getTileCount() < 400) {
-            terrain.enqueueStructure(new TerrainLine(100));
-            terrain.enqueueStructure(new TerrainLine(100));
-            terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
-            terrain.enqueueStructure(new TerrainLine(100));
-            terrain.enqueueStructure(new TerrainLine(100));
+            terrain.enqueueStructure(new TerrainLine(30));
+            terrain.enqueueStructure(new TerrainStairs(50,4,2, PI/6,-1f));
+            terrain.enqueueStructure(new TerrainSpiral(100,PI/2,PI/20));
+            terrain.enqueueStructure(new TerrainSpiral(100,-PI/2,PI/20));
             terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
 
         }

@@ -137,13 +137,12 @@ public class GameMath {
         // unit‐length axis vector
         Vector3D k = axisDirection.normalized();
 
-        float cosθ = (float) Math.cos(angleRadians);
-        float sinθ = (float) Math.sin(angleRadians);
+        float cos_theta = (float) Math.cos(angleRadians);
+        float sin_theta = (float) Math.sin(angleRadians);
 
-        // Rodrigues' rotation formula
-        Vector3D term1 = translated.mult(cosθ);
-        Vector3D term2 = k.crossProduct(translated).mult(sinθ);
-        Vector3D term3 = k.mult(k.dotProduct(translated) * (1 - cosθ));
+        Vector3D term1 = translated.mult(cos_theta);
+        Vector3D term2 = k.crossProduct(translated).mult(sin_theta);
+        Vector3D term3 = k.mult(k.dotProduct(translated) * (1 - cos_theta));
 
         Vector3D rotated = term1.add(term2).add(term3);
 

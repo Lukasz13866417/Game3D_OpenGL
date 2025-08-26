@@ -14,7 +14,6 @@ import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsE
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
 
-import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.ArrayQueue;
@@ -41,7 +40,6 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.Preallo
  */
 public class Terrain {
 
-    // Constants for magic numbers
     private static final int DEFAULT_QUEUE_CAPACITY = 100_000;
 
     // Error messages
@@ -407,11 +405,11 @@ public class Terrain {
      * @param segWidth the width of each terrain segment
      * @param segLength the length of each terrain segment
      */
-    public Terrain(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength) {
+    public Terrain(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength, float rowSpacing) {
         this.nCols = nCols;
         
         // Initialize the tile builder with the specified parameters
-        this.tileBuilder = new TileBuilder(maxSegments, nCols, startMid, segWidth, segLength, 1f);
+        this.tileBuilder = new TileBuilder(maxSegments, nCols, startMid, segWidth, segLength, rowSpacing);
 
         // Initialize the addons collection
         this.addons = new FixedMaxSizeDeque<>(maxSegments + 1);

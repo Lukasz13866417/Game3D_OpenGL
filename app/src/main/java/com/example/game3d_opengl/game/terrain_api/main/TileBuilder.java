@@ -11,7 +11,6 @@ import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.Math.sqrt;
 
-import com.example.game3d_opengl.game.terrain_api.Tile;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.FixedMaxSizeDeque;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedRowInfoBuffer;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedCoordinateBuffer;
@@ -331,8 +330,7 @@ public class TileBuilder {
 
         // distance from tile.near edge to first potential row position
         float firstDistL = (rowSpacing - lastHistory.leftoverL);
-        if (abs(firstDistL - rowSpacing) < 1e-6f) firstDistL = rowSpacing; // leftoverL == 0
-        for (float d = firstDistL; d <= lenL + 10f * EPSILON; d += rowSpacing) {
+        for (float d = firstDistL; d <= lenL; d += rowSpacing) {
             float fraction = d / lenL;
             Vector3D leftP = nl.add(eL.mult(fraction));
             leftSideBuffer.addPos(leftP.x, leftP.y, leftP.z);
@@ -341,8 +339,7 @@ public class TileBuilder {
 
 
         float firstDistR = (rowSpacing - lastHistory.leftoverR);
-        if (abs(firstDistR - rowSpacing) < 1e-6f) firstDistR = rowSpacing; // leftoverR == 0
-        for (float d = firstDistR; d <= lenR + 10f * EPSILON; d += rowSpacing) {
+        for (float d = firstDistR; d <= lenR; d += rowSpacing) {
             float fraction = d / lenR;
             Vector3D rightP = nr.add(eR.mult(fraction));
 

@@ -8,11 +8,10 @@ import android.opengl.Matrix;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
-import com.example.game3d_opengl.game.terrain_api.Tile;
+import com.example.game3d_opengl.game.terrain_api.main.Tile;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_api.main.BaseTerrainStructure;
 import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
 import com.example.game3d_opengl.game.track_elements.DeathSpike;
 import com.example.game3d_opengl.rendering.Camera;
@@ -97,7 +96,8 @@ public class AddonPlacementTestStage extends Stage {
         this.terrain = new Terrain(2000, 6,
                 V3(0, -0.5f, -3f),
                 segWidth,
-                segLength
+                segLength,
+                1f
         );
         terrain.enqueueStructure(new AdvancedTerrainStructure(100) {
             @Override

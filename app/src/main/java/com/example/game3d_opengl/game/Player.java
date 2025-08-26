@@ -17,7 +17,7 @@ import android.util.Log;
 import com.example.game3d_opengl.rendering.object3d.ModelCreator;
 import com.example.game3d_opengl.rendering.object3d.Object3D;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
-import com.example.game3d_opengl.game.terrain_api.Tile;
+import com.example.game3d_opengl.game.terrain_api.main.Tile;
 
 import java.io.IOException;
 

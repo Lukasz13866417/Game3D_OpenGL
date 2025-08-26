@@ -5,7 +5,7 @@ import android.content.Context;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.Player;
 import com.example.game3d_opengl.game.stage_api.Stage;
-import com.example.game3d_opengl.game.terrain_api.Tile;
+import com.example.game3d_opengl.game.terrain_api.main.Tile;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_structures.EmptySegmentTestStructure;
@@ -45,7 +45,7 @@ public class EmptySegmentTestStage extends Stage {
         
         // Create terrain with empty segment test structure
         terrain = new Terrain(50, 10, 
-            new Vector3D(0, 0, 0), 2.0f, 2.0f);
+            new Vector3D(0, 0, 0), 2.0f, 2.0f, 1f);
         
         // Add the test structure that alternates tiles and empty segments
         terrain.enqueueStructure(new EmptySegmentTestStructure(15));

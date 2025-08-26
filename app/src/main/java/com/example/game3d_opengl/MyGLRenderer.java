@@ -8,13 +8,10 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.util.Log;
 
-import com.example.game3d_opengl.game.stages.AddonPlacementTestStage;
-import com.example.game3d_opengl.game.stages.EmptySegmentTestStage;
 import com.example.game3d_opengl.game.stages.GameplayStage;
 import com.example.game3d_opengl.game.stages.MenuStage;
 import com.example.game3d_opengl.game.stage_api.Stage;
-import com.example.game3d_opengl.game.stages.PolygonTestStage;
-import com.example.game3d_opengl.game.stages.TestGridRowsStage;
+import com.example.game3d_opengl.game.stages.TestGridRowsStructuresStage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
@@ -57,7 +54,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.stageManager = new StageManager();
         this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
-        this.currStage =  /*new TestGridRowsStage(stageManager);*/  /*new AddonPlacementTestStage(stageManager); */new GameplayStage(stageManager); /*new PolygonTestStage(stageManager);*/
+        this.currStage = /* new TestGridRowsStructuresStage(stageManager);*/ /*  new TestGridRowsStage(stageManager); *//* new AddonPlacementTestStage(stageManager); */ new GameplayStage(stageManager); /*new PolygonTestStage(stageManager);*/
     }
 
     public Stage getCurrentStage() {

@@ -3,6 +3,7 @@ package com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segmen
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.by_length.SegmentsByLength;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.by_length.segtree_implementation.PreallocatedHashedSegmentsByLengthNodes;
+import com.example.game3d_opengl.rendering.util3d.GameRandom;
 
 import java.util.Random;
 
@@ -47,7 +48,7 @@ public class PartialSegmentHandler {
 
     public GridSegment reserveRandomFitting(int length) {
         int total = segmentsByLength.countFittingSpaces(length);
-        int k = new Random().nextInt(total)+1;
+        int k = GameRandom.randInt(1,total);
         GridSegment found = segmentsByLength.getKthFittingSpace(length,k);
         reserve(found.row, found.col, length);
         return found;
