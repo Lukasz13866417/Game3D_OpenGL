@@ -8,10 +8,9 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.util.Log;
 
-import com.example.game3d_opengl.game.stages.GameplayStage;
-import com.example.game3d_opengl.game.stages.MenuStage;
+import com.example.game3d_opengl.game.stages.main.GameplayStage;
+import com.example.game3d_opengl.game.stages.main.MenuStage;
 import com.example.game3d_opengl.game.stage_api.Stage;
-import com.example.game3d_opengl.game.stages.TestGridRowsStructuresStage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
@@ -54,7 +53,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.stageManager = new StageManager();
         this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
-        this.currStage = /* new TestGridRowsStructuresStage(stageManager);*/ /*  new TestGridRowsStage(stageManager); *//* new AddonPlacementTestStage(stageManager); */ new GameplayStage(stageManager); /*new PolygonTestStage(stageManager);*/
+        this.currStage = /* new TestGridRowsStructuresStage(stageManager);*/
+                /*  new TestGridRowsStage(stageManager); */
+                /* new AddonPlacementTestStage(stageManager); */ new GameplayStage(stageManager);
+       /* new TestWireframeStage(stageManager);*/
     }
 
     public Stage getCurrentStage() {
@@ -67,7 +69,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         lastFrameTime = System.nanoTime();
         if(getCurrentStage().isInitialized()){
-            getCurrentStage().resetGPUResources();
+            getCurrentStage().reloadOwnedGPUResources();
         }
     }
 
@@ -82,7 +84,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             pendingStage = null;
             if (!currStage.isInitialized()) {
                 currStage.setInitialized();
-                currStage.initScene(androidContext, surfaceW, surfaceH);
+                currStage.init(androidContext, surfaceW, surfaceH);
             } else {
                 currStage.onReturn();
             }
@@ -91,7 +93,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             lastFrameTime = System.nanoTime();
         }
 
-        // FPS cap: ensure at least target ns between frames
+        // FPS cap
         long now = System.nanoTime();
         long elapsed = now - lastFrameTime;
         if (elapsed < TARGET_FRAME_NS) {
@@ -111,13 +113,15 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
 
         // Slow frame logging
         if (deltaTime > SLOW_FRAME_THRESHOLD_MS) {
-            Log.w("Perf", "perf: SLOW FRAME " + (int) deltaTime + " ms");
+            Log.w("Perf", "perf: SLOW FRAME " + (int) deltaTime + " ms    |    was terrain generating: "+ GameplayStage.__DEBUG_IS_TERRAIN_GENERATING);
         }
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         if (!currStage.isPaused()) {
             currStage.updateThenDraw(deltaTime);
         }
+
+        GameplayStage.__DEBUG_IS_TERRAIN_GENERATING = false;
     }
 
     @Override
@@ -129,7 +133,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         // Initialise or re-enter current stage appropriately
         if(!getCurrentStage().isInitialized()){
             getCurrentStage().setInitialized();
-            getCurrentStage().initScene(androidContext, width, height);
+            getCurrentStage().init(androidContext, width, height);
         }else if(getCurrentStage().isPaused()){
             getCurrentStage().resume();
         }else{

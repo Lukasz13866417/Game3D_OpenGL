@@ -67,10 +67,10 @@ public class AddonsCommandsExecutor implements CommandExecutor {
             Addon addon = terrain.addonQueue.dequeue();
             int row = horizontal ? baseRow : baseRow + i;
             row += rOffset;
-            long tileId = terrain.tileBuilder.getTileIdForRow(row);
+            long tileId = terrain.tileManager.getTileIdForRow(row);
             addon.setTileId(tileId);
             int col = horizontal ? baseCol + i : baseCol;
-            Vector3D[] field = terrain.tileBuilder.getField(row,col);
+            Vector3D[] field = terrain.tileManager.getField(row,col);
             addon.place(field[0], field[1], field[2], field[3]);
             terrain.addons.pushBack(addon);
         }

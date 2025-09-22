@@ -21,6 +21,7 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.ArrayStack;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.IntArrayQueue;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.IntArrayStack;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.FixedMaxSizeDeque;
+import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.PreallocatedCommandBuffer;
@@ -46,32 +47,12 @@ public class Terrain {
     private static final String ERROR_INVALID_TILE_INDEX = "Invalid tile index: ";
     private static final String ERROR_INVALID_ADDON_INDEX = "Invalid addon index: ";
 
-    /**
-     * Cleans up all GPU resources used by the terrain system.
-     * This includes VBOs, IBOs, and other OpenGL objects.
-     * Should be called when the OpenGL context is being destroyed.
-     */
-    public void cleanupGPUResources() {
-        commandBuffer.free();
-        tileBuilder.cleanup();
-        gridCreatorWrapperQueue.clear();
-        gridCreatorWrapperStack.clear();
-        rowOffsetQueue.clear();
-        rowCountStack.clear();
-        structureStack.clear();
-        waitingStructuresQueue.clear();
-        childStructuresQueue.clear();
-        for (Addon addon : addons) {
-            addon.cleanupGPUResources();
-        }
-        addons.clear();
-    }
 
     /**
      * The tile builder responsible for creating and managing individual tiles.
      * Handles the geometry generation and GPU resource management for tiles.
      */
-    public final TileBuilder tileBuilder;
+    public final TileManager tileManager;
 
     /**
      * Gets the total number of tiles currently in the terrain.
@@ -79,7 +60,7 @@ public class Terrain {
      * @return the number of tiles
      */
     public int getTileCount() {
-        return tileBuilder.getTileCount();
+        return tileManager.getTileCount();
     }
 
     /**
@@ -90,22 +71,42 @@ public class Terrain {
      * @throws IndexOutOfBoundsException if the index is invalid
      */
     public Tile getTile(int i) {
-        if (i < 0 || i >= tileBuilder.getTileCount()) {
+        if (i < 0 || i >= tileManager.getTileCount()) {
             throw new IndexOutOfBoundsException(ERROR_INVALID_TILE_INDEX + i);
         }
-        return tileBuilder.getTile(i);
+        return tileManager.getTile(i);
     }
+
+    /**
+     * Cleans up all GPU resources used by the terrain system.
+     * This includes VBOs, IBOs, and other OpenGL objects.
+     * Should be called when the OpenGL context is being destroyed.
+     */
+    public void cleanupGPUResources() {
+        commandBuffer.free();
+        tileManager.cleanupGPUResources();
+        gridCreatorWrapperQueue.clear();
+        gridCreatorWrapperStack.clear();
+        rowOffsetQueue.clear();
+        rowCountStack.clear();
+        structureStack.clear();
+        waitingStructuresQueue.clear();
+        childStructuresQueue.clear();
+        for (Addon addon : addons) {
+            addon.cleanupOwnedGPUResources();
+        }
+        addons.clear();
+    }
+
 
     /**
      * Resets all GPU resources after a context loss.
      * Recreates VBOs and IBOs for all tiles and addons.
      */
-    public void resetGPUResources() {
-        for (int i = 0; i < tileBuilder.getTileCount(); ++i) {
-            tileBuilder.getTile(i).resetGPUResources();
-        }
+    public void reloadGPUResources() {
+        tileManager.reloadGPUResources();
         for (Addon addon : addons) {
-            addon.resetGPUResources();
+            addon.reloadOwnedGPUResources();
         }
     }
 
@@ -409,7 +410,7 @@ public class Terrain {
         this.nCols = nCols;
         
         // Initialize the tile builder with the specified parameters
-        this.tileBuilder = new TileBuilder(maxSegments, nCols, startMid, segWidth, segLength, rowSpacing);
+        this.tileManager = new TileManager(maxSegments, nCols, startMid, segWidth, segLength, rowSpacing);
 
         // Initialize the addons collection
         this.addons = new FixedMaxSizeDeque<>(maxSegments + 1);
@@ -440,6 +441,27 @@ public class Terrain {
         this.tileBrush = new TileBrush();
     }
 
+    public void updateBeforeDraw(float dt){
+        for(int i=0;i<getAddonCount();++i) {
+            getAddon(i).updateBeforeDraw(dt);
+        }
+        tileManager.updateBeforeDraw(dt);
+    }
+
+    public void draw(FColor colorTheme, float[] vp){
+        tileManager.draw(colorTheme, vp);
+        for(int i=0;i<getAddonCount();++i){
+            getAddon(i).draw(vp);
+        }
+    }
+
+    public void updateAfterDraw(float dt) {
+        for(int i=0;i<getAddonCount();++i) {
+            getAddon(i).updateBeforeDraw(dt);
+        }
+        tileManager.updateAfterDraw(dt);
+    }
+
     /**
      * Removes old addons that are far behind the player.
      * This helps manage memory usage and maintain performance.
@@ -448,7 +470,7 @@ public class Terrain {
      */
     private void removeOldAddons(long playerTileId) {
         while (!addons.isEmpty() && addons.getFirst().isGoneBy(playerTileId)) {
-            addons.popFirst().cleanupGPUResources();
+            addons.popFirst().cleanupOwnedGPUResources();
         }
     }
 
@@ -459,7 +481,7 @@ public class Terrain {
      * @param playerTileId the current player's tile ID
      */
     public void removeOldTerrainElements(long playerTileId) {
-        tileBuilder.removeOldTiles(playerTileId);
+        tileManager.removeOldTiles(playerTileId);
         removeOldAddons(playerTileId);
     }
 

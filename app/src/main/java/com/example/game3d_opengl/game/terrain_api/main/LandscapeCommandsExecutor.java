@@ -33,29 +33,29 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
         switch (code) {
             case CMD_SET_H_ANG:
                 float angleH = buffer[offset + 2];
-                terrain.tileBuilder.setHorizontalAngle(angleH);
+                terrain.tileManager.setHorizontalAngle(angleH);
                 break;
             case CMD_SET_V_ANG:
                 float angleV = buffer[offset + 2];
-                terrain.tileBuilder.setVerticalAngle(angleV);
+                terrain.tileManager.setVerticalAngle(angleV);
                 break;
             case CMD_ADD_H_ANG:
                 float deltaH = buffer[offset + 2];
-                terrain.tileBuilder.addHorizontalAngle(deltaH);
+                terrain.tileManager.addHorizontalAngle(deltaH);
                 break;
             case CMD_ADD_V_ANG:
                 float deltaV = buffer[offset + 2];
-                terrain.tileBuilder.addVerticalAngle(deltaV);
+                terrain.tileManager.addVerticalAngle(deltaV);
                 break;
             case CMD_ADD_SEG:
-                terrain.tileBuilder.addSegment(false);
+                terrain.tileManager.addSegment(false);
                 break;
             case CMD_ADD_EMPTY_SEG:
-                terrain.tileBuilder.addSegment(true);
+                terrain.tileManager.addSegment(true);
                 break;
             case CMD_LIFT_UP:
                 float dy = buffer[offset + 2];
-                terrain.tileBuilder.liftUp(dy);
+                terrain.tileManager.liftUp(dy);
                 break;
             case CMD_START_STRUCTURE_LANDSCAPE:
                 boolean isChild = (int) (buffer[offset + 2]) != 0;
@@ -71,14 +71,14 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                     what.generateTiles(terrain.tileBrush);
                     terrain.commandBuffer.addCommand(CMD_FINISH_STRUCTURE_LANDSCAPE);
                 }
-                terrain.rowCountStack.push(terrain.tileBuilder.getCurrRowCount());
+                terrain.rowCountStack.push(terrain.tileManager.getCurrRowCount());
                 break;
             case CMD_FINISH_STRUCTURE_LANDSCAPE:
                 BaseTerrainStructure<?> thatStructure = terrain.structureStack.pop();
                 int startRowCount = terrain.rowCountStack.pop();
                 GridCreatorWrapper myGridCreatorWrapper = terrain.gridCreatorWrapperStack.pop();
                 GridCreatorWrapper parentGridCreatorWrapper = terrain.gridCreatorWrapperStack.peek();
-                int nRowsAdded = terrain.tileBuilder.getCurrRowCount() - startRowCount;
+                int nRowsAdded = terrain.tileManager.getCurrRowCount() - startRowCount;
                 if(thatStructure instanceof AdvancedTerrainStructure) {
                     myGridCreatorWrapper.content = new AdvancedGridCreator(
                             nRowsAdded, terrain.nCols, parentGridCreatorWrapper,

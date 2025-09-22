@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.rendering;
+package com.example.game3d_opengl.game.stages.test.util;
 
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;

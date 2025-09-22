@@ -1,10 +1,13 @@
-package com.example.game3d_opengl.rendering;
+package com.example.game3d_opengl.game.stages.test.util;
 
-import static com.example.game3d_opengl.rendering.object3d.ShaderPair.loadShader;
+import static com.example.game3d_opengl.rendering.object3d.shader.ShaderPair.loadShader;
 
 import android.opengl.GLES20;
 
 import com.example.game3d_opengl.rendering.object3d.Object3D;
+import com.example.game3d_opengl.rendering.object3d.Object3DWithOutline;
+import com.example.game3d_opengl.rendering.object3d.infill.Mesh3DInfill;
+import com.example.game3d_opengl.rendering.object3d.wireframe.Mesh3DWireframe;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
@@ -44,7 +47,7 @@ public class LineSet3D {
     private FColor lineColor;
 
     // points as small cubes
-    private final Object3D[] pointCubes;
+    private final Object3DWithOutline[] pointCubes;
     private FColor pointColor;
 
     public LineSet3D(Vector3D[] points, int[][] edges, FColor lineColor, FColor pointColor) {
@@ -110,21 +113,30 @@ public class LineSet3D {
             {0,3,7,4}, {1,2,6,5}   // left, right
         };
 
-        pointCubes = new Object3D[points.length];
+        pointCubes = new Object3DWithOutline[points.length];
         for (int i = 0; i < points.length; i++) {
             Vector3D p = points[i];
             pointCubes[i] = makePointCubeObject3D(cubeVerts, cubeFaces, p, pointColor);
         }
     }
 
-    private static Object3D makePointCubeObject3D(Vector3D[] cubeVerts, int[][] cubeFaces, Vector3D position, FColor color) {
-        return new Object3D.Builder()
-                    .verts(cubeVerts)
-                    .faces(cubeFaces)
+    private static Object3DWithOutline makePointCubeObject3D(Vector3D[] cubeVerts, int[][] cubeFaces, Vector3D position, FColor color) {
+        Mesh3DInfill fill = new Mesh3DInfill.Builder()
+                .verts(cubeVerts)
+                .faces(cubeFaces)
                 .fillColor(color)
-                .edgeColor(color)
-                .position(position.x, position.y, position.z)
-                    .buildObject();
+                .buildObject();
+
+        Mesh3DWireframe wire = new Mesh3DWireframe.Builder()
+                .verts(cubeVerts)
+                .faces(cubeFaces)
+                .edgeColor(FColor.CLR(1,1,1,1))
+                .pixelWidth(1f)
+                .buildObject();
+
+        Object3DWithOutline obj = Object3DWithOutline.wrap(fill, wire);
+        obj.objX = position.x; obj.objY = position.y; obj.objZ = position.z;
+        return obj;
     }
 
     /* Package-private */

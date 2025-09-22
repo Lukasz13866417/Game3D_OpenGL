@@ -1,6 +1,6 @@
 package com.example.game3d_opengl.game.terrain_api.terrainutil;
 
-import com.example.game3d_opengl.game.terrain_api.main.TileBuilder.GridRowInfo;
+import com.example.game3d_opengl.game.terrain_api.main.TileManager.GridRowInfo;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**

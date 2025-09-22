@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.stages;
+package com.example.game3d_opengl.game.stages.main;
 
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
@@ -18,8 +18,8 @@ import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.rendering.LineSet3D;
-import com.example.game3d_opengl.rendering.object3d.BasicShaderPair;
+import com.example.game3d_opengl.game.stages.test.util.LineSet3D;
+import com.example.game3d_opengl.rendering.object3d.infill.InfillShaderPair;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
@@ -59,11 +59,14 @@ public class GameplayStage extends Stage {
 
     private Camera camera;
     private int frameCounter = 0; // throttled logging counter
-    private FColor colorTheme = CLR(0.7f,0,0,1);
+    private final FColor colorTheme = CLR(0.7f,0,0,1);
     private Player player;
 
+
+    public static boolean __DEBUG_IS_TERRAIN_GENERATING = false;
+
     @Override
-    public void initScene(Context context, int screenWidth, int screenHeight) {
+    protected void initScene(Context context, int screenWidth, int screenHeight) {
         // --- Camera Setup ---
         this.camera = new Camera();
 
@@ -109,6 +112,7 @@ public class GameplayStage extends Stage {
 
         }
         if (terrain.getTileCount() < 300) {
+            GameplayStage.__DEBUG_IS_TERRAIN_GENERATING = true;
             terrain.generateChunks(1);
         }
 
@@ -119,36 +123,27 @@ public class GameplayStage extends Stage {
             }
         }
 
+
+        // Includes player interactions: footing, distances to player, addon collisions
         player.updateBeforeDraw(dt);
+        terrain.updateBeforeDraw(dt);
 
         Vector3D camPos = V3(player.getX(), player.getY() + 0.75f, player.getZ())
                 .sub(player.getDir().withLen(3.8f));
         camera.updateEyePos(camPos);
         camera.updateLookPos(camPos.add(player.getDir().setY(0.0f)));
 
-        for(int i=0;i<terrain.getAddonCount();++i){
-            terrain.getAddon(i).updateBeforeDraw(dt);
-            terrain.getAddon(i).draw(camera.getViewProjectionMatrix());
-            terrain.getAddon(i).updateAfterDraw(dt);
-        }
+        float[] vpMatrix = camera.getViewProjectionMatrix();
 
-        player.draw(camera.getViewProjectionMatrix());
-        for(int i=0;i<terrain.getTileCount();++i) {
-            Tile tile = terrain.getTile(i);
-            Vector3D tc = tile.farLeft.add(tile.farRight).add(tile.nearLeft).add(tile.nearRight)
-                    .div(4);
-            if(tc.sub(V3(player.getX(), player.getY(), player.getZ())).sqlen() < 100*100) {
-                tile.setTileColor(colorTheme);
-                tile.draw(camera.getViewProjectionMatrix());
-            }
-        }
+        player.draw(vpMatrix);
+        terrain.draw(colorTheme, vpMatrix);
 
         player.updateAfterDraw(dt);
+        terrain.updateAfterDraw(dt);
 
         if ((frameCounter++ & 127) == 0) {
             Log.d("Perf", "dt=" + dt + " visible=" + terrain.getTileCount() + ","+ terrain.getAddonCount());
         }
-
 
 
     }
@@ -176,17 +171,17 @@ public class GameplayStage extends Stage {
     }
     @Override
     public void onClose() {
-        player.cleanupGPUResources();
+        player.cleanupOwnedGPUResources();
         Potion.cleanupSharedGPUResources();
         terrain.cleanupGPUResources();
     }
 
     @Override
-    public void resetGPUResources() {
-        BasicShaderPair.sharedShader.reloadProgram();
+    public void reloadOwnedGPUResources() {
+        InfillShaderPair.getSharedShader().reloadProgram();
         LineSet3D.resetProgram();
         Potion.resetSharedResources();
-        player.resetGPUResources();
-        terrain.resetGPUResources();
+        player.reloadOwnedGPUResources();
+        terrain.reloadGPUResources();
     }
 }

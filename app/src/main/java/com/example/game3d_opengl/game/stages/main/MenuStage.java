@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.stages;
+package com.example.game3d_opengl.game.stages.main;
 
 import android.content.Context;
 
@@ -37,7 +37,7 @@ public class MenuStage extends Stage {
     }
 
     @Override
-    public void initScene(Context context, int screenWidth, int screenHeight) {
+    protected void initScene(Context context, int screenWidth, int screenHeight) {
         // Nothing to initialise for the blank menu.
         System.out.println("MENU INIT");
     }
@@ -76,7 +76,7 @@ public class MenuStage extends Stage {
     }
 
     @Override
-    public void resetGPUResources() {
+    public void reloadOwnedGPUResources() {
 
     }
 }

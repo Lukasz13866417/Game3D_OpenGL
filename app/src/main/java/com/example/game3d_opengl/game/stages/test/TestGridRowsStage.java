@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.stages;
+package com.example.game3d_opengl.game.stages.test;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
@@ -9,19 +9,17 @@ import android.opengl.Matrix;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
+import com.example.game3d_opengl.game.terrain_api.main.TileManager;
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.rendering.FourPoints3D;
-import com.example.game3d_opengl.rendering.LineSet3D;
+import com.example.game3d_opengl.game.stages.test.util.FourPoints3D;
+import com.example.game3d_opengl.game.stages.test.util.LineSet3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
-import com.example.game3d_opengl.game.terrain_api.main.TileBuilder;
-
-import java.util.stream.IntStream;
 
 public class TestGridRowsStage extends Stage {
 
     private Camera camera;
-    private TileBuilder tileBuilder;
+    private TileManager tileManager;
     private FourPoints3D[] grid;
     private LineSet3D left, right;
 
@@ -84,7 +82,7 @@ public class TestGridRowsStage extends Stage {
     }
 
     @Override
-    public void initScene(Context context, int screenWidth, int screenHeight) {
+    protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
         Camera.setGlobalScreenSize(screenWidth, screenHeight);
         // initial camera setup: looking straight down
@@ -96,34 +94,35 @@ public class TestGridRowsStage extends Stage {
         camera.setProjectionAsScreen();
 
         // build terrain
-        tileBuilder = new TileBuilder(
+        tileManager = new TileManager(
                 200, 2,
                 V3(0, -0.5f, -3f),
                 2f, 0.5f, 0.75f
         );
-        //for (int i = 0; i < 6 ; ++i) {tileBuilder.addSegment(false); }
-        //tileBuilder.addSegment(true);
-        //tileBuilder.addSegment(true);
-        for (int i = 0; i < 6 ; ++i) {tileBuilder.addSegment(false); tileBuilder.addHorizontalAngle(PI/60);}
+        //for (int i = 0; i < 6 ; ++i) {tileManager.addSegment(false); }
+        //tileManager.addSegment(true);
+        //tileManager.addSegment(true);
+        for (int i = 0; i < 6 ; ++i) {
+            tileManager.addSegment(false); tileManager.addHorizontalAngle(PI/60);}
 
-        //tileBuilder.addHorizontalAngle(PI/20);
-        //for (int i = 0; i < 3; ++i) tileBuilder.addSegment(false);
+        //tileManager.addHorizontalAngle(PI/20);
+        //for (int i = 0; i < 3; ++i) tileManager.addSegment(false);
 
         // grid rectangles as FourPoints3D
-        int rows = Math.max(0, tileBuilder.getCurrRowCount());
-        final int nCols = 2; // matches TileBuilder creation above
+        int rows = Math.max(0, tileManager.getCurrRowCount());
+        final int nCols = 2; // matches TileManager creation above
         grid = new FourPoints3D[rows * nCols];
         int idx = 0;
         for (int r = 1; r <= rows; r++) {
             for (int c = 1; c <= nCols; c++) {
-                Vector3D[] field = tileBuilder.getField(r, c); // [TL, TR, BL, BR]
+                Vector3D[] field = tileManager.getField(r, c); // [TL, TR, BL, BR]
                 // reorder to clockwise: TL, TR, BR, BL
                 Vector3D[] cw = new Vector3D[]{field[0], field[1], field[3], field[2]};
                 grid[idx++] = new FourPoints3D(cw);
             }
         }
-        left = new LineSet3D(tileBuilder.leftSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(1, 0, 1));
-        right = new LineSet3D(tileBuilder.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(0, 0, 1));
+        left = new LineSet3D(tileManager.leftSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(1, 0, 1));
+        right = new LineSet3D(tileManager.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(0, 0, 1));
 
 
 
@@ -147,11 +146,6 @@ public class TestGridRowsStage extends Stage {
         Matrix.setRotateM(rot, 0, (float) Math.toDegrees(worldRoll), 0f, 0f, -1f);
         Matrix.multiplyMM(vpRot, 0, vp, 0, rot, 0); // P*V*Rz
 
-        // draw terrain with world roll applied (rotate around Z axis)
-        for (int i = 0; i < tileBuilder.getTileCount(); ++i) {
-            tileBuilder.getTile(i).setTileColor(CLR(1, 0, 0, 1));
-            tileBuilder.getTile(i).draw(vpRot);
-        }
         if (grid != null) {
             for (FourPoints3D fp : grid) {
                fp.draw(vpRot); // enable when grid is drawn
@@ -188,7 +182,7 @@ public class TestGridRowsStage extends Stage {
     }
 
     @Override
-    public void resetGPUResources() {
+    public void reloadOwnedGPUResources() {
 
     }
 }

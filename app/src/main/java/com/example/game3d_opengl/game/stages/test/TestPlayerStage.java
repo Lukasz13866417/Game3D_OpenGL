@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.stages;
+package com.example.game3d_opengl.game.stages.test;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
@@ -39,7 +39,7 @@ public class TestPlayerStage extends Stage {
     }
 
     @Override
-    public void initScene(Context context, int screenWidth, int screenHeight) {
+    protected void initScene(Context context, int screenWidth, int screenHeight) {
         // Initialize camera
         this.camera = new Camera();
         Camera.setGlobalScreenSize(screenWidth, screenHeight);
@@ -102,7 +102,7 @@ public class TestPlayerStage extends Stage {
     }
 
     @Override
-    public void resetGPUResources() {
+    public void reloadOwnedGPUResources() {
 
     }
 } 

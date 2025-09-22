@@ -4,9 +4,8 @@ import static java.lang.Math.min;
 
 import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_api.main.BaseTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
-import com.example.game3d_opengl.game.track_elements.DeathSpike;
+import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
 
 public class TerrainLine extends AdvancedTerrainStructure {
 

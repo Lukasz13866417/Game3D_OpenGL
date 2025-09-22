@@ -1,13 +1,14 @@
-package com.example.game3d_opengl.rendering.object3d;
+package com.example.game3d_opengl.rendering.object3d.shader;
 
 import android.opengl.GLES20;
+
+import com.example.game3d_opengl.rendering.GPUResourceUser;
 
 /**
  * Wrapper around a glProgram - a pair of vertex and fragment shader.
  * The purpose is to separate this concern from the Polygon3D class.
  */
-public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
-                                FragmentShaderArgValues extends ShaderArgValues> {
+public abstract class ShaderPair<VS extends ShaderArgValues, FS extends ShaderArgValues> implements GPUResourceUser {
 
     // 1) Constants and static fields
 
@@ -15,9 +16,6 @@ public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
     private int programHandle;
     private final String vsSource;
     private final String fsSource;
-    private VertexShaderArgValues va = null;
-    private FragmentShaderArgValues fa = null;
-
     // 3) Constructors
     protected ShaderPair(int programHandle, String vsSource, String fsSource) {
         this.programHandle = programHandle;
@@ -58,27 +56,6 @@ public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
         }
     }
 
-    // 4) Public methods (API)
-    public final void setArgValues(VertexShaderArgValues va, FragmentShaderArgValues fa){
-        this.va = va;
-        this.fa = fa;
-    }
-
-    public final void transferArgsToGPU(){
-        transferArgsToGPU(va, fa);
-    }
-
-    /**
-     * Enable and set up all vertex attribute pointers from the currently bound VBOs.
-     * Called by draw paths before issuing draw calls.
-     */
-    public abstract void enableAndPointVertexAttribs();
-
-    /**
-     * Disable previously enabled vertex attribute arrays. Intended to be called once after
-     * a batch of draws that shared the same attribute layout.
-     */
-    public abstract void disableVertexAttribs();
 
     public final void setAsCurrentProgram(){
         GLES20.glUseProgram(programHandle);
@@ -98,9 +75,35 @@ public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
 
     protected abstract void setupAttribLocations();
 
-    protected abstract void transferArgsToGPU(VertexShaderArgValues va, FragmentShaderArgValues fa);
+    /**
+     * Enable and set up all vertex attribute pointers from the currently bound VBOs.
+     * Called by draw paths before issuing draw calls.
+     */
+    public abstract void enableAndPointVertexAttribs();
 
-    protected int getProgramHandle(){
+    /**
+     * Disable previously enabled vertex attribute arrays. Intended to be called once after
+     * a batch of draws that shared the same attribute layout.
+     */
+    public abstract void disableVertexAttribs();
+
+
+    private VS vsArgs = null;
+    private FS fsArgs = null;
+
+    public void setArgs(VS vs, FS fs){
+        this.vsArgs = vs;
+        this.fsArgs = fs;
+    }
+
+    protected abstract void transferArgsToGPU(VS vs, FS fs);
+
+    public void transferArgsToGPU(){
+        transferArgsToGPU(vsArgs, fsArgs);
+    }
+
+
+    protected final int getProgramHandle(){
         return programHandle;
     }
 
@@ -140,5 +143,15 @@ public abstract class ShaderPair<VertexShaderArgValues extends ShaderArgValues,
             throw new RuntimeException("Shader compile error:\n" + errorMsg);
         }
         return shader;
+    }
+
+    @Override
+    public void reloadOwnedGPUResources() {
+        reloadProgram();
+    }
+
+    @Override
+    public void cleanupOwnedGPUResources() {
+        // Programs are managed by GL; nothing to cleanup explicitly here beyond program reloads.
     }
 }

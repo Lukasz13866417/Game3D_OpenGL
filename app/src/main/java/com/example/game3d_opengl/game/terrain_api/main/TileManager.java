@@ -15,6 +15,8 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.FixedMaxSizeDeque;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedRowInfoBuffer;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedCoordinateBuffer;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedSegmentHistoryBuffer;
+import com.example.game3d_opengl.game.terrain_api.terrainutil.TerrainLandscapeRenderer;
+import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
@@ -23,7 +25,7 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  * size-synchronised.  Row placement is driven by a single "centre-line"
  * distance counter so it remains consistent even when the tile turns.
  */
-public class TileBuilder {
+public class TileManager {
 
     /*––––––––––––  CONFIG & STATE  ––––––––––––*/
     private final float rowSpacing;                 // desired spacing between logical rows
@@ -37,6 +39,8 @@ public class TileBuilder {
     private final OverflowingPreallocatedSegmentHistoryBuffer segmentHistoryBuffer;
 
     private final FixedMaxSizeDeque<Tile> tiles;    // includes the guardian
+    private final TerrainLandscapeRenderer landscapeRenderer;
+
     private Tile lastTile;                          // newest tile (back of deque)
 
     /*–––––––––––– Information about the state of the geometry ––––––––––––*/
@@ -48,7 +52,7 @@ public class TileBuilder {
     // PUBLIC CONSTRUCTOR
     // ============================================================================
 
-    public TileBuilder(int maxSegments, int nCols,
+    public TileManager(int maxSegments, int nCols,
                        Vector3D startMid,
                        float segWidth, float segLength,
                        float rowSpacing) {
@@ -68,6 +72,8 @@ public class TileBuilder {
         /*–––– guardian tile (length close to 0) ––––*/
         Vector3D startLeft = V3(startMid.sub(segWidth / 2, 0, 0));
         Vector3D startRight = V3(startMid.add(segWidth / 2, 0, 0));
+
+        this.landscapeRenderer = new TerrainLandscapeRenderer();
 
         addTile(startLeft,
                 startRight,
@@ -126,7 +132,6 @@ public class TileBuilder {
         }else{
             addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), tiles.getLast().isEmptySegment(), wasLastLiftedUp);
         }
-        oldLast.cleanupGPUResources();
 
         // Add the new segment tile.
         addTile(newL1.addY(pendingLift),
@@ -162,14 +167,16 @@ public class TileBuilder {
         // If first tile is far from player, this it has been visited a long time ago
         // In that case, it can be removed because we are sure it wont be displayed anymore.
         while (tiles.size() > 1 && (playerTileId - tiles.getFirst().getID() > 50L)) {
-            tiles.popFirst().cleanupGPUResources();
+            landscapeRenderer.popFront();
+            tiles.popFirst();
         }
     }
 
-    public void cleanup() {
+    public void cleanupGPUResources() {
         while (!tiles.isEmpty()) {
-            tiles.popFirst().cleanupGPUResources();
+            tiles.popFirst();
         }
+        landscapeRenderer.cleanupGPUResources();
         leftSideBuffer.free();
         rightSideBuffer.free();
         rowInfoBuffer.free();
@@ -243,11 +250,22 @@ public class TileBuilder {
      */
     private void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, boolean isEmptySegment, boolean wasPreviousEmpty, boolean isLiftedUp) {
 
-        float slopeVal = (float) atan((fl.y - nl.y) /
-                sqrt((fl.x - nl.x) * (fl.x - nl.x) + (fl.z - nl.z) * (fl.z - nl.z)));
-
-        Tile tile = Tile.createTile(nl, nr, fl, fr, slopeVal, nextId++, isEmptySegment);
+        Tile tile = new Tile(nl, nr, fl, fr, nextId++, isEmptySegment);
         tiles.pushBack(tile);
+        if(!isEmptySegment) {
+            if (wasPreviousEmpty) {
+                // Start a new visible span: add the near edge of this tile
+                landscapeRenderer.pushBack(nl, nr);
+                // Mark the gap between previous (last) pair and this new near edge so it won't render
+                landscapeRenderer.markGapBetweenLastTwoPairs();
+            }
+            // Always append far edge; next tile will reuse it as its near edge
+            landscapeRenderer.pushBack(fl, fr);
+            if (isLiftedUp) {
+                // If the next tile will be vertically lifted, mask out the seam across to the next near edge
+                landscapeRenderer.markGapBetweenLastTwoPairs();
+            }
+        }
 
         generateRowsForTile(tile, wasPreviousEmpty, isLiftedUp);
 
@@ -278,6 +296,7 @@ public class TileBuilder {
         for (int i = 0; i < history.rowsAddedCnt; ++i) rowInfoBuffer.removeLast();
 
 
+        landscapeRenderer.popBack();
         lastTile = tiles.peekLast();
         return oldLast;
     }
@@ -395,12 +414,22 @@ public class TileBuilder {
         return rowInfo.LS_last.add(edge.mult((float) c / nCols));
     }
 
-    private Vector3D[] bufferToArray(OverflowingPreallocatedCoordinateBuffer buf) {
-        Vector3D[] res = new Vector3D[buf.size()];
-        for (int i = 0; i < res.length; i++) {
-            res[i] = V3(buf.getX(i), buf.getY(i), buf.getZ(i)).addY(0.01f);
-        }
-        return res;
+    public void updateBeforeDraw(float dt){
+    }
+
+    public void draw(FColor colorTheme, float[] vpMatrix) {
+        landscapeRenderer.draw(colorTheme, vpMatrix);
+    }
+
+    /**
+     * Recreate GL buffers for the landscape renderer and restore geometry
+     * from the CPU mirror after a context loss or first-time init.
+     */
+    public void reloadGPUResources(){
+        landscapeRenderer.restoreAfterContextLoss();
+    }
+
+    public void updateAfterDraw(float dt){
     }
 
     // ============================================================================

@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.stages;
+package com.example.game3d_opengl.game.stages.test;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
@@ -8,14 +8,12 @@ import android.opengl.Matrix;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
-import com.example.game3d_opengl.game.terrain_api.main.Tile;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
-import com.example.game3d_opengl.game.track_elements.DeathSpike;
+import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.rendering.util3d.FColor;
 
 public class AddonPlacementTestStage extends Stage {
 
@@ -82,7 +80,7 @@ public class AddonPlacementTestStage extends Stage {
     }
 
     @Override
-    public void initScene(Context context, int screenWidth, int screenHeight) {
+    protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
         Camera.setGlobalScreenSize(screenWidth, screenHeight);
         // initial camera setup (no rotation); roll will be applied via VP matrix during draw
@@ -141,11 +139,6 @@ public class AddonPlacementTestStage extends Stage {
             terrain.getAddon(i).updateAfterDraw(dt);
         }
 
-        for (int i = 0; i < terrain.getTileCount(); ++i) {
-            Tile tile = terrain.getTile(i);
-            tile.setTileColor(new FColor(1, 0, 0));
-            tile.draw(vpRot);
-        }
     }
 
     @Override
@@ -164,7 +157,7 @@ public class AddonPlacementTestStage extends Stage {
     }
 
     @Override
-    public void resetGPUResources() {
+    public void reloadOwnedGPUResources() {
 
     }
 

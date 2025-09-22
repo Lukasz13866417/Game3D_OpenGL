@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.stages;
+package com.example.game3d_opengl.game.stages.test;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
@@ -36,7 +36,7 @@ public class TestFunctionTerrainStage extends Stage {
 
 
     @Override
-    public void initScene(Context context, int screenWidth, int screenHeight) {
+    protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
         Camera.setGlobalScreenSize(screenWidth, screenHeight);
         this.camera.set(0f, 0f, 3f, // eye pos
@@ -66,10 +66,6 @@ public class TestFunctionTerrainStage extends Stage {
             Thread.sleep(20);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
-        }
-        for (int i = 0; i < terrain.getTileCount(); ++i) {
-            terrain.getTile(i).setTileColor(CLR((float)(i) / (float)(terrain.getTileCount()) , 0.2f, 0, 1));
-            terrain.getTile(i).draw(camera.getViewProjectionMatrix());
         }
         for(int i=0;i<terrain.getAddonCount();++i){
             terrain.getAddon(i).draw(camera.getViewProjectionMatrix());
@@ -102,7 +98,7 @@ public class TestFunctionTerrainStage extends Stage {
     }
 
     @Override
-    public void resetGPUResources() {
+    public void reloadOwnedGPUResources() {
 
     }
 }

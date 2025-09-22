@@ -36,5 +36,10 @@ public class FColor {
         return new FColor(r,g,b);
     }
 
+    @Override
+    public String toString(){
+        return "("+r()+","+g()+","+b()+","+a()+")";
+    }
+
 
 }

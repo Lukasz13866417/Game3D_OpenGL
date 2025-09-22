@@ -16,6 +16,8 @@ import android.util.Log;
 
 import com.example.game3d_opengl.rendering.object3d.ModelCreator;
 import com.example.game3d_opengl.rendering.object3d.Object3D;
+import com.example.game3d_opengl.rendering.object3d.Object3DWithOutline;
+import com.example.game3d_opengl.rendering.object3d.infill.Mesh3DInfill;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.main.Tile;
 
@@ -61,6 +63,21 @@ public class Player implements WorldActor {
     private static final String ERROR_ASSET_LOADING = "Failed to load player assets: ";
     private static final String TAG = "Player";
 
+    private static Object3DWithOutline PLAYER_OBJECT;
+
+    // Instance fields
+    private final Object3DWithOutline object3D;
+    private Vector3D dir;
+    private Vector3D move;
+
+    // Rotation state
+    private float stickyRotationTime = 0.0f;
+    private float stickyRotationAng = 0.0f;
+
+    // Physics state
+    private Tile tileBelow;
+    private long nearestTileId = -1L;
+
     /**
      * Loads the player's 3D model and creates the Object3D builder.
      * This method must be called before creating any Player instances.
@@ -84,14 +101,18 @@ public class Player implements WorldActor {
             playerCreator.scaleY(PLAYER_HEIGHT);
             playerCreator.scaleZ(PLAYER_HEIGHT);
 
-            // Create the Object3D builder with the processed model
-            playerBuilder = new Object3D.Builder()
-                    .angles(0, 0, 0)
-                    .edgeColor(CLR(1.0f, 1.0f, 1.0f, 1.0f))
-                    .fillColor(CLR(0.0f, 0.0f, 0.0f, 1.0f))
-                    .position(INITIAL_POSITION_X, INITIAL_POSITION_Y, INITIAL_POSITION_Z)
+            // Build the mesh (AbstractMesh3D) and wrap it with Object3D for transforms
+            Object3DWithOutline obj = new Object3DWithOutline.Builder()
                     .verts(playerCreator.getVerts())
-                    .faces(playerCreator.getFaces());
+                    .faces(playerCreator.getFaces())
+                    .fillColor(CLR(0,0,0,1))
+                    .edgeColor(CLR(1,1,1,1))
+                    .edgePixels(1.5f)
+                    .build();
+            obj.objX = INITIAL_POSITION_X;
+            obj.objY = INITIAL_POSITION_Y;
+            obj.objZ = INITIAL_POSITION_Z;
+            PLAYER_OBJECT = obj;
                     
             Log.d(TAG, "Player assets loaded successfully");
         } catch (IOException e) {
@@ -109,25 +130,19 @@ public class Player implements WorldActor {
      * 
      * @param object3D the 3D object representation of the player
      */
-    private Player(Object3D object3D) {
+    private Player(Object3DWithOutline object3D) {
         this.object3D = object3D;
         this.dir = new Vector3D(INITIAL_DIRECTION_X, INITIAL_DIRECTION_Y, INITIAL_DIRECTION_Z);
         this.move = new Vector3D(0, 0, 0);
     }
     
-    /**
-     * Creates an Object3D instance for the player.
-     * 
-     * @return the Object3D representing the player's 3D model
-     * @throws IllegalStateException if assets haven't been loaded
-     */
-    public static Object3D makeObject3D() {
-        if (playerBuilder == null) {
+    public static Object3DWithOutline makeObject3D() {
+        if (PLAYER_OBJECT == null) {
             throw new IllegalStateException(ERROR_ASSETS_NOT_LOADED);
         }
-        return playerBuilder.buildObject();
+        return PLAYER_OBJECT;
     }
-    
+
     /**
      * Factory method to create a new Player instance.
      * 
@@ -359,16 +374,16 @@ public class Player implements WorldActor {
     }
 
     @Override
-    public void cleanupGPUResources() {
+    public void cleanupOwnedGPUResources() {
         if (object3D != null) {
-            object3D.cleanup();
+            object3D.cleanupOwnedGPUResources();
         }
     }
 
     @Override
-    public void resetGPUResources() {
+    public void reloadOwnedGPUResources() {
         if (object3D != null) {
-            object3D.reload();
+            object3D.reloadOwnedGPUResources();
         }
     }
 
@@ -437,20 +452,4 @@ public class Player implements WorldActor {
     public float getX() { return object3D != null ? object3D.objX : 0f; }
     public float getY() { return object3D != null ? object3D.objY : 0f; }
     public float getZ() { return object3D != null ? object3D.objZ : 0f; }
-
-    // Static fields
-    private static Object3D.Builder playerBuilder;
-    
-    // Instance fields
-    private final Object3D object3D;
-    private Vector3D dir;
-    private Vector3D move;
-
-    // Rotation state
-    private float stickyRotationTime = 0.0f;
-    private float stickyRotationAng = 0.0f;
-
-    // Physics state
-    private Tile tileBelow;
-    private long nearestTileId = -1L;
 }

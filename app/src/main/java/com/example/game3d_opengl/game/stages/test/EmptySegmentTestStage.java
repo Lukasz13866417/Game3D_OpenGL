@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.stages;
+package com.example.game3d_opengl.game.stages.test;
 
 import android.content.Context;
 
@@ -31,7 +31,7 @@ public class EmptySegmentTestStage extends Stage {
     }
 
     @Override
-    public void initScene(Context context, int screenWidth, int screenHeight) {
+    protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
         Camera.setGlobalScreenSize(screenWidth, screenHeight);
         
@@ -74,12 +74,6 @@ public class EmptySegmentTestStage extends Stage {
         cameraAngle += dt * 0.0005f; // 0.5 radians per second
         updateCamera();
         
-        // Draw all tiles
-        for (int i = 0; i < terrain.getTileCount(); i++) {
-            Tile tile = terrain.getTile(i);
-            tile.draw(camera.getViewProjectionMatrix());
-        }
-        
         // Draw all addons (should not appear in empty segments)
         for (int i = 0; i < terrain.getAddonCount(); i++) {
             Addon addon = terrain.getAddon(i);
@@ -115,9 +109,9 @@ public class EmptySegmentTestStage extends Stage {
     }
 
     @Override
-    public void resetGPUResources() {
+    public void reloadOwnedGPUResources() {
         if (terrain != null) {
-            terrain.resetGPUResources();
+            terrain.reloadGPUResources();
         }
     }
 
