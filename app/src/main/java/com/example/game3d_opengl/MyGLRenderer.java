@@ -113,7 +113,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
 
         // Slow frame logging
         if (deltaTime > SLOW_FRAME_THRESHOLD_MS) {
-            Log.w("Perf", "perf: SLOW FRAME " + (int) deltaTime + " ms    |    was terrain generating: "+ GameplayStage.__DEBUG_IS_TERRAIN_GENERATING);
+            Log.w("Perf", "perf: SLOW FRAME " + (int) deltaTime + " ms" +
+                   "   |    was terrain generating: "+ GameplayStage.__DEBUG_IS_TERRAIN_GENERATING);
         }
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);

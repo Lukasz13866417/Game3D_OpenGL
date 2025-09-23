@@ -27,7 +27,6 @@ public abstract class ShaderPair<VS extends ShaderArgValues, FS extends ShaderAr
     public static abstract class BaseBuilder<S extends ShaderPair<?,?>, B extends BaseBuilder<S,B>> {
         protected String vsSource;
         protected String fsSource;
-        protected Integer existingProgramHandle; // optional
 
         protected abstract B self();
         protected abstract S create(int programHandle, String vs, String fs);
@@ -35,21 +34,11 @@ public abstract class ShaderPair<VS extends ShaderArgValues, FS extends ShaderAr
         public B fromSource(String vs, String fs) {
             this.vsSource = vs;
             this.fsSource = fs;
-            this.existingProgramHandle = null;
-            return self();
-        }
-
-        public B fromExistingProgram(int programHandle, String vs, String fs) {
-            this.vsSource = vs;
-            this.fsSource = fs;
-            this.existingProgramHandle = programHandle;
             return self();
         }
 
         public final S build() {
-            int handle = (existingProgramHandle != null)
-                    ? existingProgramHandle
-                    : createProgram(vsSource, fsSource);
+            int handle = createProgram(vsSource, fsSource);
             S pair = create(handle, vsSource, fsSource);
             pair.setupAttribLocations();
             return pair;

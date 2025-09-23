@@ -6,7 +6,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class MeshHelpers {
+public class RenderingUtils {
+
+    public static final int ID_NOT_SET = -1;
 
     private static final float EPS = 1e-6f;
 

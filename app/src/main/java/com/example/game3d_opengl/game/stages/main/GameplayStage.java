@@ -17,6 +17,10 @@ import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
 import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
+import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
+import com.example.game3d_opengl.game.track_elements.spike.SpikeInfillShaderPair;
+import com.example.game3d_opengl.game.track_elements.spike.SpikeWireframeMesh3D;
+import com.example.game3d_opengl.game.track_elements.spike.SpikeWireframeShaderPair;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.game.stages.test.util.LineSet3D;
 import com.example.game3d_opengl.rendering.object3d.infill.InfillShaderPair;
@@ -77,9 +81,15 @@ public class GameplayStage extends Stage {
         camera.setProjectionAsScreen();
 
         AssetManager assetManager = context.getAssets();
-        Player.LOAD_PLAYER_ASSETS(assetManager);
+
         Potion.LOAD_POTION_ASSETS(assetManager);
+        DeathSpike.LOAD_DEATHSPIKE_ASSETS();
+        SpikeInfillShaderPair.LOAD_SHADER_CODE();
+        SpikeWireframeShaderPair.LOAD_SHADER_CODE();
+
+        Player.LOAD_PLAYER_ASSETS(assetManager);
         player = Player.createPlayer();
+
         float segWidth = 3.2f, segLength = 1.4f;
         this.terrain = new Terrain(2000,6,
                 V3(player.getX(), player.getY() - 3f, player.getZ()),

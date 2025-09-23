@@ -49,7 +49,7 @@ public class Potion extends Addon {
                     .verts(modelCreator.getVerts())
                     .faces(modelCreator.getFaces())
                     .edgeColor(CLR(1,1,1,1))
-                    .pixelWidth(2f)
+                    .pixelWidth(0.9f)
                     .buildObject();
             
             assetsLoaded = true;
@@ -82,7 +82,6 @@ public class Potion extends Addon {
 
     @Override
     public void draw(float[] vpMatrix) {
-        if (!assetsLoaded || sharedFill == null || sharedWire == null || object3D == null) return;
         object3D.draw(vpMatrix);
     }
 

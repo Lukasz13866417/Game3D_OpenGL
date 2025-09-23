@@ -1,5 +1,7 @@
 package com.example.game3d_opengl.rendering.object3d;
 
+import static com.example.game3d_opengl.rendering.util3d.RenderingUtils.ID_NOT_SET;
+
 import android.opengl.GLES20;
 import android.opengl.Matrix;
 
@@ -23,10 +25,12 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
 
     private final FloatBuffer vertexData; // for reload
     private int vboId;
+    private final boolean ownsVbo;
 
     private final ShortBuffer fillIndexData; // for reload
     private int iboFillId;
     private final int fillIndexCount;
+    private final boolean ownsIbo;
 
 
     protected S shader;
@@ -34,9 +38,11 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
     protected AbstractMesh3D(BaseBuilder<?, ?, S> builder) {
         this.vertexData = builder.vertexData;
         this.vboId = builder.vboId;
+        this.ownsVbo = builder.ownsVbo;
         this.fillIndexData = builder.indexData;
         this.iboFillId = builder.iboId;
         this.fillIndexCount = builder.indexCount;
+        this.ownsIbo = builder.ownsIbo;
         this.shader = builder.shader;
     }
 
@@ -80,28 +86,32 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
      * Re-uploads buffers after a GL context loss.
      */
     public void reload() {
-        // VBO
         int[] bufs = new int[1];
-        GLES20.glGenBuffers(1, bufs, 0);
-        vboId = bufs[0];
-        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId);
-        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, vertexData.capacity() * BYTES_PER_FLOAT, vertexData, GLES20.GL_STATIC_DRAW);
-        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
+        // VBO
+        if (ownsVbo) {
+            GLES20.glGenBuffers(1, bufs, 0);
+            vboId = bufs[0];
+            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId);
+            GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, vertexData.capacity() * BYTES_PER_FLOAT, vertexData, GLES20.GL_STATIC_DRAW);
+            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
+        }
 
         // Fill IBO
-        GLES20.glGenBuffers(1, bufs, 0);
-        iboFillId = bufs[0];
-        GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, iboFillId);
-        GLES20.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, fillIndexData.capacity() * BYTES_PER_SHORT, fillIndexData, GLES20.GL_STATIC_DRAW);
-        GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
+        if (ownsIbo) {
+            GLES20.glGenBuffers(1, bufs, 0);
+            iboFillId = bufs[0];
+            GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, iboFillId);
+            GLES20.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, fillIndexData.capacity() * BYTES_PER_SHORT, fillIndexData, GLES20.GL_STATIC_DRAW);
+            GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
+        }
     }
 
     /**
      * Deletes GL buffers.
      */
     public void cleanup() {
-        GLES20.glDeleteBuffers(1, new int[]{vboId}, 0);
-        GLES20.glDeleteBuffers(1, new int[]{iboFillId}, 0);
+        if (ownsVbo) GLES20.glDeleteBuffers(1, new int[]{vboId}, 0);
+        if (ownsIbo) GLES20.glDeleteBuffers(1, new int[]{iboFillId}, 0);
     }
 
     @Override
@@ -127,8 +137,8 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
         protected Vector3D[] verts;
         protected int[][] faces; // each face is a simple, planar polygon given by ordered vertex indices
 
-        private static final int ID_NOT_SET = -1;
         protected int vboId = ID_NOT_SET,  iboId = ID_NOT_SET;
+        protected boolean ownsVbo = true, ownsIbo = true;
         protected FloatBuffer vertexData;
         protected ShortBuffer indexData;
         protected int indexCount;
@@ -168,11 +178,13 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
 
         public B vboId(int vbo){
             this.vboId = vbo;
+            this.ownsVbo = false;
             return self();
         }
 
         public B iboId(int ibo){
             this.iboId = ibo;
+            this.ownsIbo = false;
             return self();
         }
 

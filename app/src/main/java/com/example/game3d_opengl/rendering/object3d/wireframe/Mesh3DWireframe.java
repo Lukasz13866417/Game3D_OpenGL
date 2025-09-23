@@ -34,7 +34,7 @@ public class Mesh3DWireframe extends AbstractMesh3D<WireframeShaderPair> {
         vs.halfPx = pixelWidth;
         vs.viewportW = Camera.SCREEN_WIDTH;
         vs.viewportH = Camera.SCREEN_HEIGHT;
-        vs.uDepthBiasNDC = -2e-4f;
+        vs.uDepthBiasNDC = -5e-3f; // TODO change to builder arg.
 
         // fragment shader is easy here
         fs.color = edgeColor;
@@ -99,7 +99,6 @@ public class Mesh3DWireframe extends AbstractMesh3D<WireframeShaderPair> {
                 vFloat = putEdgeVert(out, vFloat, A, B, 1f, -1f); // base+2
                 vFloat = putEdgeVert(out, vFloat, A, B, 1f, +1f); // base+3
 
-                // Face for this edge-quad must point into the *expanded* stream:
                 newFaces[e] = new int[]{ vBase + 0, vBase + 1, vBase + 2, vBase + 3 };
 
                 vBase += 4;
@@ -111,7 +110,9 @@ public class Mesh3DWireframe extends AbstractMesh3D<WireframeShaderPair> {
             return out;
         }
 
-        private static int putEdgeVert(float[] dst, int off, Vector3D A, Vector3D B, float end, float side) {
+        private static int putEdgeVert(float[] dst, int off,
+                                       Vector3D A, Vector3D B,
+                                       float end, float side) {
             // aPosA
             dst[off++] = (float)A.x; dst[off++] = (float)A.y; dst[off++] = (float)A.z;
             // aPosB
