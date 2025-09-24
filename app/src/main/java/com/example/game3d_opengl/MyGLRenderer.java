@@ -26,6 +26,11 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private Stage currStage;
     private MenuStage menuStage;
     private GameplayStage gameplayStage;
+    private volatile boolean useFrameCap = true;
+
+    public void setUseFrameCap(boolean useFrameCap) {
+        this.useFrameCap = useFrameCap;
+    }
 
 
     // Simple API that enables stages to order the renderer to switch stages
@@ -69,7 +74,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         lastFrameTime = System.nanoTime();
         if(getCurrentStage().isInitialized()){
-            getCurrentStage().reloadOwnedGPUResources();
+            getCurrentStage().reloadGPUResourcesRecursively();
         }
     }
 
@@ -93,10 +98,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             lastFrameTime = System.nanoTime();
         }
 
-        // FPS cap
+        // Optional FPS cap (disabled when driven by display vsync)
         long now = System.nanoTime();
         long elapsed = now - lastFrameTime;
-        if (elapsed < TARGET_FRAME_NS) {
+        if (useFrameCap && elapsed < TARGET_FRAME_NS) {
             long sleepNs = TARGET_FRAME_NS - elapsed;
             long sleepMs = sleepNs / 1_000_000L;
             int extraNs = (int) (sleepNs % 1_000_000L);

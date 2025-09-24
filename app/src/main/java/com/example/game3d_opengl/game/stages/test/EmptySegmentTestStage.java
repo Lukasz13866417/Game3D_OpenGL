@@ -83,9 +83,7 @@ public class EmptySegmentTestStage extends Stage {
 
     @Override
     public void onClose() {
-        if (terrain != null) {
-            terrain.cleanupGPUResources();
-        }
+        terrain.cleanupGPUResourcesRecursively();
     }
 
     @Override
@@ -109,11 +107,12 @@ public class EmptySegmentTestStage extends Stage {
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
-        if (terrain != null) {
-            terrain.reloadGPUResources();
-        }
+    public void reloadGPUResourcesRecursively() {
+        terrain.reloadGPUResourcesRecursively();
     }
+
+    @Override
+    public void cleanupGPUResourcesRecursively() {}
 
     @Override
     public void onTouchDown(float x, float y) {

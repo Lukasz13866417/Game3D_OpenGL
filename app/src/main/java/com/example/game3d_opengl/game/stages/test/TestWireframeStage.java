@@ -102,7 +102,10 @@ public class TestWireframeStage extends Stage {
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
+    public void reloadGPUResourcesRecursively() {
 
     }
+
+    @Override
+    public void cleanupGPUResourcesRecursively() {}
 }

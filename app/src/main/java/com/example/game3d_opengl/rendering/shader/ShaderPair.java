@@ -1,14 +1,14 @@
-package com.example.game3d_opengl.rendering.object3d.shader;
+package com.example.game3d_opengl.rendering.shader;
 
 import android.opengl.GLES20;
 
-import com.example.game3d_opengl.rendering.GPUResourceUser;
+import com.example.game3d_opengl.rendering.GPUResourceOwner;
 
 /**
  * Wrapper around a glProgram - a pair of vertex and fragment shader.
  * The purpose is to separate this concern from the Polygon3D class.
  */
-public abstract class ShaderPair<VS extends ShaderArgValues, FS extends ShaderArgValues> implements GPUResourceUser {
+public abstract class ShaderPair<VS extends ShaderArgValues, FS extends ShaderArgValues> implements GPUResourceOwner {
 
     // 1) Constants and static fields
 
@@ -135,12 +135,12 @@ public abstract class ShaderPair<VS extends ShaderArgValues, FS extends ShaderAr
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
+    public void reloadGPUResourcesRecursively() {
         reloadProgram();
     }
 
     @Override
-    public void cleanupOwnedGPUResources() {
-        // Programs are managed by GL; nothing to cleanup explicitly here beyond program reloads.
+    public void cleanupGPUResourcesRecursively() {
+        // Programs are managed by GL; nothing to cleanup explicitly here
     }
 }

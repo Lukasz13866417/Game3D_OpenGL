@@ -2,7 +2,7 @@ package com.example.game3d_opengl.game.track_elements.spike;
 
 import android.opengl.GLES20;
 
-import com.example.game3d_opengl.rendering.object3d.shader.ShaderPair;
+import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 /**
  * Wireframe shader for spikes that maps canonical spike endpoints (weights + t)

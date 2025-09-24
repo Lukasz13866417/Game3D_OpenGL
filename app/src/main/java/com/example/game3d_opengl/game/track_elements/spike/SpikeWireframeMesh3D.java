@@ -2,7 +2,8 @@ package com.example.game3d_opengl.game.track_elements.spike;
 
 import android.opengl.GLES20;
 
-import com.example.game3d_opengl.rendering.object3d.AbstractMesh3D;
+import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
+import com.example.game3d_opengl.rendering.mesh.MeshDrawArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
@@ -12,7 +13,7 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  *   aWeightsA(4), aTA(1), aWeightsB(4), aTB(1), aEnd(1), aSide(1)
  * Stride: 12 floats per vertex.
  */
-public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeShaderPair> {
+public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDrawArgs, SpikeWireframeShaderPair> {
 
     private final FColor edgeColor;
     private final float pixelWidth;
@@ -38,28 +39,26 @@ public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeSha
     }
 
     @Override
-    public void draw(float[] vpMatrix) {
-        // Keep wireframe fully tested against depth but do not write to depth
-        // so back edges do not briefly occlude the fill during silhouette transitions.
+    public void draw(SpikeWireframeDrawArgs args) {
         GLES20.glDepthMask(false);
         try {
-            super.draw(vpMatrix);
+            super.draw(args);
         } finally {
             GLES20.glDepthMask(true);
         }
     }
 
     @Override
-    protected void setVariableArgsValues(float[] mvp, SpikeWireframeShaderPair shader) {
-        vs.mvp = mvp;
-        vs.viewportW = com.example.game3d_opengl.rendering.Camera.SCREEN_WIDTH;
-        vs.viewportH = com.example.game3d_opengl.rendering.Camera.SCREEN_HEIGHT;
-        vs.halfPx = pixelWidth;
-        vs.uDepthBiasNDC = uDepthBiasNDC;
-        vs.uNL = uNL; vs.uNR = uNR; vs.uFR = uFR; vs.uFL = uFL; vs.uApex = uApex; vs.uNormal = uNormal;
-        vs.uBaseOffset = uBaseOffset;
+    protected void setVariableArgsValues(SpikeWireframeDrawArgs args, SpikeWireframeShaderPair shader) {
+        vs.mvp = args.vp;
+        vs.viewportW = args.viewportW;
+        vs.viewportH = args.viewportH;
+        vs.halfPx = args.halfPx;
+        vs.uDepthBiasNDC = args.uDepthBiasNDC;
+        vs.uNL = args.uNL; vs.uNR = args.uNR; vs.uFR = args.uFR; vs.uFL = args.uFL; vs.uApex = args.uApex; vs.uNormal = args.uNormal;
+        vs.uBaseOffset = args.uBaseOffset;
 
-        fs.color = edgeColor;
+        fs.color = args.color != null ? args.color : edgeColor;
         shader.setArgs(vs, fs);
     }
 

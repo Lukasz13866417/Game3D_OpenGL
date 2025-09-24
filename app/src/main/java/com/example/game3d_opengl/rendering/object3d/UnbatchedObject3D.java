@@ -2,12 +2,13 @@ package com.example.game3d_opengl.rendering.object3d;
 
 import android.opengl.Matrix;
 
-import com.example.game3d_opengl.rendering.GPUResourceUser;
+import com.example.game3d_opengl.rendering.GPUResourceOwner;
 
 /**
  * Transform wrapper that composes an AbstractMesh3D.
  */
-public abstract class Object3D implements GPUResourceUser {
+// TODO figure out what to do with this class.
+public abstract class UnbatchedObject3D implements GPUResourceOwner {
     public float objX, objY, objZ, objYaw, objPitch, objRoll;
     private final float[] modelMatrix = new float[16];
 
@@ -25,6 +26,6 @@ public abstract class Object3D implements GPUResourceUser {
     }
 
     protected abstract void drawUnderlying(float[] mMat, float[] vpMat);
-    public abstract void reloadOwnedGPUResources();
-    public abstract void cleanupOwnedGPUResources();
+    public abstract void reloadGPUResourcesRecursively();
+    public abstract void cleanupGPUResourcesRecursively();
 }

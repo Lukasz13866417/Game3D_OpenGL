@@ -43,7 +43,21 @@ public class MyGLSurfaceView extends GLSurfaceView {
 
         renderer = new MyGLRenderer(context);
         setRenderer(renderer);
-        setRenderMode(RENDERMODE_CONTINUOUSLY);
+        // Use display vsync via Choreographer; one draw per vsync
+        setRenderMode(RENDERMODE_WHEN_DIRTY);
+        post(new Runnable() {
+            final android.view.Choreographer choreographer = android.view.Choreographer.getInstance();
+            final android.view.Choreographer.FrameCallback callback = new android.view.Choreographer.FrameCallback() {
+                @Override public void doFrame(long frameTimeNanos) {
+                    requestRender();
+                    choreographer.postFrameCallback(this);
+                }
+            };
+            @Override public void run() {
+                choreographer.postFrameCallback(callback);
+                renderer.setUseFrameCap(false);
+            }
+        });
         setKeepScreenOn(true);
     }
 

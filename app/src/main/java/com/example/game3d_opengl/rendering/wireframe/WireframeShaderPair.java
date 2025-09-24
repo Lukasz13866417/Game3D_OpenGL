@@ -1,8 +1,8 @@
-package com.example.game3d_opengl.rendering.object3d.wireframe;
+package com.example.game3d_opengl.rendering.wireframe;
 
 import android.content.res.AssetManager;
 import android.opengl.GLES20;
-import com.example.game3d_opengl.rendering.object3d.shader.ShaderPair;
+import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 /**
  * Thick-wire edges by extruding each edge (v0,v1) to a screen-space quad.

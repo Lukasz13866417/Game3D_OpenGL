@@ -1,14 +1,8 @@
 
 package com.example.game3d_opengl.game.terrain_api.main;
 
-import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
-import static java.lang.Math.min;
-
 import androidx.annotation.NonNull;
 
-import com.example.game3d_opengl.game.terrain_api.TerrainElement;
-import com.example.game3d_opengl.rendering.object3d.BasicPolygon3D;
-import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
@@ -17,9 +11,6 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  * needed for rendering and collision detection.
  */
 public class Tile {
-    // Constants for magic numbers
-    private static final long TILE_REMOVAL_THRESHOLD = 50L;
-
     private final long id;
 
     public long getID() {
@@ -89,15 +80,4 @@ public class Tile {
                 + "]";
     }
 
-    /**
-     * Determines if this tile should be removed based on player distance.
-     * Tiles are removed when they are far behind the player to manage memory usage
-     * and maintain performance. This prevents the terrain from growing indefinitely.
-     * 
-     * @param playerID the current player's tile ID
-     * @return true if this tile should be removed
-     */
-    public boolean isGoneBy(long playerID) {
-        return playerID - getID() > TILE_REMOVAL_THRESHOLD;
-    }
 }

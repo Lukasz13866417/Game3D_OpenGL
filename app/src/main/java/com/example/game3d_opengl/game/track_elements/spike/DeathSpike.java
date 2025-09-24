@@ -6,7 +6,6 @@ import static com.example.game3d_opengl.rendering.util3d.RenderingUtils.ID_NOT_S
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3S;
 
 import android.opengl.GLES20;
-
 import com.example.game3d_opengl.rendering.util3d.GameRandom;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
@@ -19,20 +18,54 @@ public class DeathSpike extends Addon {
 
     private static int SPIKE_FILL_VBO_ID = ID_NOT_SET;
     private static int SPIKE_WIRE_VBO_ID = ID_NOT_SET;
-    private static final int STRIDE_BYTES = 5 * 4; // vec4 weights + float t
 
-    // Per-instance mesh wrapper for infill draw
-    private SpikeInfillMesh3D fillMesh;
-    // Wireframe mesh for edges
-    private SpikeWireframeMesh3D wireMesh;
+    // Shared canonical meshes (geometry/VBO/IBO)
+    private static SpikeInfillMesh3D SHARED_FILL_MESH;
+    private static SpikeWireframeMesh3D SHARED_WIRE_MESH;
+
+    // Per-instance draw args (uniforms)
+    private SpikeInfillDrawArgs infillArgs;
+    private SpikeWireframeDrawArgs wireArgs;
 
     public static void LOAD_DEATHSPIKE_ASSETS(){
+        SpikeInfillShaderPair.LOAD_SHADER_CODE();
+        SpikeWireframeShaderPair.LOAD_SHADER_CODE();
         assert SPIKE_FILL_VBO_ID == ID_NOT_SET;
         assert SPIKE_WIRE_VBO_ID == ID_NOT_SET;
         int[] ids = new int[2];
         GLES20.glGenBuffers(2, ids,0);
         SPIKE_FILL_VBO_ID = ids[0];
         SPIKE_WIRE_VBO_ID = ids[1];
+
+        // Build shared fill mesh (uploads canonical data into SPIKE_FILL_VBO_ID)
+        SpikeInfillShaderPair fillShader = SpikeInfillShaderPair.getSharedShader();
+        SHARED_FILL_MESH = new SpikeInfillMesh3D.Builder()
+                .shader(fillShader)
+                .vboId(SPIKE_FILL_VBO_ID)
+                .color(FColor.CLR(0,0,0,1))
+                .verts(new Vector3D[]{
+                        new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0),
+                        new Vector3D(0,0,0), new Vector3D(0,0,0)
+                })
+                .faces(new int[][]{
+                        new int[]{0,1,4},
+                        new int[]{1,2,4},
+                        new int[]{2,3,4},
+                        new int[]{3,0,4}
+                })
+                .buildObject();
+
+        // Build shared wireframe mesh (uploads canonical expanded edge data into SPIKE_WIRE_VBO_ID)
+        SpikeWireframeShaderPair wireShader = SpikeWireframeShaderPair.getSharedShader();
+        SHARED_WIRE_MESH = new SpikeWireframeMesh3D.Builder()
+                .shader(wireShader)
+                .vboId(SPIKE_WIRE_VBO_ID)
+                .color(CLR(1,1,1,1))
+                .pixelWidth(1.5f)
+                // dummy verts/faces to satisfy builder contract (overridden internally)
+                .verts(new Vector3D[]{ new Vector3D(0,0,0) })
+                .faces(new int[][]{ new int[]{0,0,0} })
+                .buildObject();
     }
 
     private DeathSpike(float height) {
@@ -81,51 +114,16 @@ public class DeathSpike extends Addon {
         uApex[0]=apex.x; uApex[1]=apex.y; uApex[2]=apex.z;
         uNormal[0]=unitNormal.x; uNormal[1]=unitNormal.y; uNormal[2]=unitNormal.z;
 
-        SpikeInfillShaderPair shader = SpikeInfillShaderPair.getSharedShader();
-        SpikeInfillMesh3D.Builder b = new SpikeInfillMesh3D.Builder()
-                .shader(shader)
-                .vboId(SPIKE_FILL_VBO_ID)
-                .instanceUniforms(uNL, uNR, uFR, uFL, uApex, uNormal, baseOffset)
-                .color(FColor.CLR(0,0,0,1));
-        // Explicitly set faces/verts to satisfy builder contract
-        b.verts(new Vector3D[]{
-                new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0),
-                new Vector3D(0,0,0), new Vector3D(0,0,0)
-        });
-        b.faces(new int[][]{
-                new int[]{0,1,4},
-                new int[]{1,2,4},
-                new int[]{2,3,4},
-                new int[]{3,0,4}
-        });
-        fillMesh = b.buildObject();
-
-        // Build wireframe mesh using combined spike-wireframe shader
-        SpikeWireframeShaderPair wireShader = SpikeWireframeShaderPair.getSharedShader();
-        wireMesh = new SpikeWireframeMesh3D.Builder()
-                .shader(wireShader)
-                .vboId(SPIKE_WIRE_VBO_ID)
-                .instanceUniforms(uNL, uNR, uFR, uFL, uApex, uNormal, baseOffset)
-                .color(CLR(1,1,1,1))
-                .pixelWidth(1.5f)
-                .verts(new Vector3D[]{
-                        new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0),
-                        new Vector3D(0,0,0), new Vector3D(0,0,0)
-                })
-                .faces(new int[][]{
-                        new int[]{0,1,4},
-                        new int[]{1,2,4},
-                        new int[]{2,3,4},
-                        new int[]{3,0,4}
-                })
-                .buildObject();
+        // Per-instance args only (shared geometry)
+        this.infillArgs = new SpikeInfillDrawArgs(uNL, uNR, uFR, uFL, uApex, uNormal, baseOffset);
+        this.wireArgs = new SpikeWireframeDrawArgs(1.5f, -2e-4f, uNL, uNR, uFR, uFL, uApex, uNormal, baseOffset, CLR(1,1,1,1));
 
     }
 
     @Override
     public void draw(float[] vpMatrix) {
-        if (fillMesh != null) fillMesh.draw(vpMatrix);
-        if (wireMesh != null) wireMesh.draw(vpMatrix);
+        if (infillArgs != null) { infillArgs.vp = vpMatrix; SHARED_FILL_MESH.draw(infillArgs); }
+        if (wireArgs != null) { wireArgs.vp = vpMatrix; SHARED_WIRE_MESH.draw(wireArgs); }
     }
 
     @Override
@@ -139,15 +137,15 @@ public class DeathSpike extends Addon {
     }
 
     @Override
-    public void cleanupOwnedGPUResources() {
-        if (fillMesh != null) fillMesh.cleanupOwnedGPUResources();
-        if (wireMesh != null) wireMesh.cleanupOwnedGPUResources();
+    public void cleanupGPUResourcesRecursively() {
+        SHARED_FILL_MESH.cleanupGPUResourcesRecursively();
+        SHARED_WIRE_MESH.cleanupGPUResourcesRecursively();
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
-        if (fillMesh != null) fillMesh.reloadOwnedGPUResources();
-        if (wireMesh != null) wireMesh.reloadOwnedGPUResources();
+    public void reloadGPUResourcesRecursively() {
+        SHARED_FILL_MESH.reloadGPUResourcesRecursively();
+        SHARED_WIRE_MESH.reloadGPUResourcesRecursively();
     }
 
 

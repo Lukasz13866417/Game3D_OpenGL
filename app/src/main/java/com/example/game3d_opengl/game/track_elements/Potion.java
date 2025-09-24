@@ -5,11 +5,10 @@ import static com.example.game3d_opengl.rendering.util3d.GameMath.getNormal;
 
 import android.content.res.AssetManager;
 
-import com.example.game3d_opengl.rendering.object3d.ModelCreator;
-import com.example.game3d_opengl.rendering.object3d.Object3D;
-import com.example.game3d_opengl.rendering.object3d.Object3DWithOutline;
-import com.example.game3d_opengl.rendering.object3d.infill.Mesh3DInfill;
-import com.example.game3d_opengl.rendering.object3d.wireframe.Mesh3DWireframe;
+import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
+import com.example.game3d_opengl.rendering.util3d.ModelCreator;
+import com.example.game3d_opengl.rendering.infill.Mesh3DInfill;
+import com.example.game3d_opengl.rendering.wireframe.Mesh3DWireframe;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 
@@ -25,7 +24,7 @@ public class Potion extends Addon {
     private static boolean assetsLoaded = false;
     
     // Instance-specific transform wrapper
-    private Object3DWithOutline object3D;
+    private UnbatchedObject3DWithOutline object3D;
     
     public static void LOAD_POTION_ASSETS(AssetManager assetManager){
         if (assetsLoaded) return; // prevent loading multiple times
@@ -61,7 +60,7 @@ public class Potion extends Addon {
     public Potion(){
         super();
         if (assetsLoaded && sharedFill != null && sharedWire != null) {
-            this.object3D = Object3DWithOutline.wrap(sharedFill, sharedWire);
+            this.object3D = UnbatchedObject3DWithOutline.wrap(sharedFill, sharedWire);
         }
     }
     
@@ -95,25 +94,16 @@ public class Potion extends Addon {
     }
 
     @Override
-    public void cleanupOwnedGPUResources() {
-        // Don't cleanup shared resources here - they're shared among all potions
+    public void cleanupGPUResourcesRecursively() {
+        sharedFill.cleanupGPUResourcesRecursively();
+        sharedWire.cleanupGPUResourcesRecursively();
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
+    public void reloadGPUResourcesRecursively() {
+        sharedFill.reloadGPUResourcesRecursively();
+        sharedWire.reloadGPUResourcesRecursively();
     }
 
 
-    /**
-     * Call this when the application is shutting down to cleanup shared resources
-     */
-    public static void cleanupSharedGPUResources() {
-        if (sharedFill != null) { sharedFill.cleanupOwnedGPUResources(); sharedFill = null; }
-        if (sharedWire != null) { sharedWire.cleanupOwnedGPUResources(); sharedWire = null; }
-    }
-
-    public static void resetSharedResources(){
-        if (sharedFill != null) sharedFill.reloadOwnedGPUResources();
-        if (sharedWire != null) sharedWire.reloadOwnedGPUResources();
-    }
 }

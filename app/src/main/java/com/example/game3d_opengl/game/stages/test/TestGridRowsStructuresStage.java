@@ -165,7 +165,10 @@ public class TestGridRowsStructuresStage extends Stage {
     public void onReturn() { }
 
     @Override
-    public void reloadOwnedGPUResources() { }
+    public void reloadGPUResourcesRecursively() { }
+
+    @Override
+    public void cleanupGPUResourcesRecursively() {}
 
     @Override
     protected void onPause() { }

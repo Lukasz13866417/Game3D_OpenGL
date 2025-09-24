@@ -18,11 +18,7 @@ import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
-import com.example.game3d_opengl.game.track_elements.spike.SpikeInfillShaderPair;
-import com.example.game3d_opengl.game.track_elements.spike.SpikeWireframeShaderPair;
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.game.stages.test.util.LineSet3D;
-import com.example.game3d_opengl.rendering.object3d.infill.InfillShaderPair;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
@@ -83,8 +79,6 @@ public class GameplayStage extends Stage {
 
         Potion.LOAD_POTION_ASSETS(assetManager);
         DeathSpike.LOAD_DEATHSPIKE_ASSETS();
-        SpikeInfillShaderPair.LOAD_SHADER_CODE();
-        SpikeWireframeShaderPair.LOAD_SHADER_CODE();
 
         Player.LOAD_PLAYER_ASSETS(assetManager);
         player = Player.createPlayer();
@@ -178,19 +172,19 @@ public class GameplayStage extends Stage {
     public void onResume() {
 
     }
+
     @Override
     public void onClose() {
-        player.cleanupOwnedGPUResources();
-        Potion.cleanupSharedGPUResources();
-        terrain.cleanupGPUResources();
+        player.cleanupGPUResourcesRecursively();
+        terrain.cleanupGPUResourcesRecursively();
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
-        InfillShaderPair.getSharedShader().reloadProgram();
-        LineSet3D.resetProgram();
-        Potion.resetSharedResources();
-        player.reloadOwnedGPUResources();
-        terrain.reloadGPUResources();
+    public void reloadGPUResourcesRecursively() {
+        player.reloadGPUResourcesRecursively();
+        terrain.reloadGPUResourcesRecursively();
     }
+
+    @Override
+    public void cleanupGPUResourcesRecursively() {}
 }

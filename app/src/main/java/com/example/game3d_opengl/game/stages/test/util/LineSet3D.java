@@ -1,13 +1,13 @@
 package com.example.game3d_opengl.game.stages.test.util;
 
-import static com.example.game3d_opengl.rendering.object3d.shader.ShaderPair.loadShader;
+import static com.example.game3d_opengl.rendering.shader.ShaderPair.loadShader;
 
 import android.opengl.GLES20;
 
-import com.example.game3d_opengl.rendering.object3d.Object3D;
-import com.example.game3d_opengl.rendering.object3d.Object3DWithOutline;
-import com.example.game3d_opengl.rendering.object3d.infill.Mesh3DInfill;
-import com.example.game3d_opengl.rendering.object3d.wireframe.Mesh3DWireframe;
+import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3D;
+import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
+import com.example.game3d_opengl.rendering.infill.Mesh3DInfill;
+import com.example.game3d_opengl.rendering.wireframe.Mesh3DWireframe;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
@@ -47,7 +47,7 @@ public class LineSet3D {
     private FColor lineColor;
 
     // points as small cubes
-    private final Object3DWithOutline[] pointCubes;
+    private final UnbatchedObject3DWithOutline[] pointCubes;
     private FColor pointColor;
 
     public LineSet3D(Vector3D[] points, int[][] edges, FColor lineColor, FColor pointColor) {
@@ -113,14 +113,14 @@ public class LineSet3D {
             {0,3,7,4}, {1,2,6,5}   // left, right
         };
 
-        pointCubes = new Object3DWithOutline[points.length];
+        pointCubes = new UnbatchedObject3DWithOutline[points.length];
         for (int i = 0; i < points.length; i++) {
             Vector3D p = points[i];
             pointCubes[i] = makePointCubeObject3D(cubeVerts, cubeFaces, p, pointColor);
         }
     }
 
-    private static Object3DWithOutline makePointCubeObject3D(Vector3D[] cubeVerts, int[][] cubeFaces, Vector3D position, FColor color) {
+    private static UnbatchedObject3DWithOutline makePointCubeObject3D(Vector3D[] cubeVerts, int[][] cubeFaces, Vector3D position, FColor color) {
         Mesh3DInfill fill = new Mesh3DInfill.Builder()
                 .verts(cubeVerts)
                 .faces(cubeFaces)
@@ -134,7 +134,7 @@ public class LineSet3D {
                 .pixelWidth(1f)
                 .buildObject();
 
-        Object3DWithOutline obj = Object3DWithOutline.wrap(fill, wire);
+        UnbatchedObject3DWithOutline obj = UnbatchedObject3DWithOutline.wrap(fill, wire);
         obj.objX = position.x; obj.objY = position.y; obj.objZ = position.z;
         return obj;
     }
@@ -174,7 +174,7 @@ public class LineSet3D {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
 
         // 2) draw point-cubes
-        for (Object3D cube : pointCubes) {
+        for (UnbatchedObject3D cube : pointCubes) {
             cube.draw(vpMatrix);
         }
     }

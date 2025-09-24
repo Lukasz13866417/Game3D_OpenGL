@@ -1,6 +1,6 @@
 package com.example.game3d_opengl.game.track_elements.spike;
 
-import com.example.game3d_opengl.rendering.object3d.shader.ShaderArgValues;
+import com.example.game3d_opengl.rendering.shader.ShaderArgValues;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 
 public final class SpikeWireframeShaderArgs {

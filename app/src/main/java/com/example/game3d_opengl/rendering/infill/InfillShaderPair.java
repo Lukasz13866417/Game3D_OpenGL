@@ -1,9 +1,9 @@
-package com.example.game3d_opengl.rendering.object3d.infill;
+package com.example.game3d_opengl.rendering.infill;
 
 import android.content.res.AssetManager;
 import android.opengl.GLES20;
 
-import com.example.game3d_opengl.rendering.object3d.shader.ShaderPair;
+import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 public final class InfillShaderPair extends ShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS> {
 
