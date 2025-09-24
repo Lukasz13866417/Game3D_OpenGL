@@ -1,81 +1,152 @@
 package com.example.game3d_opengl.game.track_elements.spike;
 
-import com.example.game3d_opengl.rendering.Camera;
+import android.opengl.GLES20;
+
 import com.example.game3d_opengl.rendering.object3d.AbstractMesh3D;
-import com.example.game3d_opengl.rendering.object3d.infill.InfillShaderArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
- * Wireframe renderer for spike edges using weights+t vertex layout.
- * Generates an edge list from the canonical 5-vertex spike and renders as lines (GL_LINES-style via shader).
- * Uses SpikeWireframeShaderPair which computes screen-space thickness in the vertex shader.
+ * Custom mesh for spike wireframe. Builds an expanded vertex stream per canonical edge:
+ * each canonical edge (A,B) becomes 4 vertices (A-, A+, B-, B+) with attributes:
+ *   aWeightsA(4), aTA(1), aWeightsB(4), aTB(1), aEnd(1), aSide(1)
+ * Stride: 12 floats per vertex.
  */
 public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeShaderPair> {
 
+    private final FColor edgeColor;
+    private final float pixelWidth;
+    private final float uDepthBiasNDC;
+
+    // Per-instance spike uniforms
     private final float[] uNL, uNR, uFR, uFL, uApex, uNormal;
     private final float uBaseOffset;
-    private final FColor color;
-    private final float pixelWidth;
 
-    public SpikeWireframeMesh3D(Builder b) {
+    private final SpikeWireframeShaderArgs.VS vs;
+    private final SpikeWireframeShaderArgs.FS fs;
+
+    private SpikeWireframeMesh3D(Builder b) {
         super(b);
+        this.edgeColor = b.edgeColor;
+        this.pixelWidth = b.pixelWidth;
+        this.uDepthBiasNDC = b.uDepthBiasNDC;
         this.uNL = b.uNL; this.uNR = b.uNR; this.uFR = b.uFR; this.uFL = b.uFL;
         this.uApex = b.uApex; this.uNormal = b.uNormal; this.uBaseOffset = b.uBaseOffset;
-        this.color = b.color; this.pixelWidth = b.pixelWidth;
+
+        this.vs = new SpikeWireframeShaderArgs.VS();
+        this.fs = new SpikeWireframeShaderArgs.FS();
     }
 
     @Override
-    protected void setVariableArgsValues(float[] mvp, SpikeWireframeShaderPair s) {
-        InfillShaderArgs.VS vs = new InfillShaderArgs.VS();
-        vs.mvp = mvp;
-        vs.uNL = uNL; vs.uNR = uNR; vs.uFR = uFR; vs.uFL = uFL;
-        vs.uApex = uApex; vs.uNormal = uNormal; vs.uBaseOffset = uBaseOffset;
+    public void draw(float[] vpMatrix) {
+        // Keep wireframe fully tested against depth but do not write to depth
+        // so back edges do not briefly occlude the fill during silhouette transitions.
+        GLES20.glDepthMask(false);
+        try {
+            super.draw(vpMatrix);
+        } finally {
+            GLES20.glDepthMask(true);
+        }
+    }
 
-        InfillShaderArgs.FS fs = new InfillShaderArgs.FS();
-        fs.color = color;
-        s.setArgs(vs, fs);
+    @Override
+    protected void setVariableArgsValues(float[] mvp, SpikeWireframeShaderPair shader) {
+        vs.mvp = mvp;
+        vs.viewportW = com.example.game3d_opengl.rendering.Camera.SCREEN_WIDTH;
+        vs.viewportH = com.example.game3d_opengl.rendering.Camera.SCREEN_HEIGHT;
+        vs.halfPx = pixelWidth;
+        vs.uDepthBiasNDC = uDepthBiasNDC;
+        vs.uNL = uNL; vs.uNR = uNR; vs.uFR = uFR; vs.uFL = uFL; vs.uApex = uApex; vs.uNormal = uNormal;
+        vs.uBaseOffset = uBaseOffset;
+
+        fs.color = edgeColor;
+        shader.setArgs(vs, fs);
     }
 
     public static final class Builder extends AbstractMesh3D.BaseBuilder<SpikeWireframeMesh3D, Builder, SpikeWireframeShaderPair> {
+        private FColor edgeColor = FColor.CLR(1,1,1,1);
+        private float pixelWidth = 1.5f;
+        private float uDepthBiasNDC = -2e-4f;
+
+        // Per-instance uniforms
         private float[] uNL, uNR, uFR, uFL, uApex, uNormal;
         private float uBaseOffset;
-        private FColor color;
-        private float pixelWidth;
 
-        @Override protected Builder self() { return this; }
-        @Override protected SpikeWireframeMesh3D create() { return new SpikeWireframeMesh3D(this); }
-
-        public Builder shader(SpikeWireframeShaderPair s) { super.shader(s); return this; }
+        public Builder color(FColor c){ this.edgeColor = c; return this; }
+        public Builder pixelWidth(float px){ this.pixelWidth = px; return this; }
+        public Builder depthBias(float ndc){ this.uDepthBiasNDC = ndc; return this; }
         public Builder instanceUniforms(float[] nl, float[] nr, float[] fr, float[] fl,
-                                        float[] apex, float[] normal, float baseOffset) {
+                                        float[] apex, float[] normal, float baseOffset){
             this.uNL = nl; this.uNR = nr; this.uFR = fr; this.uFL = fl;
-            this.uApex = apex; this.uNormal = normal; this.uBaseOffset = baseOffset; return this;
+            this.uApex = apex; this.uNormal = normal; this.uBaseOffset = baseOffset; return this; }
+
+        @Override
+        protected Builder self() { return this; }
+
+        @Override
+        protected SpikeWireframeMesh3D create() { return new SpikeWireframeMesh3D(this); }
+
+        @Override
+        public void checkValid() {
+            shader(SpikeWireframeShaderPair.sharedShader);
+            super.checkValid();
         }
-        public Builder color(FColor c) { this.color = c; return this; }
-        public Builder pixelWidth(float px) { this.pixelWidth = px; return this; }
 
         @Override
         protected float[] setVertexData() {
-            // Canonical five vertices with weights+t, matching SpikeInfillMesh3D
-            float[] data = new float[]{
-                    1,0,0,0, 0,
-                    0,1,0,0, 0,
-                    0,0,1,0, 0,
-                    0,0,0,1, 0,
-                    0,0,0,0, 1
+            // Canonical spike vertices: weights + t
+            float[][] canonical = new float[][]{
+                    {1,0,0,0, 0}, // NL
+                    {0,1,0,0, 0}, // NR
+                    {0,0,1,0, 0}, // FR
+                    {0,0,0,1, 0}, // FL
+                    {0,0,0,0, 1}  // Apex
             };
-            // Provide dummy positions to satisfy builder contract
-            this.verts = new Vector3D[]{
-                    new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0),
-                    new Vector3D(0,0,0), new Vector3D(0,0,0)
-            };
-            // Edges of the spike pyramid: base square perimeter + 4 sides to apex
-            this.faces = new int[][]{
-                    new int[]{0,1}, new int[]{1,2}, new int[]{2,3}, new int[]{3,0},
-                    new int[]{0,4}, new int[]{1,4}, new int[]{2,4}, new int[]{3,4}
-            };
-            return data;
+            // Edges to render:
+            //  - Base perimeter: (NL,NR), (NR,FR), (FR,FL), (FL,NL)
+            //  - Sides to apex: (NL,Apex), (NR,Apex), (FR,Apex), (FL,Apex)
+            int[][] edges = new int[][]{{0,1},{1,2},{2,3},{3,0},{0,4},{1,4},{2,4},{3,4}};
+
+            final int vertsPerEdge = 4;
+            final int floatsPerVert = 12;
+            float[] out = new float[edges.length * vertsPerEdge * floatsPerVert];
+            int o = 0;
+            for (int[] e : edges){
+                int ia = e[0], ib = e[1];
+                float[] A = canonical[ia];
+                float[] B = canonical[ib];
+                // Emit A-, A+, B-, B+
+                o = putVert(out, o, A, B, 0f, -1f);
+                o = putVert(out, o, A, B, 0f, +1f);
+                o = putVert(out, o, A, B, 1f, -1f);
+                o = putVert(out, o, A, B, 1f, +1f);
+            }
+
+            // Replace faces by quads per edge so base class triangulates them
+            int nEdges = edges.length;
+            int[][] newFaces = new int[nEdges][];
+            for (int i = 0; i < nEdges; i++) newFaces[i] = new int[]{ i*4+0, i*4+1, i*4+2, i*4+3 };
+            this.faces = newFaces;
+
+            // Provide dummy verts array to satisfy builder contract (not used by shader)
+            this.verts = new Vector3D[]{ new Vector3D(0,0,0) };
+            return out;
+        }
+
+        private static int putVert(float[] dst, int o, float[] A, float[] B, float end, float side){
+            // aWeightsA (4)
+            dst[o++] = A[0]; dst[o++] = A[1]; dst[o++] = A[2]; dst[o++] = A[3];
+            // aTA (1)
+            dst[o++] = A[4];
+            // aWeightsB (4)
+            dst[o++] = B[0]; dst[o++] = B[1]; dst[o++] = B[2]; dst[o++] = B[3];
+            // aTB (1)
+            dst[o++] = B[4];
+            // aEnd (1)
+            dst[o++] = end;
+            // aSide (1)
+            dst[o++] = side;
+            return o;
         }
     }
 }

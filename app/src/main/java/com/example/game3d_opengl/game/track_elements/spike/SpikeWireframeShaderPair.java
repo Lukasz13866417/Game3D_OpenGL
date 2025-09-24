@@ -2,27 +2,24 @@ package com.example.game3d_opengl.game.track_elements.spike;
 
 import android.opengl.GLES20;
 
-import com.example.game3d_opengl.rendering.object3d.infill.InfillShaderArgs;
 import com.example.game3d_opengl.rendering.object3d.shader.ShaderPair;
-import com.example.game3d_opengl.rendering.object3d.wireframe.WireframeShaderPair;
 
 /**
- * Shader for spikes with non-affine bases. Vertex positions are computed
- * from per-vertex base weights and per-instance quad corners + apex.
+ * Wireframe shader for spikes that maps canonical spike endpoints (weights + t)
+ * to world space using per-instance uniforms, then expands edges to a screen-space
+ * quad to achieve constant pixel thickness.
  */
 public final class SpikeWireframeShaderPair
-        extends ShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS> {
+        extends ShaderPair<SpikeWireframeShaderArgs.VS, SpikeWireframeShaderArgs.FS> {
 
-
-    // uniforms
-    private int uMVP, uColor, uHalfPx, uDepthBiasNDC;
+    // Uniforms
+    private int uMVP, uViewport, uHalfPx, uDepthBiasNDC, uColor;
     private int uNL, uNR, uFR, uFL, uApex, uNormal, uBaseOffset;
 
-    // attributes
-    private int aWeights, aT;
+    // Attributes
+    private int aWeightsA, aTA, aWeightsB, aTB, aEnd, aSide;
 
     public static SpikeWireframeShaderPair sharedShader = null;
-
 
     private SpikeWireframeShaderPair(int programHandle, String vs, String fs) {
         super(programHandle, vs, fs);
@@ -47,81 +44,114 @@ public final class SpikeWireframeShaderPair
                 "uniform vec3 uApex;\n" +
                 "uniform vec3 uNormal;\n" +
                 "uniform float uBaseOffset;\n" +
-                "attribute vec4 aWeights;\n" +
-                "attribute float aT;\n" +
+                "attribute vec4 aWeightsA;\n" +
+                "attribute float aTA;\n" +
+                "attribute vec4 aWeightsB;\n" +
+                "attribute float aTB;\n" +
+                "attribute float aEnd;\n" +
                 "attribute float aSide;\n" +
+                "vec2 ndc(vec4 clip){ return clip.xy / clip.w; }\n" +
                 "void main(){\n" +
-                "  vec3 pBase = aWeights.x * uNL + aWeights.y * uNR + aWeights.z * uFR + aWeights.w * uFL;\n" +
-                "  vec3 worldPos = mix(pBase + uNormal * uBaseOffset, uApex, aT);\n" +
-                "  vec4 P_clip = uMVPMatrix * vec4(worldPos, 1.0);\n" +
-                "  vec2 P_ndc = P_clip.xy / P_clip.w;\n" +
-                "  // Fake a small perpendicular (constant thickness fallback)\n" +
+                "  vec3 pBaseA = aWeightsA.x * uNL + aWeightsA.y * uNR + aWeightsA.z * uFR + aWeightsA.w * uFL;\n" +
+                "  vec3 worldA = mix(pBaseA + uNormal * uBaseOffset, uApex, aTA);\n" +
+                "  vec3 pBaseB = aWeightsB.x * uNL + aWeightsB.y * uNR + aWeightsB.z * uFR + aWeightsB.w * uFL;\n" +
+                "  vec3 worldB = mix(pBaseB + uNormal * uBaseOffset, uApex, aTB);\n" +
+                "  vec4 A_clip = uMVPMatrix * vec4(worldA, 1.0);\n" +
+                "  vec4 B_clip = uMVPMatrix * vec4(worldB, 1.0);\n" +
+                "  vec2 A_ndc = ndc(A_clip);\n" +
+                "  vec2 B_ndc = ndc(B_clip);\n" +
                 "  vec2 ndc2px = 0.5 * uViewport;\n" +
-                "  vec2 delta_ndc = (uHalfPx * normalize(vec2(1.0,0.0))) / ndc2px;\n" +
+                "  vec2 d_pix = (B_ndc - A_ndc) * ndc2px;\n" +
+                "  float l2 = dot(d_pix, d_pix);\n" +
+                "  vec2 n_pix = (l2 > 1e-8) ? normalize(vec2(-d_pix.y, d_pix.x)) : vec2(0.0);\n" +
+                "  vec2 delta_ndc = (uHalfPx * n_pix) / ndc2px;\n" +
+                "  vec4 P_clip = mix(A_clip, B_clip, aEnd);\n" +
+                "  vec2 P_ndc  = mix(A_ndc,  B_ndc,  aEnd);\n" +
                 "  vec2 out_ndc = P_ndc + aSide * delta_ndc;\n" +
                 "  gl_Position = vec4(out_ndc * P_clip.w, P_clip.z, P_clip.w);\n" +
                 "  gl_Position.z += uDepthBiasNDC * gl_Position.w;\n" +
                 "}";
+
         String fs =
                 "precision mediump float;\n" +
-                "uniform vec4 vColor;\n" +
-                "void main(){ gl_FragColor = vColor; }";
+                "uniform vec4 uColor;\n" +
+                "void main(){ gl_FragColor = uColor; }";
+
         sharedShader = new Builder().fromSource(vs, fs).build();
     }
 
     @Override
     protected void setupAttribLocations() {
-        this.uMVP = GLES20.glGetUniformLocation(getProgramHandle(), "uMVPMatrix");
-        this.uColor = GLES20.glGetUniformLocation(getProgramHandle(), "vColor");
-        this.uHalfPx = GLES20.glGetUniformLocation(getProgramHandle(), "uHalfPx");
-        this.uDepthBiasNDC = GLES20.glGetUniformLocation(getProgramHandle(), "uDepthBiasNDC");
-        // viewport is needed for pixel-normal conversion
-        int uViewport = GLES20.glGetUniformLocation(getProgramHandle(), "uViewport");
-        this.uNL = GLES20.glGetUniformLocation(getProgramHandle(), "uNL");
-        this.uNR = GLES20.glGetUniformLocation(getProgramHandle(), "uNR");
-        this.uFR = GLES20.glGetUniformLocation(getProgramHandle(), "uFR");
-        this.uFL = GLES20.glGetUniformLocation(getProgramHandle(), "uFL");
-        this.uApex = GLES20.glGetUniformLocation(getProgramHandle(), "uApex");
-        this.uNormal = GLES20.glGetUniformLocation(getProgramHandle(), "uNormal");
-        this.uBaseOffset = GLES20.glGetUniformLocation(getProgramHandle(), "uBaseOffset");
+        int p = getProgramHandle();
+        uMVP = GLES20.glGetUniformLocation(p, "uMVPMatrix");
+        uViewport = GLES20.glGetUniformLocation(p, "uViewport");
+        uHalfPx = GLES20.glGetUniformLocation(p, "uHalfPx");
+        uDepthBiasNDC = GLES20.glGetUniformLocation(p, "uDepthBiasNDC");
+        uColor = GLES20.glGetUniformLocation(p, "uColor");
 
-        this.aWeights = GLES20.glGetAttribLocation(getProgramHandle(), "aWeights");
-        this.aT = GLES20.glGetAttribLocation(getProgramHandle(), "aT");
+        uNL = GLES20.glGetUniformLocation(p, "uNL");
+        uNR = GLES20.glGetUniformLocation(p, "uNR");
+        uFR = GLES20.glGetUniformLocation(p, "uFR");
+        uFL = GLES20.glGetUniformLocation(p, "uFL");
+        uApex = GLES20.glGetUniformLocation(p, "uApex");
+        uNormal = GLES20.glGetUniformLocation(p, "uNormal");
+        uBaseOffset = GLES20.glGetUniformLocation(p, "uBaseOffset");
+
+        aWeightsA = GLES20.glGetAttribLocation(p, "aWeightsA");
+        aTA       = GLES20.glGetAttribLocation(p, "aTA");
+        aWeightsB = GLES20.glGetAttribLocation(p, "aWeightsB");
+        aTB       = GLES20.glGetAttribLocation(p, "aTB");
+        aEnd      = GLES20.glGetAttribLocation(p, "aEnd");
+        aSide     = GLES20.glGetAttribLocation(p, "aSide");
     }
-
 
     @Override
     public void enableAndPointVertexAttribs() {
+        final int stride = 12 * 4; // 12 floats per vertex
+        GLES20.glEnableVertexAttribArray(aWeightsA);
+        GLES20.glVertexAttribPointer(aWeightsA, 4, GLES20.GL_FLOAT, false, stride, 0);
 
-        // weights + t layout from shared spike VBO; we add aSide as a constant attribute per draw if needed
-        GLES20.glEnableVertexAttribArray(aWeights);
-        GLES20.glVertexAttribPointer(aWeights, 4, GLES20.GL_FLOAT, false, 5 * 4, 0);
-        GLES20.glEnableVertexAttribArray(aT);
-        GLES20.glVertexAttribPointer(aT, 1, GLES20.GL_FLOAT, false, 5 * 4, 4 * 4);
+        GLES20.glEnableVertexAttribArray(aTA);
+        GLES20.glVertexAttribPointer(aTA, 1, GLES20.GL_FLOAT, false, stride, 4 * 4);
+
+        GLES20.glEnableVertexAttribArray(aWeightsB);
+        GLES20.glVertexAttribPointer(aWeightsB, 4, GLES20.GL_FLOAT, false, stride, 5 * 4);
+
+        GLES20.glEnableVertexAttribArray(aTB);
+        GLES20.glVertexAttribPointer(aTB, 1, GLES20.GL_FLOAT, false, stride, 9 * 4);
+
+        GLES20.glEnableVertexAttribArray(aEnd);
+        GLES20.glVertexAttribPointer(aEnd, 1, GLES20.GL_FLOAT, false, stride, 10 * 4);
+
+        GLES20.glEnableVertexAttribArray(aSide);
+        GLES20.glVertexAttribPointer(aSide, 1, GLES20.GL_FLOAT, false, stride, 11 * 4);
     }
 
     @Override
     public void disableVertexAttribs() {
-        GLES20.glDisableVertexAttribArray(aWeights);
-        GLES20.glDisableVertexAttribArray(aT);
+        GLES20.glDisableVertexAttribArray(aWeightsA);
+        GLES20.glDisableVertexAttribArray(aTA);
+        GLES20.glDisableVertexAttribArray(aWeightsB);
+        GLES20.glDisableVertexAttribArray(aTB);
+        GLES20.glDisableVertexAttribArray(aEnd);
+        GLES20.glDisableVertexAttribArray(aSide);
     }
-
-
 
     @Override
-    protected void transferArgsToGPU(InfillShaderArgs.VS vertexArgs, InfillShaderArgs.FS fragmentArgs) {
-        GLES20.glUniformMatrix4fv(uMVP, 1, false, vertexArgs.mvp, 0);
-        GLES20.glUniform4fv(uColor, 1, fragmentArgs.color.rgba, 0);
-    }
+    protected void transferArgsToGPU(SpikeWireframeShaderArgs.VS v, SpikeWireframeShaderArgs.FS f) {
+        GLES20.glUniformMatrix4fv(uMVP, 1, false, v.mvp, 0);
+        GLES20.glUniform2f(uViewport, v.viewportW, v.viewportH);
+        GLES20.glUniform1f(uHalfPx, v.halfPx);
+        GLES20.glUniform1f(uDepthBiasNDC, v.uDepthBiasNDC);
+        GLES20.glUniform4f(uColor, f.color.r(), f.color.g(), f.color.b(), f.color.a());
 
-    public void setInstanceUniforms(float[] nl, float[] nr, float[] fr, float[] fl, float[] apex, float[] normal, float baseOffset) {
-        GLES20.glUniform3fv(uNL, 1, nl, 0);
-        GLES20.glUniform3fv(uNR, 1, nr, 0);
-        GLES20.glUniform3fv(uFR, 1, fr, 0);
-        GLES20.glUniform3fv(uFL, 1, fl, 0);
-        GLES20.glUniform3fv(uApex, 1, apex, 0);
-        GLES20.glUniform3fv(uNormal, 1, normal, 0);
-        GLES20.glUniform1f(uBaseOffset, baseOffset);
+        GLES20.glUniform3fv(uNL, 1, v.uNL, 0);
+        GLES20.glUniform3fv(uNR, 1, v.uNR, 0);
+        GLES20.glUniform3fv(uFR, 1, v.uFR, 0);
+        GLES20.glUniform3fv(uFL, 1, v.uFL, 0);
+        GLES20.glUniform3fv(uApex, 1, v.uApex, 0);
+        GLES20.glUniform3fv(uNormal, 1, v.uNormal, 0);
+        GLES20.glUniform1f(uBaseOffset, v.uBaseOffset);
     }
 
     public static final class Builder extends ShaderPair.BaseBuilder<SpikeWireframeShaderPair, Builder> {

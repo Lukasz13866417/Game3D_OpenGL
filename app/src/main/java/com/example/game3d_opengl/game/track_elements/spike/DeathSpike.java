@@ -17,18 +17,22 @@ public class DeathSpike extends Addon {
     private final float height;
     private final float baseOffset = 0.025f;
 
-    private static int SPIKE_VBO_ID = ID_NOT_SET;
+    private static int SPIKE_FILL_VBO_ID = ID_NOT_SET;
+    private static int SPIKE_WIRE_VBO_ID = ID_NOT_SET;
     private static final int STRIDE_BYTES = 5 * 4; // vec4 weights + float t
 
     // Per-instance mesh wrapper for infill draw
     private SpikeInfillMesh3D fillMesh;
+    // Wireframe mesh for edges
+    private SpikeWireframeMesh3D wireMesh;
 
     public static void LOAD_DEATHSPIKE_ASSETS(){
-        assert SPIKE_VBO_ID == ID_NOT_SET;
-        int vboId;
-        int[] ids = new int[1];
-        GLES20.glGenBuffers(1, ids,0);
-        SPIKE_VBO_ID = ids[0];
+        assert SPIKE_FILL_VBO_ID == ID_NOT_SET;
+        assert SPIKE_WIRE_VBO_ID == ID_NOT_SET;
+        int[] ids = new int[2];
+        GLES20.glGenBuffers(2, ids,0);
+        SPIKE_FILL_VBO_ID = ids[0];
+        SPIKE_WIRE_VBO_ID = ids[1];
     }
 
     private DeathSpike(float height) {
@@ -55,7 +59,10 @@ public class DeathSpike extends Addon {
     @Override
     protected void onPlace(Vector3D fieldNearLeft, Vector3D fieldNearRight,
                            Vector3D fieldFarLeft, Vector3D fieldFarRight) {
-        Vector3D[] corners = computeCornerTargets(fieldNearLeft, fieldNearRight, fieldFarLeft, fieldFarRight);
+        Vector3D[] corners = computeCornerTargets(fieldNearLeft,
+                                                  fieldNearRight,
+                                                  fieldFarLeft,
+                                                  fieldFarRight);
         Vector3D fieldMid = fieldFarLeft.add(fieldFarRight).add(fieldNearRight).add(fieldNearLeft).div(4);
         Vector3D normal = getNormal(fieldNearLeft, fieldFarLeft, fieldFarRight);
         Vector3D unitNormal = normal.withLen(1f);
@@ -77,7 +84,7 @@ public class DeathSpike extends Addon {
         SpikeInfillShaderPair shader = SpikeInfillShaderPair.getSharedShader();
         SpikeInfillMesh3D.Builder b = new SpikeInfillMesh3D.Builder()
                 .shader(shader)
-                .vboId(SPIKE_VBO_ID)
+                .vboId(SPIKE_FILL_VBO_ID)
                 .instanceUniforms(uNL, uNR, uFR, uFL, uApex, uNormal, baseOffset)
                 .color(FColor.CLR(0,0,0,1));
         // Explicitly set faces/verts to satisfy builder contract
@@ -92,11 +99,33 @@ public class DeathSpike extends Addon {
                 new int[]{3,0,4}
         });
         fillMesh = b.buildObject();
+
+        // Build wireframe mesh using combined spike-wireframe shader
+        SpikeWireframeShaderPair wireShader = SpikeWireframeShaderPair.getSharedShader();
+        wireMesh = new SpikeWireframeMesh3D.Builder()
+                .shader(wireShader)
+                .vboId(SPIKE_WIRE_VBO_ID)
+                .instanceUniforms(uNL, uNR, uFR, uFL, uApex, uNormal, baseOffset)
+                .color(CLR(1,1,1,1))
+                .pixelWidth(1.5f)
+                .verts(new Vector3D[]{
+                        new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0),
+                        new Vector3D(0,0,0), new Vector3D(0,0,0)
+                })
+                .faces(new int[][]{
+                        new int[]{0,1,4},
+                        new int[]{1,2,4},
+                        new int[]{2,3,4},
+                        new int[]{3,0,4}
+                })
+                .buildObject();
+
     }
 
     @Override
     public void draw(float[] vpMatrix) {
         if (fillMesh != null) fillMesh.draw(vpMatrix);
+        if (wireMesh != null) wireMesh.draw(vpMatrix);
     }
 
     @Override
@@ -112,11 +141,13 @@ public class DeathSpike extends Addon {
     @Override
     public void cleanupOwnedGPUResources() {
         if (fillMesh != null) fillMesh.cleanupOwnedGPUResources();
+        if (wireMesh != null) wireMesh.cleanupOwnedGPUResources();
     }
 
     @Override
     public void reloadOwnedGPUResources() {
         if (fillMesh != null) fillMesh.reloadOwnedGPUResources();
+        if (wireMesh != null) wireMesh.reloadOwnedGPUResources();
     }
 
 

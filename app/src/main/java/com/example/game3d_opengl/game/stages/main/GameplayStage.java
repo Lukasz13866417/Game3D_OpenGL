@@ -19,7 +19,6 @@ import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
 import com.example.game3d_opengl.game.track_elements.spike.SpikeInfillShaderPair;
-import com.example.game3d_opengl.game.track_elements.spike.SpikeWireframeMesh3D;
 import com.example.game3d_opengl.game.track_elements.spike.SpikeWireframeShaderPair;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.game.stages.test.util.LineSet3D;
