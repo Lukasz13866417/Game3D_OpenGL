@@ -21,6 +21,7 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.ArrayStack;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.IntArrayQueue;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.IntArrayStack;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.FixedMaxSizeDeque;
+import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.CommandExecutor;
@@ -39,7 +40,7 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.execbuffer.Preallo
  * 3. Commands are executed in chunks to control frame time
  * 4. This allows for complex terrain generation without blocking the main thread
  */
-public class Terrain {
+public class Terrain implements GPUResourceOwner {
 
     private static final int DEFAULT_QUEUE_CAPACITY = 100_000;
 
@@ -82,18 +83,26 @@ public class Terrain {
      * This includes VBOs, IBOs, and other OpenGL objects.
      * Should be called when the OpenGL context is being destroyed.
      */
-    public void cleanupGPUResources() {
+    @Override
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+
+        // TODO this should only do GPU stuff. Make separate method for command buffers etc
+
         commandBuffer.free();
-        tileManager.cleanupGPUResources();
+        tileManager.cleanupGPUResourcesRecursivelyOnContextLoss();
+
         gridCreatorWrapperQueue.clear();
         gridCreatorWrapperStack.clear();
+
         rowOffsetQueue.clear();
         rowCountStack.clear();
+
         structureStack.clear();
         waitingStructuresQueue.clear();
         childStructuresQueue.clear();
+
         for (Addon addon : addons) {
-            addon.cleanupOwnedGPUResources();
+            addon.cleanupGPUResourcesRecursivelyOnContextLoss();
         }
         addons.clear();
     }
@@ -102,11 +111,12 @@ public class Terrain {
     /**
      * Resets all GPU resources after a context loss.
      * Recreates VBOs and IBOs for all tiles and addons.
-     */
-    public void reloadGPUResources() {
-        tileManager.reloadGPUResources();
+     **/
+    @Override
+    public void reloadGPUResourcesRecursivelyOnContextLoss() {
+        tileManager.reloadGPUResourcesRecursivelyOnContextLoss();
         for (Addon addon : addons) {
-            addon.reloadOwnedGPUResources();
+            addon.reloadGPUResourcesRecursivelyOnContextLoss();
         }
     }
 
@@ -470,7 +480,8 @@ public class Terrain {
      */
     private void removeOldAddons(long playerTileId) {
         while (!addons.isEmpty() && addons.getFirst().isGoneBy(playerTileId)) {
-            addons.popFirst().cleanupOwnedGPUResources();
+            // TODO add some cleanup of stuff that's owned per-addon.
+            addons.popFirst();
         }
     }
 

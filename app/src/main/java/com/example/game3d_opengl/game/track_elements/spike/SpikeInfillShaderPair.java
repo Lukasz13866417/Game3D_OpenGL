@@ -2,9 +2,8 @@ package com.example.game3d_opengl.game.track_elements.spike;
 
 import android.opengl.GLES20;
 
-import com.example.game3d_opengl.rendering.object3d.infill.InfillShaderArgs;
-import com.example.game3d_opengl.rendering.object3d.shader.ShaderPair;
-import com.example.game3d_opengl.rendering.object3d.wireframe.WireframeShaderPair;
+import com.example.game3d_opengl.rendering.infill.InfillShaderArgs;
+import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 /**
  * Shader for spikes with non-affine bases. Vertex positions are computed

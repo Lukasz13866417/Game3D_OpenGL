@@ -98,7 +98,10 @@ public class TestFunctionTerrainStage extends Stage {
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
+    public void reloadGPUResourcesRecursivelyOnContextLoss() {
 
     }
+
+    @Override
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
 }

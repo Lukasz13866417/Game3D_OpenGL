@@ -2,7 +2,9 @@ package com.example.game3d_opengl.game.terrain_api.terrainutil;
 
 import android.opengl.GLES20;
 import android.os.Build;
-import com.example.game3d_opengl.rendering.object3d.infill.InfillShaderArgs;
+
+import com.example.game3d_opengl.rendering.GPUResourceOwner;
+import com.example.game3d_opengl.rendering.infill.InfillShaderArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
@@ -21,7 +23,7 @@ import java.nio.ShortBuffer;
  * ES 3.x mapping path (glMapBufferRange) is used opportunistically; ES 2.0 falls back
  * to glBufferSubData, which is fine for 24-byte updates per push.
  */
-public class TerrainLandscapeRenderer {
+public class TerrainLandscapeRenderer implements GPUResourceOwner {
 
     // ---- Tunables -----------------------------------------------------------
 
@@ -141,9 +143,10 @@ public class TerrainLandscapeRenderer {
      */
     public void draw(FColor color, float[] vp) {
         if (sizePairs < 2) return;
+        // TODO fail fast would be better but might require more changes.
         // Lazily create GL buffers on first use (also covers initial startup)
         if (vboId == 0 || eboId == 0) {
-            restoreAfterContextLoss();
+            reloadGPUResourcesRecursivelyOnContextLoss();
             if (vboId == 0 || eboId == 0) return;
         }
 
@@ -212,11 +215,17 @@ public class TerrainLandscapeRenderer {
         cpuMirrorBB.clear();
     }
 
-    /**
-     * Recreate GL buffers after a context loss and restore geometry from the CPU mirror.
-     * Call this on the GL thread, typically from onSurfaceCreated().
-     */
-    public void restoreAfterContextLoss() {
+
+    /** Delete GL buffers. Safe to call even if not created yet. Call on GL thread. */
+    @Override
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+        int[] id = new int[1];
+        if (vboId != 0) { id[0] = vboId; GLES20.glDeleteBuffers(1, id, 0); vboId = 0; }
+        if (eboId != 0) { id[0] = eboId; GLES20.glDeleteBuffers(1, id, 0); eboId = 0; }
+    }
+
+    @Override
+    public void reloadGPUResourcesRecursivelyOnContextLoss() {
         initGlBuffers();
         detectCaps();        // detect ES3 mapping availability
 
@@ -231,13 +240,6 @@ public class TerrainLandscapeRenderer {
         // Rebuild the index buffer for the current deque window
         indicesDirty = true;
         ensureIndexBufferUpToDate();
-    }
-
-    /** Delete GL buffers. Safe to call even if not created yet. Call on GL thread. */
-    public void cleanupGPUResources() {
-        int[] id = new int[1];
-        if (vboId != 0) { id[0] = vboId; GLES20.glDeleteBuffers(1, id, 0); vboId = 0; }
-        if (eboId != 0) { id[0] = eboId; GLES20.glDeleteBuffers(1, id, 0); eboId = 0; }
     }
 
     // ---- Internals ----------------------------------------------------------

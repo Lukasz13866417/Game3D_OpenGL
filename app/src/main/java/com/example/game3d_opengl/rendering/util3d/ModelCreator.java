@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.rendering.object3d;
+package com.example.game3d_opengl.rendering.util3d;
 
 
 import static com.example.game3d_opengl.rendering.util3d.GameMath.rotX;

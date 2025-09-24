@@ -6,7 +6,6 @@ import static com.example.game3d_opengl.rendering.util3d.GameMath.rotateAroundTw
 import static com.example.game3d_opengl.rendering.util3d.GameMath.tan;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static java.lang.Math.abs;
-import static java.lang.Math.atan;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.Math.sqrt;
@@ -16,6 +15,7 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallo
 import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedCoordinateBuffer;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.OverflowingPreallocatedSegmentHistoryBuffer;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.TerrainLandscapeRenderer;
+import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
@@ -25,7 +25,7 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  * size-synchronised.  Row placement is driven by a single "centre-line"
  * distance counter so it remains consistent even when the tile turns.
  */
-public class TileManager {
+public class TileManager implements GPUResourceOwner {
 
     /*––––––––––––  CONFIG & STATE  ––––––––––––*/
     private final float rowSpacing;                 // desired spacing between logical rows
@@ -172,16 +172,29 @@ public class TileManager {
         }
     }
 
-    public void cleanupGPUResources() {
+    @Override
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
         while (!tiles.isEmpty()) {
             tiles.popFirst();
         }
-        landscapeRenderer.cleanupGPUResources();
+        landscapeRenderer.cleanupGPUResourcesRecursivelyOnContextLoss();
+
+        // TODO this should only do GPU stuff. Make separate method for buffers etc
         leftSideBuffer.free();
         rightSideBuffer.free();
         rowInfoBuffer.free();
         segmentHistoryBuffer.free();
     }
+
+    /**
+     * Recreate GL buffers for the landscape renderer and restore geometry
+     * from the CPU mirror after a context loss or first-time init.
+     */
+    @Override
+    public void reloadGPUResourcesRecursivelyOnContextLoss(){
+        landscapeRenderer.reloadGPUResourcesRecursivelyOnContextLoss();
+    }
+
 
     // ============================================================================
     // GETTERS AND SETTERS
@@ -277,7 +290,7 @@ public class TileManager {
      * associated buffers so the builder can overwrite that tile.
      */
     private Tile removeLastTile() {
-        // It is legal to remove the guardian (initial placeholder) – the very
+        // It is legal to remove the guardian (only inside addSegment() ) – the very
         // next addTile() will immediately create a proper first tile.  We only
         // forbid popping when the deque is already empty (should never happen).
         if (tiles.isEmpty()) {
@@ -323,9 +336,7 @@ public class TileManager {
 
         SegmentHistory lastHistory = segmentHistoryBuffer.get(segmentHistoryBuffer.size() - 1);
 
-
         int cntL = 0, cntR = 0, cntRows = 0;
-        int lastLeftSideSize = leftSideBuffer.size(), lastRightSideSize = rightSideBuffer.size();
 
         if (wasPreviousEmpty || lastHistory.isLiftedUp) {
             // First real tile – add bridging row along its near edge so the grid starts flush.
@@ -421,13 +432,6 @@ public class TileManager {
         landscapeRenderer.draw(colorTheme, vpMatrix);
     }
 
-    /**
-     * Recreate GL buffers for the landscape renderer and restore geometry
-     * from the CPU mirror after a context loss or first-time init.
-     */
-    public void reloadGPUResources(){
-        landscapeRenderer.restoreAfterContextLoss();
-    }
 
     public void updateAfterDraw(float dt){
     }

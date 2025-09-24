@@ -14,10 +14,8 @@ import static java.lang.Math.signum;
 import android.content.res.AssetManager;
 import android.util.Log;
 
-import com.example.game3d_opengl.rendering.object3d.ModelCreator;
-import com.example.game3d_opengl.rendering.object3d.Object3D;
-import com.example.game3d_opengl.rendering.object3d.Object3DWithOutline;
-import com.example.game3d_opengl.rendering.object3d.infill.Mesh3DInfill;
+import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
+import com.example.game3d_opengl.rendering.util3d.ModelCreator;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.main.Tile;
 
@@ -63,10 +61,10 @@ public class Player implements WorldActor {
     private static final String ERROR_ASSET_LOADING = "Failed to load player assets: ";
     private static final String TAG = "Player";
 
-    private static Object3DWithOutline PLAYER_OBJECT;
+    private static UnbatchedObject3DWithOutline PLAYER_OBJECT;
 
     // Instance fields
-    private final Object3DWithOutline object3D;
+    private final UnbatchedObject3DWithOutline object3D;
     private Vector3D dir;
     private Vector3D move;
 
@@ -79,7 +77,7 @@ public class Player implements WorldActor {
     private long nearestTileId = -1L;
 
     /**
-     * Loads the player's 3D model and creates the Object3D builder.
+     * Loads the player's 3D model and creates the UnbatchedObject3D builder.
      * This method must be called before creating any Player instances.
      * 
      * @param assetManager the Android asset manager for loading model files
@@ -101,8 +99,8 @@ public class Player implements WorldActor {
             playerCreator.scaleY(PLAYER_HEIGHT);
             playerCreator.scaleZ(PLAYER_HEIGHT);
 
-            // Build the mesh (AbstractMesh3D) and wrap it with Object3D for transforms
-            Object3DWithOutline obj = new Object3DWithOutline.Builder()
+            // Build the mesh (AbstractMesh3D) and wrap it with UnbatchedObject3D for transforms
+            UnbatchedObject3DWithOutline obj = new UnbatchedObject3DWithOutline.Builder()
                     .verts(playerCreator.getVerts())
                     .faces(playerCreator.getFaces())
                     .fillColor(CLR(0,0,0,1))
@@ -130,13 +128,13 @@ public class Player implements WorldActor {
      * 
      * @param object3D the 3D object representation of the player
      */
-    private Player(Object3DWithOutline object3D) {
+    private Player(UnbatchedObject3DWithOutline object3D) {
         this.object3D = object3D;
         this.dir = new Vector3D(INITIAL_DIRECTION_X, INITIAL_DIRECTION_Y, INITIAL_DIRECTION_Z);
         this.move = new Vector3D(0, 0, 0);
     }
     
-    public static Object3DWithOutline makeObject3D() {
+    public static UnbatchedObject3DWithOutline makeObject3D() {
         if (PLAYER_OBJECT == null) {
             throw new IllegalStateException(ERROR_ASSETS_NOT_LOADED);
         }
@@ -189,7 +187,7 @@ public class Player implements WorldActor {
                 tile.triangles[0][0], tile.triangles[0][1], tile.triangles[0][2]
         );
         
-        // If first triangle collision fails, test second triangle
+        // If first triangle collision doesn't occur, test second triangle
         if (!(!Float.isInfinite(d1) && d1 / PLAYER_HEIGHT < COLLISION_THRESHOLD_MULTIPLIER)) {
             float d2 = rayTriangleDistance(
                     V3(object3D.objX, object3D.objY, object3D.objZ),
@@ -374,28 +372,17 @@ public class Player implements WorldActor {
     }
 
     @Override
-    public void cleanupOwnedGPUResources() {
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
         if (object3D != null) {
-            object3D.cleanupOwnedGPUResources();
+            object3D.cleanupGPUResourcesRecursivelyOnContextLoss();
         }
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
+    public void reloadGPUResourcesRecursivelyOnContextLoss() {
         if (object3D != null) {
-            object3D.reloadOwnedGPUResources();
+            object3D.reloadGPUResourcesRecursivelyOnContextLoss();
         }
-    }
-
-    /**
-     * Returns the maximum value by absolute magnitude.
-     * 
-     * @param a first value
-     * @param b second value
-     * @return the value with larger absolute magnitude
-     */
-    private float maxByAbs(float a, float b) {
-        return abs(a) > abs(b) ? a : b;
     }
 
     /**

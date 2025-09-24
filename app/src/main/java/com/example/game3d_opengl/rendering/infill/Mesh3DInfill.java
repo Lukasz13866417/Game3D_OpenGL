@@ -1,12 +1,13 @@
-package com.example.game3d_opengl.rendering.object3d.infill;
+package com.example.game3d_opengl.rendering.infill;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 
-import com.example.game3d_opengl.rendering.object3d.AbstractMesh3D;
+import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
+import com.example.game3d_opengl.rendering.mesh.MeshDrawArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
-public class Mesh3DInfill extends AbstractMesh3D<InfillShaderPair> {
+public class Mesh3DInfill extends AbstractMesh3D<MeshDrawArgs, InfillShaderPair> {
 
     public Mesh3DInfill(Builder builder){
         super(builder);
@@ -16,9 +17,9 @@ public class Mesh3DInfill extends AbstractMesh3D<InfillShaderPair> {
     private final FColor fillColor;
 
     @Override
-    protected void setVariableArgsValues(float[] mvp, InfillShaderPair s) {
+    protected void setVariableArgsValues(MeshDrawArgs args, InfillShaderPair s) {
         InfillShaderArgs.VS vs = new InfillShaderArgs.VS();
-        vs.mvp = mvp;
+        vs.mvp = args.vp;
         InfillShaderArgs.FS fs = new InfillShaderArgs.FS();
         fs.color = fillColor != null ? fillColor : CLR(1,1,1,1);
         s.setArgs(vs, fs);

@@ -5,7 +5,6 @@ import android.content.Context;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.Player;
 import com.example.game3d_opengl.game.stage_api.Stage;
-import com.example.game3d_opengl.game.terrain_api.main.Tile;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_structures.EmptySegmentTestStructure;
@@ -83,9 +82,7 @@ public class EmptySegmentTestStage extends Stage {
 
     @Override
     public void onClose() {
-        if (terrain != null) {
-            terrain.cleanupGPUResources();
-        }
+        terrain.cleanupGPUResourcesRecursivelyOnContextLoss();
     }
 
     @Override
@@ -109,11 +106,12 @@ public class EmptySegmentTestStage extends Stage {
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
-        if (terrain != null) {
-            terrain.reloadGPUResources();
-        }
+    public void reloadGPUResourcesRecursivelyOnContextLoss() {
+        terrain.reloadGPUResourcesRecursivelyOnContextLoss();
     }
+
+    @Override
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
 
     @Override
     public void onTouchDown(float x, float y) {

@@ -1,12 +1,11 @@
-package com.example.game3d_opengl.rendering.object3d;
+package com.example.game3d_opengl.rendering.mesh;
 
 import static com.example.game3d_opengl.rendering.util3d.RenderingUtils.ID_NOT_SET;
 
 import android.opengl.GLES20;
-import android.opengl.Matrix;
 
-import com.example.game3d_opengl.rendering.GPUResourceUser;
-import com.example.game3d_opengl.rendering.object3d.shader.ShaderPair;
+import com.example.game3d_opengl.rendering.GPUResourceOwner;
+import com.example.game3d_opengl.rendering.shader.ShaderPair;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 import java.nio.ByteBuffer;
@@ -14,7 +13,8 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.ShortBuffer;
 
-public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUResourceUser {
+// TODO remove unused stuff.
+public abstract class AbstractMesh3D<A extends MeshDrawArgs, S extends ShaderPair<?, ?>> implements GPUResourceOwner {
 
     // Constants and static fields
     private static final int BYTES_PER_FLOAT = 4;
@@ -46,7 +46,7 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
         this.shader = builder.shader;
     }
 
-    protected abstract void setVariableArgsValues(float[] mvp, S targetShader);
+    protected abstract void setVariableArgsValues(A meshDrawArgs, S targetShader);
 
 
     // Public methods (API)
@@ -54,14 +54,13 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
     /**
      * Draws the object using the given view-projection matrix.
      */
-    public void _draw(float[] vpMatrix) {
+    public void draw(A args) {
         // Bind shared program and VBO once
         shader.setAsCurrentProgram();
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId);
         shader.enableAndPointVertexAttribs();
 
-        // Fill pass
-        setVariableArgsValues(vpMatrix, shader);
+        setVariableArgsValues(args, shader);
         shader.transferArgsToGPU();
 
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, iboFillId);
@@ -73,19 +72,10 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
-    public void draw(float[] vpMatrix) {
-        _draw(vpMatrix);
-    }
-
-    public void draw(float[] modelMatrix, float[] vpMatrix) {
-        Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
-        this._draw(mvpMatrix);
-    }
-
     /**
      * Re-uploads buffers after a GL context loss.
      */
-    public void reload() {
+    private void reload() {
         int[] bufs = new int[1];
         // VBO
         if (ownsVbo) {
@@ -109,21 +99,21 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
     /**
      * Deletes GL buffers.
      */
-    public void cleanup() {
+    private void cleanup() {
         if (ownsVbo) GLES20.glDeleteBuffers(1, new int[]{vboId}, 0);
         if (ownsIbo) GLES20.glDeleteBuffers(1, new int[]{iboFillId}, 0);
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
+    public void reloadGPUResourcesRecursivelyOnContextLoss() {
         reload();
-        if (shader != null) shader.reloadOwnedGPUResources();
+        shader.reloadGPUResourcesRecursivelyOnContextLoss();
     }
 
     @Override
-    public void cleanupOwnedGPUResources() {
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
         cleanup();
-        if (shader != null) shader.cleanupOwnedGPUResources();
+        shader.cleanupGPUResourcesRecursivelyOnContextLoss();
     }
 
     // 5) Protected methods
@@ -131,13 +121,13 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
     /**
      * Base class for Builders of 3D objects
      */
-    protected static abstract class BaseBuilder<T extends AbstractMesh3D<S>,
-                                                B extends BaseBuilder<T, B, S>,
-                                                S extends ShaderPair<?, ?>> {
+    protected static abstract class BaseBuilder<T extends AbstractMesh3D<?, S>,
+            B extends BaseBuilder<T, B, S>,
+            S extends ShaderPair<?, ?>> {
         protected Vector3D[] verts;
         protected int[][] faces; // each face is a simple, planar polygon given by ordered vertex indices
 
-        protected int vboId = ID_NOT_SET,  iboId = ID_NOT_SET;
+        protected int vboId = ID_NOT_SET, iboId = ID_NOT_SET;
         protected boolean ownsVbo = true, ownsIbo = true;
         protected FloatBuffer vertexData;
         protected ShortBuffer indexData;
@@ -149,7 +139,7 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
 
         protected abstract T create();
 
-        protected void checkValid(){
+        protected void checkValid() {
             assert faces != null;
             assert verts != null;
             assert shader != null;
@@ -171,18 +161,18 @@ public abstract class AbstractMesh3D<S extends ShaderPair<?, ?>> implements GPUR
             return create();
         }
 
-        public B shader(S what){
+        public B shader(S what) {
             this.shader = what;
             return self();
         }
 
-        public B vboId(int vbo){
+        public B vboId(int vbo) {
             this.vboId = vbo;
             this.ownsVbo = false;
             return self();
         }
 
-        public B iboId(int ibo){
+        public B iboId(int ibo) {
             this.iboId = ibo;
             this.ownsIbo = false;
             return self();

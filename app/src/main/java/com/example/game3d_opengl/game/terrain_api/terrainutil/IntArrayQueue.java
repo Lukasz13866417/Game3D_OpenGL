@@ -25,12 +25,10 @@ public class IntArrayQueue {
 		size++;
 	}
 
-	public int dequeue() {
+	public void dequeue() {
 		if (size == 0) throw new NoSuchElementException("Queue is empty");
-		int value = data[head];
 		head = (head + 1) % capacity;
 		size--;
-		return value;
 	}
 
 	public int peek() {

@@ -157,10 +157,11 @@ public class AddonPlacementTestStage extends Stage {
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
+    public void reloadGPUResourcesRecursivelyOnContextLoss() {
 
     }
-
+    @Override
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
     @Override
     protected void onPause() {
 

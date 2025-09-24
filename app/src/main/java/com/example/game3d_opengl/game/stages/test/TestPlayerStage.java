@@ -102,7 +102,10 @@ public class TestPlayerStage extends Stage {
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
+    public void reloadGPUResourcesRecursivelyOnContextLoss() {
 
     }
+
+    @Override
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
 } 

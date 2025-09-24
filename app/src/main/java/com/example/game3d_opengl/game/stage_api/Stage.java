@@ -5,12 +5,12 @@ import android.content.Context;
 import android.content.res.AssetManager;
 
 import com.example.game3d_opengl.MyGLRenderer.StageManager;
-import com.example.game3d_opengl.rendering.GPUResourceUser;
-import com.example.game3d_opengl.rendering.object3d.infill.InfillShaderPair;
-import com.example.game3d_opengl.rendering.object3d.wireframe.WireframeShaderPair;
+import com.example.game3d_opengl.rendering.GPUResourceOwner;
+import com.example.game3d_opengl.rendering.infill.InfillShaderPair;
+import com.example.game3d_opengl.rendering.wireframe.WireframeShaderPair;
 
 
-public abstract class Stage implements GPUResourceUser {
+public abstract class Stage implements GPUResourceOwner {
 
     public Stage(StageManager stageManager){
         this.stageManager = stageManager;
@@ -32,7 +32,7 @@ public abstract class Stage implements GPUResourceUser {
 
     public abstract void updateThenDraw(float dt);
 
-    public abstract void onClose(); // TODO (why is this unused?? wtf is this for???)
+    public abstract void onClose();
 
     public abstract void onSwitch();
 
@@ -73,11 +73,9 @@ public abstract class Stage implements GPUResourceUser {
         is_initialized = true;
     }
 
-    public abstract void reloadOwnedGPUResources();
+    public abstract void reloadGPUResourcesRecursivelyOnContextLoss();
 
-    public void cleanupOwnedGPUResources(){
-        // By default, nothing to do.
-    }
+    public abstract void cleanupGPUResourcesRecursivelyOnContextLoss();
 
     protected abstract void onPause();
 

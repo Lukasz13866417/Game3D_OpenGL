@@ -1,13 +1,14 @@
-package com.example.game3d_opengl.rendering.object3d.wireframe;
+package com.example.game3d_opengl.rendering.wireframe;
 
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.rendering.object3d.AbstractMesh3D;
+import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
+import com.example.game3d_opengl.rendering.mesh.MeshDrawArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 import java.util.ArrayList;
 
-public class Mesh3DWireframe extends AbstractMesh3D<WireframeShaderPair> {
+public class Mesh3DWireframe extends AbstractMesh3D<MeshDrawArgs, WireframeShaderPair> {
 
     private final FColor edgeColor;
     final float pixelWidth;
@@ -27,10 +28,10 @@ public class Mesh3DWireframe extends AbstractMesh3D<WireframeShaderPair> {
 
 
     @Override
-    protected void setVariableArgsValues(float[] mvp, WireframeShaderPair s) {
+    protected void setVariableArgsValues(MeshDrawArgs args, WireframeShaderPair s) {
         // vertex shader uniform args
         vs.color = edgeColor;
-        vs.mvp = mvp;
+        vs.mvp = args.vp;
         vs.halfPx = pixelWidth;
         vs.viewportW = Camera.SCREEN_WIDTH;
         vs.viewportH = Camera.SCREEN_HEIGHT;

@@ -25,11 +25,6 @@ public class IntArrayStack {
 		return data[--size];
 	}
 
-	public int peek() {
-		if (size == 0) throw new EmptyStackException();
-		return data[size - 1];
-	}
-
 	public boolean isEmpty() {
 		return size == 0;
 	}

@@ -13,16 +13,11 @@ import android.util.Log;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
-import com.example.game3d_opengl.game.terrain_structures.TerrainLine;
+import com.example.game3d_opengl.game.terrain_structures.TerrainLineWithSpikeRect;
 import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
-import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
-import com.example.game3d_opengl.game.track_elements.spike.SpikeInfillShaderPair;
-import com.example.game3d_opengl.game.track_elements.spike.SpikeWireframeShaderPair;
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.game.stages.test.util.LineSet3D;
-import com.example.game3d_opengl.rendering.object3d.infill.InfillShaderPair;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
@@ -83,8 +78,6 @@ public class GameplayStage extends Stage {
 
         Potion.LOAD_POTION_ASSETS(assetManager);
         DeathSpike.LOAD_DEATHSPIKE_ASSETS();
-        SpikeInfillShaderPair.LOAD_SHADER_CODE();
-        SpikeWireframeShaderPair.LOAD_SHADER_CODE();
 
         Player.LOAD_PLAYER_ASSETS(assetManager);
         player = Player.createPlayer();
@@ -96,10 +89,10 @@ public class GameplayStage extends Stage {
                 segLength,
                 1f
         );
-        terrain.enqueueStructure(new TerrainLine( 30));
+        terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
+        terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
         terrain.enqueueStructure(new TerrainStairs(100,4,2, PI/6,-1f));
-        terrain.enqueueStructure(new TerrainSpiral(100,PI/2,PI/20));
-        terrain.enqueueStructure(new TerrainSpiral(100,-PI/2,PI/20));
+        terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
         terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
 
         terrain.generateChunks(-1);
@@ -113,10 +106,9 @@ public class GameplayStage extends Stage {
 
         terrain.removeOldTerrainElements(player.getNearestTileId());
         if (terrain.getTileCount() < 400) {
-            terrain.enqueueStructure(new TerrainLine(30));
+            terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
+            terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
             terrain.enqueueStructure(new TerrainStairs(50,4,2, PI/6,-1f));
-            terrain.enqueueStructure(new TerrainSpiral(100,PI/2,PI/20));
-            terrain.enqueueStructure(new TerrainSpiral(100,-PI/2,PI/20));
             terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
 
         }
@@ -178,19 +170,19 @@ public class GameplayStage extends Stage {
     public void onResume() {
 
     }
+
     @Override
     public void onClose() {
-        player.cleanupOwnedGPUResources();
-        Potion.cleanupSharedGPUResources();
-        terrain.cleanupGPUResources();
+        player.cleanupGPUResourcesRecursivelyOnContextLoss();
+        terrain.cleanupGPUResourcesRecursivelyOnContextLoss();
     }
 
     @Override
-    public void reloadOwnedGPUResources() {
-        InfillShaderPair.getSharedShader().reloadProgram();
-        LineSet3D.resetProgram();
-        Potion.resetSharedResources();
-        player.reloadOwnedGPUResources();
-        terrain.reloadGPUResources();
+    public void reloadGPUResourcesRecursivelyOnContextLoss() {
+        player.reloadGPUResourcesRecursivelyOnContextLoss();
+        terrain.reloadGPUResourcesRecursivelyOnContextLoss();
     }
+
+    @Override
+    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
 }
