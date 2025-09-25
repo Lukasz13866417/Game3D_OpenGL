@@ -58,12 +58,21 @@ public class Potion extends Addon {
             throw new RuntimeException(e);
         }
     }
+
+
+    public static Potion createPotion(){
+        assert sharedWire != null && sharedFill != null;
+        // This doesn't actually create any GPU resources or CPU buffers.
+        // Every such thing used by this obj3d is shared and already created;
+        UnbatchedObject3DWithOutline obj3d =
+                                          UnbatchedObject3DWithOutline.wrap(sharedFill, sharedWire);
+        return new Potion(obj3d);
+    }
     
-    public Potion(){
+    private Potion(UnbatchedObject3DWithOutline object3DWithOutline){
         super();
-        if (assetsLoaded && sharedFill != null && sharedWire != null) {
-            this.object3D = UnbatchedObject3DWithOutline.wrap(sharedFill, sharedWire);
-        }
+        this.object3D = object3DWithOutline;
+
     }
     
     @Override

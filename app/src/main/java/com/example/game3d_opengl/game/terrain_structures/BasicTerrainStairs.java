@@ -70,7 +70,7 @@ public class BasicTerrainStairs extends BasicTerrainStructure {
 
     private void placeTopPotion(Terrain.BasicGridBrush brush, int nRows, int nCols) {
         if (nRows <= 0) return;
-        Potion[] one = new Potion[1]; one[0] = new Potion();
+        Potion[] one = new Potion[1]; one[0] = Potion.createPotion();
         int row = Math.max(1, nRows);
         int c = Math.max(1, Math.min(nCols, (nCols / 2) + 1));
         brush.reserveHorizontal(row, c, 1, one);

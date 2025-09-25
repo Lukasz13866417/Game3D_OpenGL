@@ -52,7 +52,7 @@ public class BasicTerrainCurve extends BasicTerrainStructure {
 
     private void placeEndPotion(Terrain.BasicGridBrush brush, int nRows, int nCols) {
         Potion[] potions = new Potion[1];
-        potions[0] = new Potion();
+        potions[0] = Potion.createPotion();
         int row = Math.max(1, nRows);
         int col2 = Math.max(1, Math.min(nCols, (2 * nCols) / 3 + 1));
         brush.reserveHorizontal(row, col2, 1, potions);

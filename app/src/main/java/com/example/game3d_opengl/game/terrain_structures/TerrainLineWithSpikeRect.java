@@ -4,6 +4,7 @@ import static java.lang.Math.min;
 
 import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
+import com.example.game3d_opengl.game.track_elements.Potion;
 import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
 
 public class TerrainLineWithSpikeRect extends AdvancedTerrainStructure {
@@ -43,5 +44,13 @@ public class TerrainLineWithSpikeRect extends AdvancedTerrainStructure {
         brush.reserveVertical(
                 topLeftRow + 1, topLeftCol, sideSize - 1, spikes[3]
         );
+
+        for(int i = 0;i<3;++i) {
+            Potion[] potions = new Potion[1];
+            for (int j = 0; j < potions.length; ++j) {
+                potions[j] = Potion.createPotion();
+            }
+            brush.reserveRandomFittingVertical(1, potions);
+        }
     }
 }

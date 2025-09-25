@@ -54,7 +54,7 @@ public class TerrainStairs extends AdvancedTerrainStructure {
         for (int i = 0; i < 8; ++i) {
             Potion[] addons = new Potion[1];
             for (int j = 0; j < addons.length; ++j) {
-                addons[j] = new Potion();
+                addons[j] = Potion.createPotion();
             }
             brush.reserveRandomFittingVertical(addons.length, addons);
         }
