@@ -123,11 +123,11 @@ public class TileManager implements GPUResourceOwner {
 
         // Update the last tile's far edge by replacing it with [newL1,newR1].
         SegmentHistory lastHistory = segmentHistoryBuffer.get(segmentHistoryBuffer.size()-1);
-        boolean wasLastLiftedUp = lastHistory.isLiftedUp;
+        boolean wasLastLiftedUp = lastHistory.isFirstLiftedUp;
         Tile oldLast = removeLastTile();
 
         if(tiles.isEmpty()){ // re-adding guardian - oldLast.isEmptySegment() -> true
-            // so oldLast.isLiftedUp() -> false, and isLiftedUp doesn't matter
+            // so oldLast.isFirstLiftedUp() -> false, and isFirstLiftedUp doesn't matter
             addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), false, false);
         }else{
             addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), tiles.getLast().isEmptySegment(), wasLastLiftedUp);
@@ -261,7 +261,7 @@ public class TileManager implements GPUResourceOwner {
     /**
      * Helper: builds a new tile and fully integrates it with row/buffer tracking.
      */
-    private void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, boolean isEmptySegment, boolean wasPreviousEmpty, boolean isLiftedUp) {
+    private void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, boolean isEmptySegment, boolean wasPreviousEmpty, boolean isFirstLiftedUp) {
 
         Tile tile = new Tile(nl, nr, fl, fr, nextId++, isEmptySegment);
         tiles.pushBack(tile);
@@ -274,13 +274,13 @@ public class TileManager implements GPUResourceOwner {
             }
             // Always append far edge; next tile will reuse it as its near edge
             landscapeRenderer.pushBack(fl, fr);
-            if (isLiftedUp) {
+            if (isFirstLiftedUp) {
                 // If the next tile will be vertically lifted, mask out the seam across to the next near edge
                 landscapeRenderer.markGapBetweenLastTwoPairs();
             }
         }
 
-        generateRowsForTile(tile, wasPreviousEmpty, isLiftedUp);
+        generateRowsForTile(tile, wasPreviousEmpty, isFirstLiftedUp);
 
         lastTile = tile;
     }
@@ -314,7 +314,7 @@ public class TileManager implements GPUResourceOwner {
         return oldLast;
     }
 
-    private void generateRowsForTile(Tile tile, boolean wasPreviousEmpty, boolean isLiftedUp) {
+    private void generateRowsForTile(Tile tile, boolean wasPreviousEmpty, boolean isFirstLiftedUp) {
         Vector3D nl = tile.nearLeft;
         Vector3D nr = tile.nearRight;
         Vector3D fl = tile.farLeft;
@@ -336,19 +336,23 @@ public class TileManager implements GPUResourceOwner {
 
         SegmentHistory lastHistory = segmentHistoryBuffer.get(segmentHistoryBuffer.size() - 1);
 
+
+        float lastLeftOverL = lastHistory.leftoverL, lastLeftOverR = lastHistory.leftoverR;
         int cntL = 0, cntR = 0, cntRows = 0;
 
-        if (wasPreviousEmpty || lastHistory.isLiftedUp) {
+        if (wasPreviousEmpty || isFirstLiftedUp) {
             // First real tile – add bridging row along its near edge so the grid starts flush.
             leftSideBuffer.addPos(nl.x, nl.y, nl.z);
             rightSideBuffer.addPos(nr.x, nr.y, nr.z);
             ++cntL;
             ++cntR;
+            lastLeftOverL = 0;
+            lastLeftOverR = 0;
         }
 
-        int nextRowLeft = (wasPreviousEmpty || lastHistory.isLiftedUp)
+        int nextRowLeft = (wasPreviousEmpty || isFirstLiftedUp)
                 ? leftSideBuffer.size() : lastHistory.nextRowLeftInd;
-        int nextRowRight = (wasPreviousEmpty || lastHistory.isLiftedUp)
+        int nextRowRight = (wasPreviousEmpty || isFirstLiftedUp)
                 ? rightSideBuffer.size() : lastHistory.nextRowRightInd;
 
         Vector3D eL = fl.sub(nl);
@@ -359,7 +363,7 @@ public class TileManager implements GPUResourceOwner {
 
 
         // distance from tile.near edge to first potential row position
-        float firstDistL = (rowSpacing - lastHistory.leftoverL);
+        float firstDistL = (rowSpacing - lastLeftOverL);
         for (float d = firstDistL; d <= lenL; d += rowSpacing) {
             float fraction = d / lenL;
             Vector3D leftP = nl.add(eL.mult(fraction));
@@ -368,7 +372,7 @@ public class TileManager implements GPUResourceOwner {
         }
 
 
-        float firstDistR = (rowSpacing - lastHistory.leftoverR);
+        float firstDistR = (rowSpacing - lastLeftOverR);
         for (float d = firstDistR; d <= lenR; d += rowSpacing) {
             float fraction = d / lenR;
             Vector3D rightP = nr.add(eR.mult(fraction));
@@ -409,7 +413,7 @@ public class TileManager implements GPUResourceOwner {
         float currLeftoverR = (lastHistory.leftoverR + lenR) % rowSpacing;
 
         segmentHistoryBuffer.add(cntL, cntR, cntRows,
-                isLiftedUp,
+                isFirstLiftedUp,
                 nextRowLeft,
                 nextRowRight,
                 currLeftoverL, currLeftoverR, nl, nr);
@@ -443,7 +447,7 @@ public class TileManager implements GPUResourceOwner {
     public static class SegmentHistory {
 
         public int leftAddedCnt = 0, rightAddedCnt = 0, rowsAddedCnt = 0;
-        public boolean isLiftedUp = false;
+        public boolean isFirstLiftedUp = false;
         public int nextRowLeftInd = 0, nextRowRightInd = 0;
         public float leftoverL, leftoverR;
         public Vector3D nl = V3(0, 0, 0), nr = V3(0, 0, 0);
@@ -454,14 +458,14 @@ public class TileManager implements GPUResourceOwner {
 
         public void set(int leftAddedCnt, int rightAddedCnt,
                         int rowsAddedCnt,
-                        boolean isLiftedUp,
+                        boolean isFirstLiftedUp,
                         int nextRowLeftInd, int nextRowRightInd,
                         float leftoverL, float leftoverR,
                         Vector3D nl, Vector3D nr) {
             this.leftAddedCnt = leftAddedCnt;
             this.rightAddedCnt = rightAddedCnt;
             this.rowsAddedCnt = rowsAddedCnt;
-            this.isLiftedUp = isLiftedUp;
+            this.isFirstLiftedUp = isFirstLiftedUp;
             this.nextRowLeftInd = nextRowLeftInd;
             this.nextRowRightInd = nextRowRightInd;
             this.leftoverL = leftoverL;
