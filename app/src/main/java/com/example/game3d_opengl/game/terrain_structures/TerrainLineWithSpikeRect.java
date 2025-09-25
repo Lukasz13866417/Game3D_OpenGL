@@ -31,7 +31,6 @@ public class TerrainLineWithSpikeRect extends AdvancedTerrainStructure {
         }
         final int topLeftRow = 1 + (nRows - sideSize) / 2;
         final int topLeftCol = 1 + (nCols - sideSize) / 2;
-        System.out.println("HAIYAAA "+topLeftRow+","+topLeftCol);
         brush.reserveHorizontal(
                 topLeftRow, topLeftCol, sideSize - 1, spikes[0]
         );
