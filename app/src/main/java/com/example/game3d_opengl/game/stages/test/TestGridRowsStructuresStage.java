@@ -10,6 +10,9 @@ import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
+import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
+import com.example.game3d_opengl.game.track_elements.Potion;
+import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.game.stages.test.util.FourPoints3D;
 import com.example.game3d_opengl.game.stages.test.util.LineSet3D;
@@ -98,6 +101,9 @@ public class TestGridRowsStructuresStage extends Stage {
         );
         camera.setProjectionAsScreen();
 
+        DeathSpike.LOAD_DEATHSPIKE_ASSETS();
+        Potion.LOAD_POTION_ASSETS(context.getAssets());
+
 
         float segWidth = 0.8f, segLength = 0.4f;
         this.terrain = new Terrain(2000,6,
@@ -106,8 +112,8 @@ public class TestGridRowsStructuresStage extends Stage {
                 segLength,
                 0.25f
         );
-        terrain.enqueueStructure(new TerrainSpiral(50,PI/2,PI/20));
-        terrain.enqueueStructure(new TerrainSpiral(50,-PI/2,PI/20));
+        terrain.enqueueStructure(new TerrainStairs(10, 5,PI/4,0.5f));
+        terrain.enqueueStructure(new TerrainStairs(10, 3,-PI/4,-0.5f));
 
         terrain.generateChunks(-1);
 
