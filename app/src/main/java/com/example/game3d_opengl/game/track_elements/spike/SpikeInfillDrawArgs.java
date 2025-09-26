@@ -1,8 +1,8 @@
 package com.example.game3d_opengl.game.track_elements.spike;
 
-import com.example.game3d_opengl.rendering.mesh.MeshDrawArgs;
+import com.example.game3d_opengl.rendering.mesh.BaseMeshDrawArgs;
 
-public final class SpikeInfillDrawArgs extends MeshDrawArgs {
+public final class SpikeInfillDrawArgs extends BaseMeshDrawArgs {
     public float[] uNL;
     public float[] uNR;
     public float[] uFR;

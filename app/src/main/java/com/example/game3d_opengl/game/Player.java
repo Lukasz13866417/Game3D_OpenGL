@@ -1,10 +1,10 @@
 package com.example.game3d_opengl.game;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.getNormal;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.rayTriangleDistance;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.rotY;
+import static com.example.game3d_opengl.game.util.GameMath.PI;
+import static com.example.game3d_opengl.game.util.GameMath.getNormal;
+import static com.example.game3d_opengl.game.util.GameMath.rayTriangleDistance;
+import static com.example.game3d_opengl.game.util.GameMath.rotY;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import static java.lang.Float.max;

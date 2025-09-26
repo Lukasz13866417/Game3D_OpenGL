@@ -1,9 +1,9 @@
 package com.example.game3d_opengl.game.terrain_api.main;
 
-import static com.example.game3d_opengl.rendering.util3d.GameMath.EPSILON;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.rotateAroundTwoPoints;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.tan;
+import static com.example.game3d_opengl.game.util.GameMath.EPSILON;
+import static com.example.game3d_opengl.game.util.GameMath.PI;
+import static com.example.game3d_opengl.game.util.GameMath.rotateAroundTwoPoints;
+import static com.example.game3d_opengl.game.util.GameMath.tan;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static java.lang.Math.abs;
 import static java.lang.Math.max;
@@ -18,6 +18,7 @@ import com.example.game3d_opengl.game.terrain_api.terrainutil.TerrainLandscapeRe
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
+import com.example.game3d_opengl.game.LightSource;
 
 /**
  * Builds a deque of terrain tiles and, in parallel, keeps three buffers
@@ -432,8 +433,8 @@ public class TileManager implements GPUResourceOwner {
     public void updateBeforeDraw(float dt){
     }
 
-    public void draw(FColor colorTheme, float[] vpMatrix) {
-        landscapeRenderer.draw(colorTheme, vpMatrix);
+    public void draw(FColor color, float[] vp, LightSource light) {
+        landscapeRenderer.draw(color, vp, light);
     }
 
 

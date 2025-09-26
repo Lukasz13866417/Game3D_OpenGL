@@ -4,8 +4,8 @@ import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_api.main.BasicTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
-import com.example.game3d_opengl.game.track_elements.Potion;
-import com.example.game3d_opengl.rendering.util3d.GameRandom;
+import com.example.game3d_opengl.game.track_elements.potion.Potion;
+import com.example.game3d_opengl.game.util.GameRandom;
 
 public class BasicTerrainStairs extends BasicTerrainStructure {
 

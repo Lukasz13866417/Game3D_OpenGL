@@ -1,7 +1,7 @@
-package com.example.game3d_opengl.game.track_elements;
+package com.example.game3d_opengl.game.track_elements.potion;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.getNormal;
+import static com.example.game3d_opengl.game.util.GameMath.getNormal;
 
 import android.content.res.AssetManager;
 

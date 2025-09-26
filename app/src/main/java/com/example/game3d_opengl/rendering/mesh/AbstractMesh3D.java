@@ -14,15 +14,13 @@ import java.nio.FloatBuffer;
 import java.nio.ShortBuffer;
 
 // TODO remove unused stuff.
-public abstract class AbstractMesh3D<A extends MeshDrawArgs, S extends ShaderPair<?, ?>> implements GPUResourceOwner {
+public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends ShaderPair<?, ?>> implements GPUResourceOwner {
 
     // Constants and static fields
     private static final int BYTES_PER_FLOAT = 4;
     private static final int BYTES_PER_SHORT = 2;
 
     // Instance fields
-    private final float[] mvpMatrix = new float[16];
-
     private final FloatBuffer vertexData; // for reload
     private int vboId;
     private final boolean ownsVbo;

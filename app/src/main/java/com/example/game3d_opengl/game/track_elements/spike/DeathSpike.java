@@ -1,12 +1,12 @@
 package com.example.game3d_opengl.game.track_elements.spike;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.getNormal;
+import static com.example.game3d_opengl.game.util.GameMath.getNormal;
 import static com.example.game3d_opengl.rendering.util3d.RenderingUtils.ID_NOT_SET;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3S;
 
 import android.opengl.GLES20;
-import com.example.game3d_opengl.rendering.util3d.GameRandom;
+import com.example.game3d_opengl.game.util.GameRandom;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.rendering.util3d.FColor;

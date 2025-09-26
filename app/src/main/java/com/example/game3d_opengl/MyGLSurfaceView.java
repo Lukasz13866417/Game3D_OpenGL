@@ -72,7 +72,7 @@ public class MyGLSurfaceView extends GLSurfaceView {
         float y = event.getY();
         switch (event.getAction()) {
             case MotionEvent.ACTION_MOVE:
-                if (x != lastX || y != lastY && renderer.getCurrentStage().isInitialized()) {
+                if ((x != lastX || y != lastY) && renderer.getCurrentStage().isInitialized()) {
                     renderer.getCurrentStage().onTouchMove(lastX, lastY, x, y);
                 }
                 break;

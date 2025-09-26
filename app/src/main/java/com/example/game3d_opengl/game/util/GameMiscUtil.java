@@ -1,6 +1,6 @@
-package com.example.game3d_opengl.rendering.util3d;
+package com.example.game3d_opengl.game.util;
 
-import static com.example.game3d_opengl.rendering.util3d.GameMath.INF;
+import static com.example.game3d_opengl.game.util.GameMath.INF;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 

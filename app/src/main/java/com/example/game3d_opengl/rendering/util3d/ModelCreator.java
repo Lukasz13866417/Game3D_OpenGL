@@ -1,9 +1,9 @@
 package com.example.game3d_opengl.rendering.util3d;
 
 
-import static com.example.game3d_opengl.rendering.util3d.GameMath.rotX;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.rotY;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.rotZ;
+import static com.example.game3d_opengl.game.util.GameMath.rotX;
+import static com.example.game3d_opengl.game.util.GameMath.rotY;
+import static com.example.game3d_opengl.game.util.GameMath.rotZ;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import android.content.res.AssetManager;

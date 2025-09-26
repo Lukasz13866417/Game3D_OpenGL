@@ -3,7 +3,6 @@ package com.example.game3d_opengl.game.track_elements.spike;
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
-import com.example.game3d_opengl.rendering.mesh.MeshDrawArgs;
 import com.example.game3d_opengl.rendering.infill.InfillShaderArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 

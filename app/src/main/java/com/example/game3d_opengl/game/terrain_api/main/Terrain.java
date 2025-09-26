@@ -14,6 +14,7 @@ import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsE
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
 
+import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain_api.terrainutil.ArrayQueue;
@@ -133,8 +134,6 @@ public class Terrain implements GPUResourceOwner {
         /**
          * Sets the horizontal angle for the next tile.
          * This controls the left/right orientation of the terrain.
-         * 
-         * @param ang the horizontal angle in radians
          */
         @SuppressWarnings("unused")
         public void setHorizontalAng(float ang) {
@@ -144,8 +143,6 @@ public class Terrain implements GPUResourceOwner {
         /**
          * Sets the vertical angle for the next tile.
          * This controls the up/down slope of the terrain.
-         * 
-         * @param ang the vertical angle in radians
          */
         @SuppressWarnings("unused")
         public void setVerticalAng(float ang) {
@@ -155,8 +152,6 @@ public class Terrain implements GPUResourceOwner {
         /**
          * Adds to the current vertical angle.
          * This creates a gradual slope change.
-         * 
-         * @param ang the angle increment in radians
          */
         @SuppressWarnings("unused")
         public void addVerticalAng(float ang) {
@@ -166,8 +161,6 @@ public class Terrain implements GPUResourceOwner {
         /**
          * Adds to the current horizontal angle.
          * This creates a gradual turn in the terrain.
-         * 
-         * @param ang the angle increment in radians
          */
         @SuppressWarnings("unused")
         public void addHorizontalAng(float ang) {
@@ -195,8 +188,6 @@ public class Terrain implements GPUResourceOwner {
         /**
          * Lifts the terrain up by the specified amount.
          * This creates elevation changes in the terrain.
-         * 
-         * @param dy the vertical offset in world units
          */
         public void liftUp(float dy) {
             commandBuffer.addCommand(CMD_LIFT_UP, dy);
@@ -206,8 +197,6 @@ public class Terrain implements GPUResourceOwner {
          * Adds a child terrain structure to be generated after the current one.
          * Child structures are useful for creating complex terrain features
          * that depend on the parent structure's geometry.
-         * 
-         * @param child the child terrain structure to add
          */
         public void addChild(BaseTerrainStructure<?> child) {
             childStructuresQueue.enqueue(child);
@@ -225,21 +214,11 @@ public class Terrain implements GPUResourceOwner {
     public abstract static class BaseGridBrush {
         /**
          * Reserves a vertical strip of grid cells for addon placement.
-         * 
-         * @param row the starting row
-         * @param col the column
-         * @param length the number of cells to reserve
-         * @param addons the addons to place
          */
         public abstract void reserveVertical(int row, int col, int length, Addon[] addons);
 
         /**
          * Reserves a horizontal strip of grid cells for addon placement.
-         * 
-         * @param row the row
-         * @param col the starting column
-         * @param length the number of cells to reserve
-         * @param addons the addons to place
          */
         public abstract void reserveHorizontal(int row, int col, int length, Addon[] addons);
     }
@@ -247,16 +226,11 @@ public class Terrain implements GPUResourceOwner {
     /**
      * Basic version of the grid brush API.
      * It doesn't check for situations where multiple addons occupy the same grid square.
-     * This is faster but may result in overlapping addons.
+     * This is faster but may result in overlapping addons. (If the root grid creator is only basic)
      */
     public class BasicGridBrush extends BaseGridBrush {
         /**
          * Reserves a vertical strip without collision checking.
-         * 
-         * @param row the starting row
-         * @param col the column
-         * @param length the number of cells to reserve
-         * @param addons the addons to place
          */
         public void reserveVertical(int row, int col, int length, Addon[] addons) {
             assert row>0;
@@ -272,11 +246,6 @@ public class Terrain implements GPUResourceOwner {
 
         /**
          * Reserves a horizontal strip without collision checking.
-         * 
-         * @param row the row
-         * @param col the starting column
-         * @param length the number of cells to reserve
-         * @param addons the addons to place
          */
         public void reserveHorizontal(int row, int col, int length, Addon[] addons) {
             assert row>0;
@@ -300,11 +269,6 @@ public class Terrain implements GPUResourceOwner {
     public class AdvancedGridBrush extends BaseGridBrush {
         /**
          * Reserves a vertical strip with collision checking.
-         * 
-         * @param row the starting row
-         * @param col the column
-         * @param length the number of cells to reserve
-         * @param addons the addons to place
          */
         public void reserveVertical(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
@@ -320,11 +284,6 @@ public class Terrain implements GPUResourceOwner {
 
         /**
          * Reserves a horizontal strip with collision checking.
-         * 
-         * @param row the row
-         * @param col the starting column
-         * @param length the number of cells to reserve
-         * @param addons the addons to place
          */
         public void reserveHorizontal(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
@@ -341,9 +300,6 @@ public class Terrain implements GPUResourceOwner {
         /**
          * Reserves a random horizontal strip that fits the specified length.
          * The system will find an available location automatically.
-         * 
-         * @param length the number of cells to reserve
-         * @param addons the addons to place
          */
         public void reserveRandomFittingHorizontal(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
@@ -357,9 +313,6 @@ public class Terrain implements GPUResourceOwner {
         /**
          * Reserves a random vertical strip that fits the specified length.
          * The system will find an available location automatically.
-         * 
-         * @param length the number of cells to reserve
-         * @param addons the addons to place
          */
         public void reserveRandomFittingVertical(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
@@ -407,15 +360,6 @@ public class Terrain implements GPUResourceOwner {
     private final LandscapeCommandsExecutor landscapeCommandExecutor;
     private final AddonsCommandsExecutor addonsCommandExecutor;
 
-    /**
-     * Creates a new terrain system with the specified parameters.
-     * 
-     * @param maxSegments the maximum number of terrain segments
-     * @param nCols the number of columns in the terrain grid
-     * @param startMid the starting position for terrain generation
-     * @param segWidth the width of each terrain segment
-     * @param segLength the length of each terrain segment
-     */
     public Terrain(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength, float rowSpacing) {
         this.nCols = nCols;
         
@@ -458,8 +402,8 @@ public class Terrain implements GPUResourceOwner {
         tileManager.updateBeforeDraw(dt);
     }
 
-    public void draw(FColor colorTheme, float[] vp){
-        tileManager.draw(colorTheme, vp);
+    public void draw(FColor colorTheme, float[] vp, LightSource light){
+        tileManager.draw(colorTheme, vp, light);
         for(int i=0;i<getAddonCount();++i){
             getAddon(i).draw(vp);
         }
@@ -475,8 +419,6 @@ public class Terrain implements GPUResourceOwner {
     /**
      * Removes old addons that are far behind the player.
      * This helps manage memory usage and maintain performance.
-     * 
-     * @param playerTileId the current player's tile ID
      */
     private void removeOldAddons(long playerTileId) {
         while (!addons.isEmpty() && addons.getFirst().isGoneBy(playerTileId)) {
@@ -488,30 +430,15 @@ public class Terrain implements GPUResourceOwner {
     /**
      * Removes old terrain elements (tiles and addons) that are far behind the player.
      * This is called each frame to maintain a reasonable terrain size.
-     * 
-     * @param playerTileId the current player's tile ID
      */
     public void removeOldTerrainElements(long playerTileId) {
         tileManager.removeOldTiles(playerTileId);
         removeOldAddons(playerTileId);
     }
-
-    /**
-     * Gets the number of addons currently in the terrain.
-     * 
-     * @return the number of addons
-     */
     public int getAddonCount() {
         return addons.size();
     }
 
-    /**
-     * Gets an addon at the specified index.
-     * 
-     * @param i the addon index
-     * @return the addon at the specified index
-     * @throws IndexOutOfBoundsException if the index is invalid
-     */
     public Addon getAddon(int i) {
         if (i < 0 || i >= addons.size()) {
             throw new IndexOutOfBoundsException(ERROR_INVALID_ADDON_INDEX + i);
@@ -521,9 +448,7 @@ public class Terrain implements GPUResourceOwner {
 
     /**
      * Adds a terrain structure to the waiting queue.
-     * The structure will be processed during the next generation cycle.
-     * 
-     * @param what the terrain structure to add
+     * The structure will be processed later
      */
     public void enqueueStructure(BaseTerrainStructure<?> what) {
         waitingStructuresQueue.enqueue(what);
@@ -532,8 +457,6 @@ public class Terrain implements GPUResourceOwner {
     /**
      * Generates terrain chunks by executing pending commands.
      * The number of chunks generated is limited to control frame time.
-     * 
-     * @param nChunks the number of chunks to generate, or -1 for all pending
      */
     public void generateChunks(int nChunks) {
         while (nChunks != 0) {

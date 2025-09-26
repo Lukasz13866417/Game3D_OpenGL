@@ -4,7 +4,7 @@ import com.example.game3d_opengl.game.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
-import com.example.game3d_opengl.game.track_elements.Potion;
+import com.example.game3d_opengl.game.track_elements.potion.Potion;
 
 public class TerrainStairs extends AdvancedTerrainStructure {
 

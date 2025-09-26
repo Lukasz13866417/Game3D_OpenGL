@@ -1,6 +1,6 @@
 package com.example.game3d_opengl.game.stages.test;
 
-import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
+import static com.example.game3d_opengl.game.util.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import android.content.Context;
@@ -9,9 +9,8 @@ import android.opengl.Matrix;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain_structures.TerrainSpiral;
 import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
-import com.example.game3d_opengl.game.track_elements.Potion;
+import com.example.game3d_opengl.game.track_elements.potion.Potion;
 import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.game.stages.test.util.FourPoints3D;

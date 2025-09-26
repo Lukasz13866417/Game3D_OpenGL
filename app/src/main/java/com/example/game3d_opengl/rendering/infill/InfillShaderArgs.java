@@ -20,6 +20,8 @@ public final class InfillShaderArgs {
 
     public static final class FS extends ShaderArgValues {
         public FColor color;
+        public float lightX, lightY, lightZ;
+        public FColor lightColor;
     }
 }
 

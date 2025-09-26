@@ -2,9 +2,8 @@ package com.example.game3d_opengl.game.stages.main;
 
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
-import static com.example.game3d_opengl.rendering.util3d.GameMath.PI;
+import static com.example.game3d_opengl.game.util.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
-import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.sub;
 import static java.lang.Math.abs;
 
 import android.content.Context;
@@ -12,10 +11,12 @@ import android.content.res.AssetManager;
 import android.util.Log;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.bottom_spikes.BottomSpikes;
 import com.example.game3d_opengl.game.stage_api.Stage;
+import com.example.game3d_opengl.game.terrain_structures.Terrain2DCurve;
 import com.example.game3d_opengl.game.terrain_structures.TerrainLineWithSpikeRect;
 import com.example.game3d_opengl.game.terrain_structures.TerrainStairs;
-import com.example.game3d_opengl.game.track_elements.Potion;
+import com.example.game3d_opengl.game.track_elements.potion.Potion;
 import com.example.game3d_opengl.game.track_elements.spike.DeathSpike;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -23,6 +24,7 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.Player;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_api.main.Tile;
+import com.example.game3d_opengl.game.LightSource;
 
 /**
  * Demonstration of a gameplay stage that:
@@ -59,7 +61,7 @@ public class GameplayStage extends Stage {
     private int frameCounter = 0; // throttled logging counter
     private final FColor colorTheme = CLR(0.7f,0,0,1);
     private Player player;
-
+    private LightSource lightSource;
 
     public static boolean __DEBUG_IS_TERRAIN_GENERATING = false;
 
@@ -81,6 +83,8 @@ public class GameplayStage extends Stage {
 
         Player.LOAD_PLAYER_ASSETS(assetManager);
         player = Player.createPlayer();
+        lightSource = new LightSource(CLR(1,1,1,1));
+
 
         float segWidth = 3.2f, segLength = 1.4f;
         this.terrain = new Terrain(2000,6,
@@ -93,7 +97,7 @@ public class GameplayStage extends Stage {
         terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
         terrain.enqueueStructure(new TerrainStairs(100,4,2, PI/6,-1f));
         terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
-        terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
+        terrain.enqueueStructure(new Terrain2DCurve(50,0,PI/8f));
 
         terrain.generateChunks(-1);
 
@@ -109,7 +113,7 @@ public class GameplayStage extends Stage {
             terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
             terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
             terrain.enqueueStructure(new TerrainStairs(50,4,2, PI/6,-1f));
-            terrain.enqueueStructure(new TerrainStairs(30,4,2, PI/6,-1f));
+            terrain.enqueueStructure(new Terrain2DCurve(50,0,PI/4f));
 
         }
         if (terrain.getTileCount() < 300) {
@@ -129,15 +133,21 @@ public class GameplayStage extends Stage {
         player.updateBeforeDraw(dt);
         terrain.updateBeforeDraw(dt);
 
+        Vector3D lightPos = V3(player.getX(), player.getY(), player.getZ() - 3f)
+                .sub(player.getDir().withLen(6f));
+        lightSource.setPosition(lightPos);
+
         Vector3D camPos = V3(player.getX(), player.getY() + 0.75f, player.getZ())
                 .sub(player.getDir().withLen(3.8f));
         camera.updateEyePos(camPos);
         camera.updateLookPos(camPos.add(player.getDir().setY(0.0f)));
-
+        Vector3D playerPos = V3(player.getX(), player.getY(), player.getZ());
+        lightSource.position = playerPos.add(player.getDir().withLen(5f))
+                                        .add(V3(0, 80f, 0));
         float[] vpMatrix = camera.getViewProjectionMatrix();
 
         player.draw(vpMatrix);
-        terrain.draw(colorTheme, vpMatrix);
+        terrain.draw(colorTheme, vpMatrix, lightSource);
 
         player.updateAfterDraw(dt);
         terrain.updateAfterDraw(dt);

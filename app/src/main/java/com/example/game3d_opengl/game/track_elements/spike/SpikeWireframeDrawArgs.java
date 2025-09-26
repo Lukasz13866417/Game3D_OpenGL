@@ -1,9 +1,9 @@
 package com.example.game3d_opengl.game.track_elements.spike;
 
-import com.example.game3d_opengl.rendering.mesh.MeshDrawArgs;
+import com.example.game3d_opengl.rendering.mesh.BaseMeshDrawArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 
-public final class SpikeWireframeDrawArgs extends MeshDrawArgs {
+public final class SpikeWireframeDrawArgs extends BaseMeshDrawArgs {
     public int viewportW;
     public int viewportH;
     public float halfPx;

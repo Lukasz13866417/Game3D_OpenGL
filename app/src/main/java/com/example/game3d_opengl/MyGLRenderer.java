@@ -11,7 +11,6 @@ import android.util.Log;
 import com.example.game3d_opengl.game.stages.main.GameplayStage;
 import com.example.game3d_opengl.game.stages.main.MenuStage;
 import com.example.game3d_opengl.game.stage_api.Stage;
-import com.example.game3d_opengl.game.stages.test.TestGridRowsStructuresStage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
@@ -25,8 +24,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     // Stage requested by UI thread, applied next frame on GL thread
     private volatile Stage pendingStage = null;
     private Stage currStage;
-    private MenuStage menuStage;
-    private GameplayStage gameplayStage;
+    private final MenuStage menuStage;
+    private final GameplayStage gameplayStage;
     private volatile boolean useFrameCap = true;
 
     public void setUseFrameCap(boolean useFrameCap) {
@@ -122,13 +121,13 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             Log.w("Perf", "perf: SLOW FRAME " + (int) deltaTime + " ms" +
                    "   |    was terrain generating: "+ GameplayStage.__DEBUG_IS_TERRAIN_GENERATING);
         }
+        GameplayStage.__DEBUG_IS_TERRAIN_GENERATING = false;
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         if (!currStage.isPaused()) {
             currStage.updateThenDraw(deltaTime);
         }
 
-        GameplayStage.__DEBUG_IS_TERRAIN_GENERATING = false;
     }
 
     @Override

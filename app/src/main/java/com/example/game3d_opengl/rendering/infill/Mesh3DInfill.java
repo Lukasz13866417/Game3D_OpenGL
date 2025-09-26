@@ -3,11 +3,11 @@ package com.example.game3d_opengl.rendering.infill;
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
-import com.example.game3d_opengl.rendering.mesh.MeshDrawArgs;
+import com.example.game3d_opengl.rendering.mesh.BaseMeshDrawArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
-public class Mesh3DInfill extends AbstractMesh3D<MeshDrawArgs, InfillShaderPair> {
+public class Mesh3DInfill extends AbstractMesh3D<BaseMeshDrawArgs, InfillShaderPair> {
 
     public Mesh3DInfill(Builder builder){
         super(builder);
@@ -17,7 +17,7 @@ public class Mesh3DInfill extends AbstractMesh3D<MeshDrawArgs, InfillShaderPair>
     private final FColor fillColor;
 
     @Override
-    protected void setVariableArgsValues(MeshDrawArgs args, InfillShaderPair s) {
+    protected void setVariableArgsValues(BaseMeshDrawArgs args, InfillShaderPair s) {
         InfillShaderArgs.VS vs = new InfillShaderArgs.VS();
         vs.mvp = args.vp;
         InfillShaderArgs.FS fs = new InfillShaderArgs.FS();

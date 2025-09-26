@@ -8,7 +8,7 @@ import com.example.game3d_opengl.game.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain_structures.EmptySegmentTestStructure;
-import com.example.game3d_opengl.game.track_elements.Potion;
+import com.example.game3d_opengl.game.track_elements.potion.Potion;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 

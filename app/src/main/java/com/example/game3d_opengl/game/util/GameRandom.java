@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.rendering.util3d;
+package com.example.game3d_opengl.game.util;
 
 import static java.lang.Math.pow;
 

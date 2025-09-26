@@ -27,6 +27,8 @@ public class Terrain2DCurve extends AdvancedTerrainStructure {
             brush.addVerticalAng(angVerPerTile);
             brush.addSegment();
         }
+        brush.addVerticalAng(-dAngVer);
+        brush.addHorizontalAng(-dAngHor);
     }
 
     @Override

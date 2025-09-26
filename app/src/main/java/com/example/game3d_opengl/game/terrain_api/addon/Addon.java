@@ -1,13 +1,7 @@
 package com.example.game3d_opengl.game.terrain_api.addon;
 
-import static com.example.game3d_opengl.rendering.util3d.GameMath.getCentroid;
-
 import com.example.game3d_opengl.game.terrain_api.TerrainElement;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
-
-import java.util.Collections;
-import java.util.Set;
-import java.util.WeakHashMap;
 
 public abstract class Addon implements TerrainElement {
 

@@ -1,8 +1,11 @@
 package com.example.game3d_opengl.game.terrain_api.terrainutil;
 
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
+
 import android.opengl.GLES20;
 import android.os.Build;
 
+import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.infill.InfillShaderArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -35,11 +38,11 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
 
     // ---- Constants ----------------------------------------------------------
 
-    private static final int FLOATS_PER_VERTEX = 4;            // vec3 position + mask
+    private static final int FLOATS_PER_VERTEX = 8;            // vec4 pos+mask, vec4 normal
     private static final int BYTES_PER_FLOAT   = 4;
-    private static final int BYTES_PER_VERTEX  = FLOATS_PER_VERTEX * BYTES_PER_FLOAT; // 12
+    private static final int BYTES_PER_VERTEX  = FLOATS_PER_VERTEX * BYTES_PER_FLOAT; // 32
     private static final int VERTICES_PER_PAIR = 2;            // [left, right]
-    private static final int BYTES_PER_PAIR    = VERTICES_PER_PAIR * BYTES_PER_VERTEX;// 24
+    private static final int BYTES_PER_PAIR    = VERTICES_PER_PAIR * BYTES_PER_VERTEX;// 64
     private static final int BYTES_PER_SHORT   = 2;
 
     // ---- GL Objects (created only when a GL context is current) --------------
@@ -108,16 +111,21 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         }
         int pairIndex = (headPair + sizePairs) % capacityPairs;
 
-        // 1) CPU mirror (authoritative source)
-        writePairIntoCpuMirror(pairIndex, newLeft, newRight);
+        // 1) CPU mirror (authoritative source) - add with temp normal
+        writePairIntoCpuMirror(pairIndex, newLeft, newRight, V3(0,1,0), V3(0,1,0), 1f, 1f);
 
         // 2) GPU cache (if GL buffers exist, update them too)
         if (vboId != 0) {
-            writePairIntoVbo(pairIndex, newLeft, newRight, /*maskLeft=*/1f, /*maskRight=*/1f);
+            uploadOnePairFromCpu(pairIndex);
         }
 
         sizePairs++;
         indicesDirty = true;
+
+        // 3) Update normals for the *previous* pair now that we have a forward neighbor
+        if (sizePairs >= 3) {
+            updateNormalsForMiddlePair();
+        }
     }
 
     /** Remove newest pair at the back, if any. */
@@ -141,13 +149,13 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
      * Draw as a triangle strip ribbon using the currently bound InfillShaderPair.
      * Assumes the caller has bound the program and uploaded uniforms.
      */
-    public void draw(FColor color, float[] vp) {
+    public void draw(FColor color, float[] vp, LightSource light) {
         if (sizePairs < 2) return;
         // TODO fail fast would be better but might require more changes.
         // Lazily create GL buffers on first use (also covers initial startup)
         if (vboId == 0 || eboId == 0) {
             reloadGPUResourcesRecursivelyOnContextLoss();
-            if (vboId == 0 || eboId == 0) return;
+            assert !(vboId == 0 || eboId == 0);
         }
 
         // Bind and configure the shader for this draw
@@ -155,7 +163,11 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         shader.setAsCurrentProgram();
 
         vsArgs.mvp   = vp;  // 16-length float array, column-major
-        fsArgs.color = color;    // holds float[4] RGBA
+        fsArgs.color = color;
+        fsArgs.lightX = light.position.x;
+        fsArgs.lightY = light.position.y;
+        fsArgs.lightZ = light.position.z;
+        fsArgs.lightColor = light.color;
         shader.setArgs(vsArgs, fsArgs);
         shader.transferArgsToGPU();
 
@@ -193,11 +205,11 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
     }
 
     private void setPairMaskInternal(int ringIndex, float maskL, float maskR) {
-        final int floatsPerPair = FLOATS_PER_VERTEX * VERTICES_PER_PAIR; // 8
+        final int floatsPerPair = FLOATS_PER_VERTEX * VERTICES_PER_PAIR;
         final int base = ringIndex * floatsPerPair;
         // Update CPU mirror masks
         cpuMirrorFB.put(base + 3, maskL);
-        cpuMirrorFB.put(base + 7, maskR);
+        cpuMirrorFB.put(base + 3 + FLOATS_PER_VERTEX, maskR); // R mask
         // Update GPU VBO for this pair if available
         if (vboId != 0) {
             uploadOnePairFromCpu(ringIndex);
@@ -277,10 +289,12 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
     }
 
     private void writePairIntoCpuMirror(int pairIndex, Vector3D L, Vector3D R) {
-        final int floatOffset = pairIndex * (FLOATS_PER_VERTEX * VERTICES_PER_PAIR); // 8 floats per pair
+        final int floatOffset = pairIndex * (FLOATS_PER_VERTEX * VERTICES_PER_PAIR);
         cpuMirrorFB.position(floatOffset);
         cpuMirrorFB.put(L.x).put(L.y).put(L.z).put(1f);
+        cpuMirrorFB.put(0).put(1).put(0).put(0); // Temp normal
         cpuMirrorFB.put(R.x).put(R.y).put(R.z).put(1f);
+        cpuMirrorFB.put(0).put(1).put(0).put(0); // Temp normal
     }
 
     private void uploadContiguousPairsToVbo(int startPair, int pairCount) {
@@ -311,10 +325,11 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
                     BYTES_PER_PAIR,
                     ES3.WRITE | ES3.INVALIDATE_RANGE);
             if (mapped != null) {
-                mapped.order(ByteOrder.nativeOrder()).asFloatBuffer()
-                        .put(L.x).put(L.y).put(L.z).put(maskL)
-                        .put(R.x).put(R.y).put(R.z).put(maskR)
-                        .rewind();
+                FloatBuffer fb = mapped.order(ByteOrder.nativeOrder()).asFloatBuffer();
+                fb.put(L.x).put(L.y).put(L.z).put(maskL);
+                fb.put(0).put(1).put(0).put(0); // Default normal
+                fb.put(R.x).put(R.y).put(R.z).put(maskR);
+                fb.put(0).put(1).put(0).put(0); // Default normal
                 ES3.unmap(GLES20.GL_ARRAY_BUFFER);
                 GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
                 return;
@@ -325,8 +340,10 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
 
         // ES 2.0-safe fallback: small subdata upload
         pairUploadScratchFloats.position(0);
-        pairUploadScratchFloats.put(L.x).put(L.y).put(L.z).put(maskL)
-                .put(R.x).put(R.y).put(R.z).put(maskR);
+        pairUploadScratchFloats.put(L.x).put(L.y).put(L.z).put(maskL);
+        pairUploadScratchFloats.put(0).put(1).put(0).put(0);
+        pairUploadScratchFloats.put(R.x).put(R.y).put(R.z).put(maskR);
+        pairUploadScratchFloats.put(0).put(1).put(0).put(0);
         pairUploadScratch.position(0); // bytes
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId);
         GLES20.glBufferSubData(GLES20.GL_ARRAY_BUFFER, byteOffset, BYTES_PER_PAIR, pairUploadScratch);
@@ -357,6 +374,54 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
 
         indicesDirty = false;
+    }
+
+    private void writePairIntoCpuMirror(int pairIndex, Vector3D L, Vector3D R, Vector3D nL, Vector3D nR, float maskL, float maskR) {
+        final int floatOffset = pairIndex * FLOATS_PER_VERTEX * VERTICES_PER_PAIR;
+        cpuMirrorFB.position(floatOffset);
+        cpuMirrorFB.put(L.x).put(L.y).put(L.z).put(maskL);
+        cpuMirrorFB.put(nL.x).put(nL.y).put(nL.z).put(0f);
+        cpuMirrorFB.put(R.x).put(R.y).put(R.z).put(maskR);
+        cpuMirrorFB.put(nR.x).put(nR.y).put(nR.z).put(0f);
+    }
+
+    private void updateNormalsForMiddlePair() {
+        int idx2 = (headPair + sizePairs - 1) % capacityPairs;
+        int idx1 = (headPair + sizePairs - 2 + capacityPairs) % capacityPairs;
+        int idx0 = (headPair + sizePairs - 3 + capacityPairs) % capacityPairs;
+
+        Vector3D L0 = getPos(idx0, 0);
+        Vector3D R0 = getPos(idx0, 1);
+        Vector3D L1 = getPos(idx1, 0);
+        Vector3D R1 = getPos(idx1, 1);
+        Vector3D L2 = getPos(idx2, 0);
+        Vector3D R2 = getPos(idx2, 1);
+        float maskL0 = getMask(idx0, 0);
+        float maskR0 = getMask(idx0, 1);
+        float maskL2 = getMask(idx2, 0);
+        float maskR2 = getMask(idx2, 1);
+
+        Vector3D tanL, tanR;
+
+        if (maskL0 == 0f) tanL = L2.sub(L1); else if (maskL2 == 0f) tanL = L1.sub(L0); else tanL = L2.sub(L0);
+        if (maskR0 == 0f) tanR = R2.sub(R1); else if (maskR2 == 0f) tanR = R1.sub(R0); else tanR = R2.sub(R0);
+
+        Vector3D across = R1.sub(L1);
+        Vector3D normalL = across.crossProduct(tanL).normalized();
+        Vector3D normalR = across.crossProduct(tanR).normalized();
+
+        writePairIntoCpuMirror(idx1, L1, R1, normalL, normalR, getMask(idx1,0), getMask(idx1,1));
+        uploadOnePairFromCpu(idx1);
+    }
+
+    private Vector3D getPos(int pairIndex, int side) { // 0=L, 1=R
+        final int floatOffset = pairIndex * FLOATS_PER_VERTEX * VERTICES_PER_PAIR + side * FLOATS_PER_VERTEX;
+        return V3(cpuMirrorFB.get(floatOffset), cpuMirrorFB.get(floatOffset+1), cpuMirrorFB.get(floatOffset+2));
+    }
+
+    private float getMask(int pairIndex, int side) {
+        final int floatOffset = pairIndex * FLOATS_PER_VERTEX * VERTICES_PER_PAIR + side * FLOATS_PER_VERTEX + 3;
+        return cpuMirrorFB.get(floatOffset);
     }
 
     // ---- ES3 helper (only loaded/used when API >= 18 and GL 3.x) ------------

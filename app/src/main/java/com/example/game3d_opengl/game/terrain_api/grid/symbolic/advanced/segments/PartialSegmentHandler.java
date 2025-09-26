@@ -3,9 +3,7 @@ package com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segmen
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.GridSegment;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.by_length.SegmentsByLength;
 import com.example.game3d_opengl.game.terrain_api.grid.symbolic.advanced.segments.by_length.segtree_implementation.PreallocatedHashedSegmentsByLengthNodes;
-import com.example.game3d_opengl.rendering.util3d.GameRandom;
-
-import java.util.Random;
+import com.example.game3d_opengl.game.util.GameRandom;
 
 public class PartialSegmentHandler {
 
