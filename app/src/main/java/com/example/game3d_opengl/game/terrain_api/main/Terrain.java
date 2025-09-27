@@ -10,6 +10,7 @@ import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsE
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_EMPTY_SEG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_V_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_LIFT_UP;
+import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_ALPHAS;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_H_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
 import static com.example.game3d_opengl.game.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
@@ -58,7 +59,7 @@ public class Terrain implements GPUResourceOwner {
 
     /**
      * Gets the total number of tiles currently in the terrain.
-     * 
+     *
      * @return the number of tiles
      */
     public int getTileCount() {
@@ -67,7 +68,7 @@ public class Terrain implements GPUResourceOwner {
 
     /**
      * Gets a tile at the specified index.
-     * 
+     *
      * @param i the tile index
      * @return the tile at the specified index
      * @throws IndexOutOfBoundsException if the index is invalid
@@ -128,7 +129,7 @@ public class Terrain implements GPUResourceOwner {
      * to generate the actual terrain.
      */
     public class TileBrush {
-        // Each command is stored as [commandCode, arg].
+        // Each command is stored as [commandCode, argCount, arg_1, arg_2, ..., arg_argCount].
         // For commands with no arg (e.g. addSegment), we only store the code.
 
         /**
@@ -194,6 +195,14 @@ public class Terrain implements GPUResourceOwner {
         }
 
         /**
+         * Sets alpha values for every new tile.
+         * If not called, defaults to 1,1,1,1
+         */
+        public void setCornerAlphas(float alphaL, float alphaR) {
+            commandBuffer.addCommand(CMD_SET_ALPHAS, alphaL, alphaR);
+        }
+
+        /**
          * Adds a child terrain structure to be generated after the current one.
          * Child structures are useful for creating complex terrain features
          * that depend on the parent structure's geometry.
@@ -233,10 +242,10 @@ public class Terrain implements GPUResourceOwner {
          * Reserves a vertical strip without collision checking.
          */
         public void reserveVertical(int row, int col, int length, Addon[] addons) {
-            assert row>0;
-            assert col>0;
-            assert col<=nCols;
-            assert length>0;
+            assert row > 0;
+            assert col > 0;
+            assert col <= nCols;
+            assert length > 0;
             assert addons.length == length : "Addon count doesn't match segment length";
             commandBuffer.addCommand(CMD_RESERVE_VERTICAL, row, col, length);
             for (Addon addon : addons) {
@@ -248,10 +257,10 @@ public class Terrain implements GPUResourceOwner {
          * Reserves a horizontal strip without collision checking.
          */
         public void reserveHorizontal(int row, int col, int length, Addon[] addons) {
-            assert row>0;
-            assert col>0;
-            assert col<=nCols;
-            assert length>0;
+            assert row > 0;
+            assert col > 0;
+            assert col <= nCols;
+            assert length > 0;
             assert addons.length == length : "Addon count doesn't match segment length";
             commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL, row, col, length);
             for (Addon addon : addons) {
@@ -272,10 +281,10 @@ public class Terrain implements GPUResourceOwner {
          */
         public void reserveVertical(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            assert row>0;
-            assert col>0;
-            assert col<=nCols;
-            assert length>0;
+            assert row > 0;
+            assert col > 0;
+            assert col <= nCols;
+            assert length > 0;
             commandBuffer.addCommand(CMD_RESERVE_VERTICAL, row, col, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
@@ -287,10 +296,10 @@ public class Terrain implements GPUResourceOwner {
          */
         public void reserveHorizontal(int row, int col, int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            assert row>0;
-            assert col>0;
-            assert col<=nCols;
-            assert length>0;
+            assert row > 0;
+            assert col > 0;
+            assert col <= nCols;
+            assert length > 0;
             commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL, row, col, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
@@ -303,7 +312,7 @@ public class Terrain implements GPUResourceOwner {
          */
         public void reserveRandomFittingHorizontal(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            assert length>0;
+            assert length > 0;
             commandBuffer.addCommand(CMD_RESERVE_RANDOM_HORIZONTAL, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
@@ -316,7 +325,7 @@ public class Terrain implements GPUResourceOwner {
          */
         public void reserveRandomFittingVertical(int length, Addon[] addons) {
             assert addons.length == length : "Addon count doesn't match segment length";
-            assert length>0;
+            assert length > 0;
             commandBuffer.addCommand(CMD_RESERVE_RANDOM_VERTICAL, length);
             for (Addon addon : addons) {
                 addonQueue.enqueue(addon);
@@ -330,10 +339,10 @@ public class Terrain implements GPUResourceOwner {
     final IntArrayQueue rowOffsetQueue;
     final ArrayQueue<Addon> addonQueue;
     final IntArrayStack rowCountStack;
-    
+
     // Structures waiting for command interpretation
     final ArrayStack<BaseTerrainStructure<?>> structureStack;
-    
+
     // Structures waiting for command generation
     final ArrayQueue<BaseTerrainStructure<?>> waitingStructuresQueue;
     final ArrayQueue<BaseTerrainStructure<?>> childStructuresQueue;
@@ -362,7 +371,7 @@ public class Terrain implements GPUResourceOwner {
 
     public Terrain(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength, float rowSpacing) {
         this.nCols = nCols;
-        
+
         // Initialize the tile builder with the specified parameters
         this.tileManager = new TileManager(maxSegments, nCols, startMid, segWidth, segLength, rowSpacing);
 
@@ -395,22 +404,22 @@ public class Terrain implements GPUResourceOwner {
         this.tileBrush = new TileBrush();
     }
 
-    public void updateBeforeDraw(float dt){
-        for(int i=0;i<getAddonCount();++i) {
+    public void updateBeforeDraw(float dt) {
+        for (int i = 0; i < getAddonCount(); ++i) {
             getAddon(i).updateBeforeDraw(dt);
         }
         tileManager.updateBeforeDraw(dt);
     }
 
-    public void draw(FColor colorTheme, float[] vp, LightSource light){
+    public void draw(FColor colorTheme, float[] vp, LightSource light) {
         tileManager.draw(colorTheme, vp, light);
-        for(int i=0;i<getAddonCount();++i){
+        for (int i = 0; i < getAddonCount(); ++i) {
             getAddon(i).draw(vp);
         }
     }
 
     public void updateAfterDraw(float dt) {
-        for(int i=0;i<getAddonCount();++i) {
+        for (int i = 0; i < getAddonCount(); ++i) {
             getAddon(i).updateBeforeDraw(dt);
         }
         tileManager.updateAfterDraw(dt);
@@ -435,6 +444,7 @@ public class Terrain implements GPUResourceOwner {
         tileManager.removeOldTiles(playerTileId);
         removeOldAddons(playerTileId);
     }
+
     public int getAddonCount() {
         return addons.size();
     }

@@ -143,7 +143,7 @@ public class GameplayStage extends Stage {
         camera.updateLookPos(camPos.add(player.getDir().setY(0.0f)));
         Vector3D playerPos = V3(player.getX(), player.getY(), player.getZ());
         lightSource.position = playerPos.add(player.getDir().withLen(5f))
-                                        .add(V3(0, 80f, 0));
+                                        .add(V3(0, 70f, 0));
         float[] vpMatrix = camera.getViewProjectionMatrix();
 
         player.draw(vpMatrix);

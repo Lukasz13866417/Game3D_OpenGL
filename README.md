@@ -1,16 +1,16 @@
 # OpenGL 3D Game From Scratch
-> **A fully custom 3D game engine built on OpenGL for Android, featuring a self-made, cutting-edge terrain generation API.**
+> **Has a custom 3D game & rendering engine AND a highly optimized terrain generation engine**
 
 ## Introduction
-This project began as an experiment to render 3D graphics on Android using the **Canvas** API—an unconventional approach that required numerous tricks (like face-culling, Painter’s algorithm modifications, and more) to achieve acceptable performance. However, the limitations of 2D rendering soon became a bottleneck.
+This began as an experiment to render 3D graphics on Android using the 2D **Canvas** API. Numerous tricks (aggressive culling, Painter’s algorithm modifications, and more) to achieve acceptable performance. However, this was far from enough for a production-ready game.
 
 The codebase has since evolved into a **full OpenGL** rendering solution, complete with:
 ## Key Features
 - **Custom 3D Rendering Pipeline**: Built on OpenGL, encapsulated in clean classes like `Camera`, `Object3D`, and more.
 - **Modular Terrain API**: Create subclasses of `TerrainStructure` to define tiles, place “addons” (like spikes or potions), and customize your landscape.
 - **Lazy Terrain Generation**: Terrain structures can have child structures, which are compiled into commands and then “interpreted” at runtime to generate the environment as needed.
-- **SymbolicGrid Integration**: Efficient 2D grid queries and randomization, enabling complex terrain features and item placement without heavy performance hits.
-- **Performance-Focused**: Preallocation, minimal heap allocations, and specialized data structures ensure smooth gameplay and quick load times on mobile devices.
+- **Integrated with my "SymbolicGrid" repo**: Efficient 2D grid queries and randomization, enabling complex terrain features and item placement without heavy performance hits.
+- **Performance-Focused**: Preallocation, minimal heap allocations, specialized data structures, shader tricks, efficient use of GPU resources.
 
 ## Screenshots
 ![Screenshot of Game Stage](https://github.com/user-attachments/assets/2b78fd37-cfe1-4630-b902-ea5328005814)
@@ -35,6 +35,7 @@ The **terrain generation** system is designed for flexibility and performance.
 - Supporting large, on-demand worlds without major slowdowns or stutters.
 
 ## Building & Running
+Should be very straightforward - no dependencies except what's already provided if you have a standard Android Studio setup
 1. **Clone the Repository**  
    ```bash
    git clone https://github.com/Lukasz13866417/Game3D_OpenGL.git
@@ -50,5 +51,9 @@ The **terrain generation** system is designed for flexibility and performance.
 
 ## License
 
-This project is licensed under the **Creative Commons Attribution 4.0 International License**.  
-You are free to share and adapt the material as long as you provide proper attribution. For more details, please see the [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).
+The source code is provided under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/). 
+This means you can view, learn from, and modify the code, but you cannot use it for commercial purposes. 
+
+Game assets (art, music, etc.) are licensed under the [CC BY-NC 4.0 License](https://creativecommons.org/licenses/by-nc/4.0/). 
+
+© 2025 Łukasz Staszewski. All rights reserved.

@@ -22,6 +22,7 @@ public final class InfillShaderArgs {
         public FColor color;
         public float lightX, lightY, lightZ;
         public FColor lightColor;
+        public int isDepthPass;
     }
 }
 

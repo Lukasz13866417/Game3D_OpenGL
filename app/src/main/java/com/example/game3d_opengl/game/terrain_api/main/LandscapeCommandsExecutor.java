@@ -16,10 +16,11 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
     public static final int CMD_ADD_EMPTY_SEG = 6;
     public static final int CMD_LIFT_UP = 7;
     public static final int CMD_START_STRUCTURE_LANDSCAPE = 8;
-    public static final int CMD_LANDSCAPE_USER_LAST = 8;
+    public static final int CMD_SET_ALPHAS = 9;
+    public static final int CMD_LANDSCAPE_USER_LAST = 9;
 
     // Internal commands
-    public static final int CMD_FINISH_STRUCTURE_LANDSCAPE = 9;
+    public static final int CMD_FINISH_STRUCTURE_LANDSCAPE = 10;
 
     private final Terrain terrain;
 
@@ -94,6 +95,10 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 terrain.rowOffsetQueue.enqueue(startRowCount);
                 thatStructure.generateAddons(terrain, nRowsAdded, terrain.nCols);
                 terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS);
+                break;
+            case CMD_SET_ALPHAS:
+                float alphaL = buffer[offset + 2], alphaR = buffer[offset + 3];
+                terrain.tileManager.setUpcomingAlphas(alphaL, alphaR);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown command code: " + code);

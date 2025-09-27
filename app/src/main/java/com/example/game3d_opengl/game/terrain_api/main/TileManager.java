@@ -49,6 +49,8 @@ public class TileManager implements GPUResourceOwner {
     private float pendingLift = 0f;
     private long nextId = 0L;
 
+    private float alphaL = 1, alphaR = 1;
+
     // ============================================================================
     // PUBLIC CONSTRUCTOR
     // ============================================================================
@@ -255,6 +257,11 @@ public class TileManager implements GPUResourceOwner {
         return res;
     }
 
+    public void setUpcomingAlphas(float alphaL, float alphaR){
+        this.alphaL = alphaL;
+        this.alphaR = alphaR;
+    }
+
     // ============================================================================
     // PACKAGE-PRIVATE AND PRIVATE METHODS
     // ============================================================================
@@ -269,12 +276,12 @@ public class TileManager implements GPUResourceOwner {
         if(!isEmptySegment) {
             if (wasPreviousEmpty) {
                 // Start a new visible span: add the near edge of this tile
-                landscapeRenderer.pushBack(nl, nr);
+                landscapeRenderer.pushBack(nl, nr, alphaL, alphaR);
                 // Mark the gap between previous (last) pair and this new near edge so it won't render
                 landscapeRenderer.markGapBetweenLastTwoPairs();
             }
             // Always append far edge; next tile will reuse it as its near edge
-            landscapeRenderer.pushBack(fl, fr);
+            landscapeRenderer.pushBack(fl, fr, alphaL, alphaR);
             if (isFirstLiftedUp) {
                 // If the next tile will be vertically lifted, mask out the seam across to the next near edge
                 landscapeRenderer.markGapBetweenLastTwoPairs();

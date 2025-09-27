@@ -27,12 +27,14 @@ public class BasicTerrainStairs extends BasicTerrainStructure {
 
     @Override
     protected void generateTiles(Terrain.TileBrush brush) {
+        brush.setCornerAlphas(0.5f,0.5f);
         float angHorPerTile = dAngHor / (float) (tilesToMake);
         for (int i = 0; i < cntStairs; ++i) {
-            for (int j = 0; j < tilesPerStair; ++j) {
+            for(int j=0;j<tilesPerStair;++j) {
                 brush.addHorizontalAng(angHorPerTile);
                 brush.addSegment();
             }
+            // add empty tiles between levels (not after the last level)
             if (i < cntStairs - 1) {
                 for (int e = 0; e < emptyBetween; ++e) {
                     brush.addEmptySegment();
@@ -40,6 +42,7 @@ public class BasicTerrainStairs extends BasicTerrainStructure {
             }
             brush.liftUp(jump);
         }
+        brush.setCornerAlphas(1f,1f);
     }
 
     @Override
