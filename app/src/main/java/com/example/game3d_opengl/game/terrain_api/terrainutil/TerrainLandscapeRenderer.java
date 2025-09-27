@@ -107,6 +107,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         if (sizePairs == capacityPairs) {
             if (EVICT_OLDEST_ON_OVERFLOW) popFront(); else return;
         }
+        System.out.println("alphas: " + alphaL + "," + alphaR); // seems to output correct values.
         int pairIndex = (headPair + sizePairs) % capacityPairs;
 
         // 1) CPU mirror (authoritative source) - add with temp normal
