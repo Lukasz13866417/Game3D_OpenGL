@@ -18,10 +18,8 @@ import java.nio.ShortBuffer;
 
 /**
  * A ring-buffer (deque) of (left,right) points rendered as a triangle strip ribbon.
- *
  * VBO layout: per pair two vec3 vertices: [Li.xyz, Ri.xyz]
  * EBO (indices): [L0, R0, L1, R1, ..., L(n-1), R(n-1)] -> GL_TRIANGLE_STRIP
- *
  * CPU mirror stores all pairs so geometry can be restored after EGL context loss.
  * ES 3.x mapping path (glMapBufferRange) is used opportunistically; ES 2.0 falls back
  * to glBufferSubData, which is fine for 24-byte updates per push.
@@ -105,14 +103,15 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
     // ---- Public API ---------------------------------------------------------
 
     /** Append a new (L,R) pair to the back. Evicts front if at capacity and eviction enabled. */
-    public void pushBack(Vector3D newLeft, Vector3D newRight) {
+    public void pushBack(Vector3D newLeft, Vector3D newRight, float alphaL, float alphaR) {
         if (sizePairs == capacityPairs) {
             if (EVICT_OLDEST_ON_OVERFLOW) popFront(); else return;
         }
+        System.out.println("alphas: " + alphaL + "," + alphaR); // seems to output correct values.
         int pairIndex = (headPair + sizePairs) % capacityPairs;
 
         // 1) CPU mirror (authoritative source) - add with temp normal
-        writePairIntoCpuMirror(pairIndex, newLeft, newRight, V3(0,1,0), V3(0,1,0), 1f, 1f);
+        writePairIntoCpuMirror(pairIndex, newLeft, newRight, V3(0,1,0), V3(0,1,0), 1f, 1f, alphaL, alphaR);
 
         // 2) GPU cache (if GL buffers exist, update them too)
         if (vboId != 0) {
@@ -179,18 +178,47 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
     private void drawInternal() {
         ensureIndexBufferUpToDate();
 
+        TerrainRibbonShaderPair shader = TerrainRibbonShaderPair.sharedShader;
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId);
-        TerrainRibbonShaderPair.sharedShader.enableAndPointVertexAttribs();
+        shader.enableAndPointVertexAttribs();
 
         boolean cullEnabled = GLES20.glIsEnabled(GLES20.GL_CULL_FACE);
         if (cullEnabled) GLES20.glDisable(GLES20.GL_CULL_FACE);
 
+        final int indexCount = sizePairs * VERTICES_PER_PAIR;
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, eboId);
-        final int indexCount = sizePairs * VERTICES_PER_PAIR; // 2 per pair
+
+        // PASS 1: Opaque Depth Pre-Pass
+        GLES20.glColorMask(false, false, false, false);
+        GLES20.glDepthMask(true);
+        GLES20.glDisable(GLES20.GL_BLEND);
+
+        fsArgs.isDepthPass = 1;
+        shader.setArgs(vsArgs, fsArgs);
+        shader.transferArgsToGPU();
+
         GLES20.glDrawElements(GLES20.GL_TRIANGLE_STRIP, indexCount, GLES20.GL_UNSIGNED_SHORT, 0);
 
+        // PASS 2: Color Pass
+        GLES20.glColorMask(true, true, true, true);
+        GLES20.glDepthMask(false);
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+        GLES20.glDepthFunc(GLES20.GL_LEQUAL);
+
+        fsArgs.isDepthPass = 0;
+        shader.setArgs(vsArgs, fsArgs);
+        shader.transferArgsToGPU();
+
+        GLES20.glDrawElements(GLES20.GL_TRIANGLE_STRIP, indexCount, GLES20.GL_UNSIGNED_SHORT, 0);
+
+        // CLEANUP
+        GLES20.glDepthMask(true);
+        GLES20.glDisable(GLES20.GL_BLEND);
+        GLES20.glDepthFunc(GLES20.GL_LESS);
+
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
-        TerrainRibbonShaderPair.sharedShader.disableVertexAttribs();
+        shader.disableVertexAttribs();
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
         if (cullEnabled) GLES20.glEnable(GLES20.GL_CULL_FACE);
     }
@@ -210,6 +238,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         // Update CPU mirror masks
         cpuMirrorFB.put(base + 3, maskL);
         cpuMirrorFB.put(base + 3 + FLOATS_PER_VERTEX, maskR); // R mask
+
         // Update GPU VBO for this pair if available
         if (vboId != 0) {
             uploadOnePairFromCpu(ringIndex);
@@ -327,9 +356,9 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
             if (mapped != null) {
                 FloatBuffer fb = mapped.order(ByteOrder.nativeOrder()).asFloatBuffer();
                 fb.put(L.x).put(L.y).put(L.z).put(maskL);
-                fb.put(0).put(1).put(0).put(0); // Default normal
+                fb.put(0).put(1).put(0).put(1); // Default normal, alpha=1
                 fb.put(R.x).put(R.y).put(R.z).put(maskR);
-                fb.put(0).put(1).put(0).put(0); // Default normal
+                fb.put(0).put(1).put(0).put(1); // Default normal, alpha=1
                 ES3.unmap(GLES20.GL_ARRAY_BUFFER);
                 GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
                 return;
@@ -341,9 +370,9 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         // ES 2.0-safe fallback: small subdata upload
         pairUploadScratchFloats.position(0);
         pairUploadScratchFloats.put(L.x).put(L.y).put(L.z).put(maskL);
-        pairUploadScratchFloats.put(0).put(1).put(0).put(0);
+        pairUploadScratchFloats.put(0).put(1).put(0).put(1);
         pairUploadScratchFloats.put(R.x).put(R.y).put(R.z).put(maskR);
-        pairUploadScratchFloats.put(0).put(1).put(0).put(0);
+        pairUploadScratchFloats.put(0).put(1).put(0).put(1);
         pairUploadScratch.position(0); // bytes
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId);
         GLES20.glBufferSubData(GLES20.GL_ARRAY_BUFFER, byteOffset, BYTES_PER_PAIR, pairUploadScratch);
@@ -376,13 +405,13 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         indicesDirty = false;
     }
 
-    private void writePairIntoCpuMirror(int pairIndex, Vector3D L, Vector3D R, Vector3D nL, Vector3D nR, float maskL, float maskR) {
+    private void writePairIntoCpuMirror(int pairIndex, Vector3D L, Vector3D R, Vector3D nL, Vector3D nR, float maskL, float maskR, float alphaL, float alphaR) {
         final int floatOffset = pairIndex * FLOATS_PER_VERTEX * VERTICES_PER_PAIR;
         cpuMirrorFB.position(floatOffset);
         cpuMirrorFB.put(L.x).put(L.y).put(L.z).put(maskL);
-        cpuMirrorFB.put(nL.x).put(nL.y).put(nL.z).put(0f);
+        cpuMirrorFB.put(nL.x).put(nL.y).put(nL.z).put(alphaL);
         cpuMirrorFB.put(R.x).put(R.y).put(R.z).put(maskR);
-        cpuMirrorFB.put(nR.x).put(nR.y).put(nR.z).put(0f);
+        cpuMirrorFB.put(nR.x).put(nR.y).put(nR.z).put(alphaR);
     }
 
     private void updateNormalsForMiddlePair() {
@@ -400,17 +429,19 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         float maskR0 = getMask(idx0, 1);
         float maskL2 = getMask(idx2, 0);
         float maskR2 = getMask(idx2, 1);
+        float alphaL1 = getAlpha(idx1, 0);
+        float alphaR1 = getAlpha(idx1, 1);
 
         Vector3D tanL, tanR;
 
-        if (maskL0 == 0f) tanL = L2.sub(L1); else if (maskL2 == 0f) tanL = L1.sub(L0); else tanL = L2.sub(L0);
-        if (maskR0 == 0f) tanR = R2.sub(R1); else if (maskR2 == 0f) tanR = R1.sub(R0); else tanR = R2.sub(R0);
+        tanL = L2.sub(L1);
+        tanR = R2.sub(R1);
 
         Vector3D across = R1.sub(L1);
         Vector3D normalL = across.crossProduct(tanL).normalized();
         Vector3D normalR = across.crossProduct(tanR).normalized();
 
-        writePairIntoCpuMirror(idx1, L1, R1, normalL, normalR, getMask(idx1,0), getMask(idx1,1));
+        writePairIntoCpuMirror(idx1, L1, R1, normalL, normalR, getMask(idx1,0), getMask(idx1,1), alphaL1, alphaR1);
         uploadOnePairFromCpu(idx1);
     }
 
@@ -421,6 +452,11 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
 
     private float getMask(int pairIndex, int side) {
         final int floatOffset = pairIndex * FLOATS_PER_VERTEX * VERTICES_PER_PAIR + side * FLOATS_PER_VERTEX + 3;
+        return cpuMirrorFB.get(floatOffset);
+    }
+
+    private float getAlpha(int pairIndex, int side) {
+        final int floatOffset = pairIndex * FLOATS_PER_VERTEX * VERTICES_PER_PAIR + side * FLOATS_PER_VERTEX + 7;
         return cpuMirrorFB.get(floatOffset);
     }
 

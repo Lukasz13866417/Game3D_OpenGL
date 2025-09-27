@@ -26,7 +26,9 @@ public class TerrainStairs extends AdvancedTerrainStructure {
 
     @Override
     protected void generateTiles(Terrain.TileBrush brush) {
+        brush.setCornerAlphas(0.5f,0.5f);
         float angHorPerTile = dAngHor / (float) (tilesToMake);
+        brush.liftUp(jump);
         for (int i = 0; i < cntStairs; ++i) {
             for(int j=0;j<tilesPerStair;++j) {
                 brush.addHorizontalAng(angHorPerTile);
@@ -40,7 +42,9 @@ public class TerrainStairs extends AdvancedTerrainStructure {
             }
             brush.liftUp(jump);
         }
+        brush.setCornerAlphas(1f,1f);
     }
+
 
     @Override
     protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
