@@ -28,11 +28,12 @@ The **terrain generation** system is designed for flexibility and performance.
 - The ```Tile``` class can be extended for extra capabilities.
 - **lazy loading**:  Instead of instantly generating tiles&addons based on provided structures, the information is turned into commands. At any time, the user can tell the terrain to "interpret" a given number of commands. The commands generated for a structure can be reused. This approach resulted in better performance than running the terrain generation on a separate thread and synchronizing.
 
-### SymbolicGrid
+### Terrain
+A grid is built on top of the terrain to allow precise placement of addons (spikes, potions etc). Lots of data structures needed to allow randomization & more advanced queries.
 [SymbolicGrid](https://github.com/Lukasz13866417/SymbolicGrid) is my own, self-made library for efficient, randomized 2D grid queries. It significantly boosts performance by:
-- Reducing memory overhead with specialized data structures.
-- Minimizing random lookups and generation overhead.
-- Supporting large, on-demand worlds without major slowdowns or stutters.
+- Reduced time complexity specialized data structures.
+- Minimizing random lookups and heap allocations with pre-allocation.
+- Tree-like system of grids (a terrain structure can have child structures who have their own grids within their parent grid)
 
 ## Building & Running
 Should be very straightforward - no dependencies except what's already provided if you have a standard Android Studio setup
