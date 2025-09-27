@@ -8,9 +8,9 @@ import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.util.Log;
 
-import com.example.game3d_opengl.game.stages.main.GameplayStage;
-import com.example.game3d_opengl.game.stages.main.MenuStage;
-import com.example.game3d_opengl.game.stage_api.Stage;
+import com.example.game3d_opengl.game.stage.stages.main.GameplayStage;
+import com.example.game3d_opengl.game.stage.stages.main.MenuStage;
+import com.example.game3d_opengl.game.stage.stage_api.Stage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
