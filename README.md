@@ -6,10 +6,8 @@ This began as an experiment to render 3D graphics on Android using the 2D **Canv
 
 The codebase has since evolved into a **full OpenGL** project, complete with:
 ## Key Features
-- **Custom 3D Rendering Pipeline**: Built on OpenGL, encapsulated in clean classes like `Camera`, `Object3D`, and more.
+- **Custom 3D Rendering Pipeline**: Built on OpenGL, encapsulated in clean classes like `Camera`, `AbstractMesh3D`, and more.
 - **Modular Terrain API**: Create subclasses of `TerrainStructure` to define tiles, place “addons” (like spikes or potions), and customize your landscape.
-- **Lazy Terrain Generation**: Terrain structures can have child structures, which are compiled into commands and then “interpreted” at runtime to generate the environment as needed.
-- **Integrated with my "SymbolicGrid" repo**: Efficient 2D grid queries and randomization, enabling complex terrain features and item placement without heavy performance hits.
 - **Performance-Focused**:
   * Preallocation, **minimal heap allocations, avoiding GC spikes**, 
   * Shader tricks, efficient use of GPU resources.
