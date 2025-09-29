@@ -8,7 +8,7 @@ The codebase has since evolved into a **full OpenGL** project, complete with:
 ## Key Features
 - Custom 3D Rendering Pipeline: Built on OpenGL, encapsulated in clean classes like `Camera`, `AbstractMesh3D`, and more.
 - Modular Terrain API: Create subclasses of `TerrainStructure` to define tiles, place “addons” (like spikes or potions), and customize your landscape.
-- Performance-Focused:
+- Focus on performance:
   * Preallocation, **minimal heap allocations, avoiding GC spikes**, 
   * Shader tricks, efficient use of GPU resources.
   * **Specialized data structures**: Segment Trees, Automata, Hashing, Red-Black Trees
