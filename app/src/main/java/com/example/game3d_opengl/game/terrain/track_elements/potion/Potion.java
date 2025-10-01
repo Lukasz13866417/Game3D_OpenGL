@@ -6,6 +6,7 @@ import static com.example.game3d_opengl.game.util.GameMath.getNormal;
 import android.content.res.AssetManager;
 
 import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
+import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.ModelCreator;
 import com.example.game3d_opengl.rendering.infill.Mesh3DInfill;
 import com.example.game3d_opengl.rendering.wireframe.Mesh3DWireframe;
@@ -16,9 +17,12 @@ import java.io.IOException;
 
 public class Potion extends Addon {
 
-    private static final float POTION_WIDTH = 0.2f,
-                               POTION_HEIGHT = 0.62f,
-                               POTION_LINE_THICKNESS = 0.78f;
+    public static final float POTION_MODEL_WIDTH = 0.2f,
+                               POTION_MODEL_HEIGHT = 0.62f,
+                               POTION_MODEL_LINE_THICKNESS = 0.78f;
+
+    public static FColor POTION_FILL_COLOR = CLR(0.8f,0,0.8f,1);
+    public static FColor POTION_EDGE_COLOR = CLR(1,1,1,1);
     
     // Shared meshes for all potions
     private static Mesh3DInfill sharedFill;
@@ -26,31 +30,35 @@ public class Potion extends Addon {
     private static boolean assetsLoaded = false;
     
     // Instance-specific transform wrapper
-    private UnbatchedObject3DWithOutline object3D;
+    private final UnbatchedObject3DWithOutline object3D;
     
     public static void LOAD_POTION_ASSETS(AssetManager assetManager){
-        if (assetsLoaded) return; // prevent loading multiple times
+        if (assetsLoaded){
+            // Prevent loading multiple times. Always fail fast in this project
+            throw new IllegalStateException("Attempt to load twice");
+            // TODO slight improvement:  do the same in each LOAD_xxx_ASSETS.
+        };
         
         ModelCreator modelCreator = new ModelCreator(assetManager);
         try {
             modelCreator.load("potion.obj");
             modelCreator.centerVerts();
-            modelCreator.scaleX(POTION_WIDTH);
-            modelCreator.scaleY(POTION_HEIGHT);
-            modelCreator.scaleZ(POTION_WIDTH);
+            modelCreator.scaleX(POTION_MODEL_WIDTH);
+            modelCreator.scaleY(POTION_MODEL_HEIGHT);
+            modelCreator.scaleZ(POTION_MODEL_WIDTH);
             
             // Build shared meshes once
             sharedFill = new Mesh3DInfill.Builder()
                     .verts(modelCreator.getVerts())
                     .faces(modelCreator.getFaces())
-                    .fillColor(CLR(0.8f,0,0.8f,1))
+                    .fillColor(POTION_FILL_COLOR)
                     .buildObject();
 
             sharedWire = new Mesh3DWireframe.Builder()
                     .verts(modelCreator.getVerts())
                     .faces(modelCreator.getFaces())
-                    .edgeColor(CLR(1,1,1,1))
-                    .pixelWidth(POTION_LINE_THICKNESS)
+                    .edgeColor(POTION_EDGE_COLOR)
+                    .pixelWidth(POTION_MODEL_LINE_THICKNESS)
                     .buildObject();
             
             assetsLoaded = true;
@@ -81,7 +89,7 @@ public class Potion extends Addon {
         Vector3D fieldMid = fieldFarLeft.add(fieldFarRight)
                 .add(fieldNearRight).add(fieldNearLeft).div(4);
         Vector3D out = getNormal(fieldNearLeft,fieldFarLeft,fieldFarRight).mult(-1);
-        Vector3D myMid = fieldMid.add(out.withLen(0.1f)).addY(POTION_HEIGHT/2);
+        Vector3D myMid = fieldMid.add(out.withLen(0.1f)).addY(POTION_MODEL_HEIGHT/2);
         
         if (object3D != null) {
             object3D.objX = myMid.x;

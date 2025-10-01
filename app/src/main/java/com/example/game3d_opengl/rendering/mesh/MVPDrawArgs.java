@@ -4,6 +4,10 @@ public final class MVPDrawArgs extends BaseMeshDrawArgs {
     public MVPDrawArgs(float[] mvp){
         this.vp = mvp;
     }
+
+    public void setMvp(float[] mvp){
+        this.vp = mvp;
+    }
 }
 
 

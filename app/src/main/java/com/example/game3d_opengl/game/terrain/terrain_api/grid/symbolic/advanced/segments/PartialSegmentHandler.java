@@ -7,16 +7,11 @@ import com.example.game3d_opengl.game.util.GameRandom;
 
 public class PartialSegmentHandler {
 
-    private final int nRows, nCols;
-    private final boolean vertical;
 
     private final SegmentsByLength segmentsByLength;
     private final SegmentsByEndPosition segmentsByEndPosition;
 
     public PartialSegmentHandler(int nRows, int nCols, boolean vertical) {
-        this.nRows = nRows;
-        this.nCols = nCols;
-        this.vertical = vertical;
         this.segmentsByLength = new PreallocatedHashedSegmentsByLengthNodes(nRows, nCols, vertical);
         this.segmentsByEndPosition = new SegmentsByEndPosition(nRows, nCols, vertical);
 

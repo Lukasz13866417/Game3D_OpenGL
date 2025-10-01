@@ -11,6 +11,7 @@ import android.util.Log;
 import com.example.game3d_opengl.game.stage.stages.main.GameplayStage;
 import com.example.game3d_opengl.game.stage.stages.main.MenuStage;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
+import com.example.game3d_opengl.game.stage.stages.test.IconTestStage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
@@ -58,10 +59,13 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.stageManager = new StageManager();
         this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
-        this.currStage =  /*new TestGridRowsStructuresStage(stageManager);*/
-                /*  new TestGridRowsStage(stageManager); */
-                /* new AddonPlacementTestStage(stageManager); */ new GameplayStage(stageManager);
-       /* new TestWireframeStage(stageManager);*/
+        this.currStage =
+                          //new TestGridRowsStructuresStage(stageManager);
+                          //new TestGridRowsStage(stageManager);
+                          //new AddonPlacementTestStage(stageManager);
+                          new GameplayStage(stageManager);
+                          //new TestWireframeStage(stageManager);
+                          //new IconTestStage(stageManager);
     }
 
     public Stage getCurrentStage() {

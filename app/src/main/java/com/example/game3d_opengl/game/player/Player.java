@@ -15,7 +15,7 @@ import android.content.res.AssetManager;
 import android.util.Log;
 
 import com.example.game3d_opengl.game.WorldActor;
-import com.example.game3d_opengl.game.player.effects.Effect;
+import com.example.game3d_opengl.game.player.player_state.api.EffectOnPlayer;
 import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
 import com.example.game3d_opengl.rendering.util3d.ModelCreator;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -424,18 +424,20 @@ public class Player implements WorldActor {
     public float getX() { return object3D != null ? object3D.objX : 0f; }
     public float getY() { return object3D != null ? object3D.objY : 0f; }
     public float getZ() { return object3D != null ? object3D.objZ : 0f; }
+    
+    
+    private boolean canJump;
+    
 
 
     // An API for Effect subclasses which allows these classes to make changes to Player state.
     public class PlayerEffectsAPI {
-        public void setCanJump(boolean canJump){
-             // TODO
-            throw new RuntimeException("Not implemented yet");
+        public void setCanJump(boolean _canJump){
+            canJump = _canJump;
         }
 
         public boolean canJump(){
-            // TODO
-            throw new RuntimeException("Not implemented yet");
+            return canJump;
         }
 
         public void setBaseSpeed(float val){
@@ -447,7 +449,7 @@ public class Player implements WorldActor {
             throw new RuntimeException("Not implemented yet");
         }
 
-        public void addNewEffect(Effect what){
+        public void addNewEffect(EffectOnPlayer<?> what){
             // TODO
             throw new RuntimeException("Not implemented yet");
         }

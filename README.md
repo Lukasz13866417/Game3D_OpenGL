@@ -9,7 +9,7 @@ The codebase has since evolved into a **full OpenGL** rendering solution, comple
 - **Custom 3D Rendering Pipeline**: Built on OpenGL, encapsulated in clean classes like `Camera`, `Object3D`, and more.
 - **Modular Terrain API**: Create subclasses of `TerrainStructure` to define tiles, place “addons” (like spikes or potions), and customize your landscape.
 - **Lazy Terrain Generation**: Terrain structures can have child structures, which are compiled into commands and then “interpreted” at runtime to generate the environment as needed.
-- **Integrated with my "SymbolicGrid" repo**: Efficient 2D grid queries and randomization, enabling complex terrain features and item placement without heavy performance hits.
+- **Data structures optimization**: Custom red-black trees, hashing, segment trees, pre-alloacted data structures.
 - **Performance-Focused**: Preallocation, minimal heap allocations, specialized data structures, shader tricks, efficient use of GPU resources.
 
 ## Screenshots
@@ -18,7 +18,7 @@ The codebase has since evolved into a **full OpenGL** rendering solution, comple
 ## Project Structure
 Packages:
 - **`game`**: Core game logic, player handling, and world interactions.
-- **`game/terrain_api`**: Classes and interfaces for procedural terrain generation. Includes the `SymbolicGrid` integration.
+- **`game/terrain_api`**: Classes and interfaces for procedural terrain generation. Includes my data structure project  `SymbolicGrid`.
 - **`rendering`**: All OpenGL and 3D rendering classes, from camera setup to object definitions.
 
 ## Terrain Generation & SymbolicGrid API
@@ -26,7 +26,7 @@ The **terrain generation** system is designed for flexibility and performance.
 - All terrain patterns extend the **```TerrainStructure```** class - an API for arranging tiles and placing addons on a grid.
 - Terrain structures form a "tree" - each structure can incorporate child structures with their own addons and tiles. 
 - The ```Tile``` class can be extended for extra capabilities.
-- **lazy loading**:  Instead of instantly generating tiles&addons based on provided structures, the information is turned into commands. At any time, the user can tell the terrain to "interpret" a given number of commands. The commands generated for a structure can be reused. This approach resulted in better performance than running the terrain generation on a separate thread and synchronizing.
+- **lazy loading**:  Instead of instantly generating tiles & addons based on provided structures, the information is turned into commands. At any time, the user can tell the terrain to "interpret" a given number of commands. The commands generated for a structure can be reused. This approach resulted in better performance than running the terrain generation on a separate thread and synchronizing.
 
 ### Terrain
 A grid is built on top of the terrain to allow precise placement of addons (spikes, potions etc). Lots of data structures needed to allow randomization & more advanced queries.
