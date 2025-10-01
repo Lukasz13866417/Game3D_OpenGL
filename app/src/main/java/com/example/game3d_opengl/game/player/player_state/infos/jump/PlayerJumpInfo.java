@@ -1,9 +1,9 @@
-package com.example.game3d_opengl.game.player.player_state.infos;
+package com.example.game3d_opengl.game.player.player_state.infos.jump;
 
-public abstract class PlayerJumpInfo extends PlayerAffectingInfo {
-    public void accept(PlayerJumpVisitor visitor) {
-        visitor.visit(this);
-    }
+import com.example.game3d_opengl.game.player.player_state.infos.PlayerAffectingInfo;
+
+public abstract class PlayerJumpInfo extends PlayerAffectingInfo<PlayerJumpVisitor> {
+    public abstract void accept(PlayerJumpVisitor visitor);
 
     public static class PlayerHasFooting extends PlayerJumpInfo {
         public void accept(PlayerJumpVisitor visitor) {

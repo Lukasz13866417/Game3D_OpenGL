@@ -16,6 +16,8 @@ import android.util.Log;
 
 import com.example.game3d_opengl.game.WorldActor;
 import com.example.game3d_opengl.game.player.player_state.api.EffectOnPlayer;
+import com.example.game3d_opengl.game.player.player_state.infos.PlayerInfoVisitor;
+import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerJumpInfo;
 import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
 import com.example.game3d_opengl.rendering.util3d.ModelCreator;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -28,7 +30,7 @@ import java.io.IOException;
  * Handles movement, collision detection, physics, and rendering.
  * The player moves along the terrain and can interact with various game elements.
  */
-public class Player implements WorldActor {
+public class Player implements WorldActor, PlayerInfoVisitor {
 
     // Constants for magic numbers
     public static final float PLAYER_WIDTH = 0.132f;
@@ -424,35 +426,9 @@ public class Player implements WorldActor {
     public float getX() { return object3D != null ? object3D.objX : 0f; }
     public float getY() { return object3D != null ? object3D.objY : 0f; }
     public float getZ() { return object3D != null ? object3D.objZ : 0f; }
-    
-    
-    private boolean canJump;
-    
 
+    @Override
+    public void visit(PlayerJumpInfo info) {
 
-    // An API for Effect subclasses which allows these classes to make changes to Player state.
-    public class PlayerEffectsAPI {
-        public void setCanJump(boolean _canJump){
-            canJump = _canJump;
-        }
-
-        public boolean canJump(){
-            return canJump;
-        }
-
-        public void setBaseSpeed(float val){
-            // TODO
-            throw new RuntimeException("Not implemented yet");
-        }
-        public void setAlive(boolean val){
-            // TODO
-            throw new RuntimeException("Not implemented yet");
-        }
-
-        public void addNewEffect(EffectOnPlayer<?> what){
-            // TODO
-            throw new RuntimeException("Not implemented yet");
-        }
-        // etc. More to be added as needed.
     }
 }

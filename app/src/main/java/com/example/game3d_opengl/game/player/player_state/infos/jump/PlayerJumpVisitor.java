@@ -1,6 +1,8 @@
-package com.example.game3d_opengl.game.player.player_state.infos;
+package com.example.game3d_opengl.game.player.player_state.infos.jump;
 
-public interface PlayerJumpVisitor {
+import com.example.game3d_opengl.game.player.player_state.infos.PlayerInfoVisitor;
+
+public interface PlayerJumpVisitor extends PlayerInfoVisitor {
 
     default void visit(PlayerJumpInfo jumpInfo){
         throw new IllegalStateException("Unknown subclass - not handled");

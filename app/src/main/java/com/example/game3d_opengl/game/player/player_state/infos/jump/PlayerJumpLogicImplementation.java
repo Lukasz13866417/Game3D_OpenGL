@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.player.player_state.infos;
+package com.example.game3d_opengl.game.player.player_state.infos.jump;
 
 import java.util.Objects;
 
@@ -24,15 +24,15 @@ public class PlayerJumpLogicImplementation implements PlayerJumpVisitor {
     
     // Pair of info and its explicit application order
     private static final class InfoAndOrder {
-        final PlayerJumpInfo info;
-        final int order;
+        PlayerJumpInfo info;
+        int order;
         InfoAndOrder(PlayerJumpInfo info, int order) {
             this.info = info;
             this.order = order;
         }
     }
 
-    // Preallocated array for info+order pairs
+    // Pre-allocated array for info+order pairs
     private final InfoAndOrder[] infos = new InfoAndOrder[MAX_JUMP_INFOS];
     private int infoCount = 0;
     
@@ -44,6 +44,12 @@ public class PlayerJumpLogicImplementation implements PlayerJumpVisitor {
     private final JumpAutomaton automaton = new JumpAutomaton();
 
     // ------------------------------------- PUBLIC API --------------------------------------------
+
+    public PlayerJumpLogicImplementation(){
+        for(int i=0;i<infos.length;++i){
+            infos[i] = new InfoAndOrder(null, Integer.MAX_VALUE);
+        }
+    }
     
     /**
      * Clean up the automaton state at the beginning of each frame.
@@ -121,11 +127,12 @@ public class PlayerJumpLogicImplementation implements PlayerJumpVisitor {
     }
     
     /**
-     * Add jump info with explicit order to the preallocated array
+     * Add jump info with explicit order to the pre-allocated array
      */
     private void addInfo(PlayerJumpInfo info, int order) {
         if (infoCount < MAX_JUMP_INFOS) {
-            infos[infoCount++] = new InfoAndOrder(info, order);
+            infos[infoCount].info = info;
+            infos[infoCount++].order = order;
         }
         // If array is full, we ignore new infos to keep it simple
     }
