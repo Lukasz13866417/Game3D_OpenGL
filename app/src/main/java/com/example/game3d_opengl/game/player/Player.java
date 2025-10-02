@@ -15,9 +15,10 @@ import android.content.res.AssetManager;
 import android.util.Log;
 
 import com.example.game3d_opengl.game.WorldActor;
-import com.example.game3d_opengl.game.player.player_state.api.EffectOnPlayer;
 import com.example.game3d_opengl.game.player.player_state.infos.PlayerInfoVisitor;
+import com.example.game3d_opengl.game.player.player_state.infos.PlayerAffectingInfo;
 import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerJumpInfo;
+import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerJumpLogicImplementation;
 import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
 import com.example.game3d_opengl.rendering.util3d.ModelCreator;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -80,6 +81,8 @@ public class Player implements WorldActor, PlayerInfoVisitor {
     private Tile tileBelow;
     private long nearestTileId = -1L;
 
+    private final PlayerJumpLogicImplementation jumpLogicImplementation;
+
     /**
      * Loads the player's 3D model and creates the UnbatchedObject3D builder.
      * This method must be called before creating any Player instances.
@@ -136,9 +139,11 @@ public class Player implements WorldActor, PlayerInfoVisitor {
         this.object3D = object3D;
         this.dir = new Vector3D(INITIAL_DIRECTION_X, INITIAL_DIRECTION_Y, INITIAL_DIRECTION_Z);
         this.move = new Vector3D(0, 0, 0);
+        this.jumpLogicImplementation = new PlayerJumpLogicImplementation();
+        this.interactableAPI = new InteractableAPI(this);
     }
     
-    public static UnbatchedObject3DWithOutline makeObject3D() {
+    private static UnbatchedObject3DWithOutline getObject3D() {
         if (PLAYER_OBJECT == null) {
             throw new IllegalStateException(ERROR_ASSETS_NOT_LOADED);
         }
@@ -152,7 +157,7 @@ public class Player implements WorldActor, PlayerInfoVisitor {
      * @throws IllegalStateException if assets haven't been loaded
      */
     public static Player createPlayer() {
-        return new Player(makeObject3D());
+        return new Player(getObject3D());
     }
 
     /**
@@ -206,7 +211,6 @@ public class Player implements WorldActor, PlayerInfoVisitor {
     /**
      * Sets the tile that the player is currently standing on.
      * Updates the player's footing and nearest tile ID for terrain management.
-     * 
      * @param what the tile the player is standing on, or null if not on any tile
      */
     public void setFooting(Tile what) {
@@ -218,39 +222,6 @@ public class Player implements WorldActor, PlayerInfoVisitor {
 
     // Physics state
     private float fallSpeed = 0f;
-
-    /**
-     * Updates the player's physics and movement before rendering.
-     * Handles gravity, collision response, and movement calculations.
-     * 
-     * @param dtMillis time delta in milliseconds
-     */
-    @Override
-    public void updateBeforeDraw(float dtMillis) {
-        // Update sticky rotation (gradual rotation decay)
-        stickyRotationTime = max(0f, stickyRotationTime - dtMillis);
-        if (stickyRotationTime == 0 && stickyRotationAng != 0) {
-            float dYaw = minByAbs(signum(stickyRotationAng) * STICKY_ROTATION_ANGLE_DECAY_RATE * dtMillis, stickyRotationAng);
-            object3D.objYaw -= dYaw;
-            stickyRotationAng -= dYaw;
-        }
-
-        if (tileBelow != null) {
-            // Player is on ground - handle movement along surface
-            handleGroundMovement(dtMillis);
-        } else {
-            // Player is falling - apply gravity
-            handleFallingMovement(dtMillis);
-        }
-        
-        // Apply movement to position
-        object3D.objX += move.x;
-        object3D.objY += move.y;
-        object3D.objZ += move.z;
-        
-        // Update visual rotation based on movement
-        object3D.objPitch -= dtMillis * PLAYER_SPEED / (PI * PLAYER_HEIGHT) * 2 * PI;
-    }
 
     /**
      * Handles movement when the player is on solid ground.
@@ -353,9 +324,58 @@ public class Player implements WorldActor, PlayerInfoVisitor {
     }
 
     @Override
+    public void visit(PlayerJumpInfo info) {
+        info.accept(jumpLogicImplementation);
+    }
+
+
+    /**
+     * Updates the player's physics and movement before rendering.
+     * Handles gravity, collision response, and movement calculations.
+     *
+     * @param dtMillis time delta in milliseconds
+     */
+    @Override
+    public void updateBeforeDraw(float dtMillis) {
+        // Update sticky rotation (gradual rotation decay)
+        stickyRotationTime = max(0f, stickyRotationTime - dtMillis);
+        if (stickyRotationTime == 0 && stickyRotationAng != 0) {
+            float dYaw = minByAbs(signum(stickyRotationAng) * STICKY_ROTATION_ANGLE_DECAY_RATE * dtMillis, stickyRotationAng);
+            object3D.objYaw -= dYaw;
+            stickyRotationAng -= dYaw;
+        }
+
+        if (tileBelow != null) {
+            // Player is on ground - handle movement along surface
+            handleGroundMovement(dtMillis);
+        } else {
+            // Player is falling - apply gravity
+            handleFallingMovement(dtMillis);
+        }
+
+        // Apply movement to position
+        object3D.objX += move.x;
+        object3D.objY += move.y;
+        object3D.objZ += move.z;
+
+        // Update visual rotation based on movement
+        object3D.objPitch -= dtMillis * PLAYER_SPEED / (PI * PLAYER_HEIGHT) * 2 * PI;
+
+    }
+
+
+    @Override
+    public void draw(float[] mvpMatrix) {
+        if (object3D != null) {
+            object3D.draw(mvpMatrix);
+        }
+    }
+
+    @Override
     public void updateAfterDraw(float dt) {
         // Reset tile below after physics update
         tileBelow = null;
+        jumpLogicImplementation.resetFrame();
     }
 
     @Override
@@ -416,19 +436,77 @@ public class Player implements WorldActor, PlayerInfoVisitor {
         object3D.objYaw -= dx * STICKY_ROTATION_COEFFICIENT;
     }
 
-    @Override
-    public void draw(float[] mvpMatrix) {
-        if (object3D != null) {
-            object3D.draw(mvpMatrix);
-        }
-    }
+
 
     public float getX() { return object3D != null ? object3D.objX : 0f; }
     public float getY() { return object3D != null ? object3D.objY : 0f; }
     public float getZ() { return object3D != null ? object3D.objZ : 0f; }
 
-    @Override
-    public void visit(PlayerJumpInfo info) {
+    // InteractableAPI instance
+    private final InteractableAPI interactableAPI;
 
+    /**
+     * Returns an API for interactables (like Potions, Addons) to interact with the player.
+     * Allows adding PlayerAffectingInfo and accessing safe player state.
+     */
+    public InteractableAPI getInteractableAPI() {
+        return interactableAPI;
     }
+
+    /**
+     * API class for interactables to interact with the player.
+     */
+    public static class InteractableAPI {
+        private final Player player;
+
+        public InteractableAPI(Player player) {
+            this.player = player;
+        }
+
+        /**
+         * Adds a PlayerAffectingInfo to the player.
+         */
+        public void addInfo(PlayerAffectingInfo<?> info) {
+            info.acceptDefault(player);
+        }
+
+        /**
+         * Gets the player's X position.
+         */
+        public float getPlayerX() {
+            return player.getX();
+        }
+
+        /**
+         * Gets the player's Y position.
+         */
+        public float getPlayerY() {
+            return player.getY();
+        }
+
+        /**
+         * Gets the player's Z position.
+         */
+        public float getPlayerZ() {
+            return player.getZ();
+        }
+
+        /**
+         * Gets the player's direction vector.
+         */
+        public Vector3D getPlayerDirection() {
+            return player.getDir();
+        }
+
+        /**
+         * Gets the ID of the nearest tile to the player.
+         */
+        public long getNearestTileId() {
+            return player.getNearestTileId();
+        }
+
+        // Add other getters as needed for interactables
+    }
+
+
 }

@@ -4,7 +4,7 @@ import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerJumpI
 
 public interface PlayerInfoVisitor {
 
-    default void visit(PlayerAffectingInfo info){
+    default void visit(PlayerAffectingInfo<?> info){
         throw new IllegalStateException("Unknown subclass - not handled");
     }
     void visit(PlayerJumpInfo info);

@@ -49,7 +49,7 @@ public class IconTestStage extends Stage {
 
         // Build a spinning icon with same geometry/colors as the potion
         // Reuse the already loaded potion verts/faces/colors via PotionIconBuilder
-        spinningIcon = (SpinningIcon) new SpinningIcon.SpinningBuilder()
+        spinningIcon = new SpinningIcon.SpinningBuilder()
                 .verts(PotionIcon.getLoadedVerts())
                 .faces(PotionIcon.getLoadedFaces())
                 .fillColor(Potion.POTION_FILL_COLOR)

@@ -36,7 +36,6 @@ public class Icon implements GPUResourceOwner {
 
 
     public void draw() {
-        // Draw in screen space: pass our precomputed MVP directly (ignores incoming model/vp).
         fillMesh.draw(drawArgs);
         edgeMesh.draw(drawArgs);
     }
@@ -139,7 +138,7 @@ public class Icon implements GPUResourceOwner {
         public B edgePixels(float px){ this.edgePixels = px; return self(); }
         public B placementRect(Rect r){ this.placementRect = r; return self(); }
 
-        public Icon build(){
+        public T build(){
 
             checkValid();
 
