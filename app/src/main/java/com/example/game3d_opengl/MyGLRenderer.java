@@ -21,6 +21,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private final Context androidContext;
     private int surfaceW = 0, surfaceH = 0;
     private long lastFrameTime = -1;
+    // Last UI vsync timestamp provided by Choreographer (set from UI thread)
+    private volatile long lastVsyncNanos = -1;
     private final StageManager stageManager;
     // Stage requested by UI thread, applied next frame on GL thread
     private volatile Stage pendingStage = null;
@@ -31,6 +33,11 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
 
     public void setUseFrameCap(boolean useFrameCap) {
         this.useFrameCap = useFrameCap;
+    }
+
+    // Called from UI thread's Choreographer callback to provide vsync time
+    public void onVsync(long frameTimeNanos) {
+        this.lastVsyncNanos = frameTimeNanos;
     }
 
 
@@ -102,23 +109,32 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             lastFrameTime = System.nanoTime();
         }
 
-        // Optional FPS cap (disabled when driven by display vsync)
+        // Frame pacing and dt:
+        // If Choreographer provides a vsync timestamp, prefer that for stable dt.
+        // Otherwise, fall back to System.nanoTime() with optional sleep-based cap.
+        long vsync = lastVsyncNanos;
         long now = System.nanoTime();
-        long elapsed = now - lastFrameTime;
-        if (useFrameCap && elapsed < TARGET_FRAME_NS) {
-            long sleepNs = TARGET_FRAME_NS - elapsed;
-            long sleepMs = sleepNs / 1_000_000L;
-            int extraNs = (int) (sleepNs % 1_000_000L);
-            try {
-                if (sleepMs > 0 || extraNs > 0) {
-                    Thread.sleep(sleepMs, extraNs);
-                }
-            } catch (InterruptedException ignored) {}
-            now = System.nanoTime();
-            elapsed = now - lastFrameTime;
+        long referenceNow = (vsync > 0 ? vsync : now);
+
+        long elapsed = (lastFrameTime > 0 ? (referenceNow - lastFrameTime) : 0);
+        if (vsync <= 0) {
+            // No vsync provided: optionally apply coarse sleep-based cap
+            if (useFrameCap && elapsed < TARGET_FRAME_NS) {
+                long sleepNs = TARGET_FRAME_NS - elapsed;
+                long sleepMs = sleepNs / 1_000_000L;
+                int extraNs = (int) (sleepNs % 1_000_000L);
+                try {
+                    if (sleepMs > 0 || extraNs > 0) {
+                        Thread.sleep(sleepMs, extraNs);
+                    }
+                } catch (InterruptedException ignored) {}
+                now = System.nanoTime();
+                referenceNow = now;
+                elapsed = (lastFrameTime > 0 ? (referenceNow - lastFrameTime) : 0);
+            }
         }
-        float deltaTime = elapsed / 1_000_000f; // pass actual time since last frame (ms)
-        lastFrameTime = now;
+        float deltaTime = (elapsed <= 0 ? 0.0f : (elapsed / 1_000_000f)); // ms
+        lastFrameTime = referenceNow;
 
         // Slow frame logging
         if (deltaTime > SLOW_FRAME_THRESHOLD_MS) {

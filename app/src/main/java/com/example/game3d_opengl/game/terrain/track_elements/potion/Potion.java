@@ -5,6 +5,7 @@ import static com.example.game3d_opengl.game.util.GameMath.getNormal;
 
 import android.content.res.AssetManager;
 
+import com.example.game3d_opengl.game.player.Player;
 import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.ModelCreator;
@@ -125,4 +126,8 @@ public class Potion extends Addon {
     }
 
 
+    @Override
+    public void interactWithPlayer(Player.InteractableAPI api) {
+
+    }
 }

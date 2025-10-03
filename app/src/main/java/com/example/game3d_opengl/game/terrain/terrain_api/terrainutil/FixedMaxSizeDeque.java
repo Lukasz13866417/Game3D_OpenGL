@@ -9,6 +9,7 @@ public class FixedMaxSizeDeque<T> implements Iterable<T> {
     private final T[] elements;
     private final int max_size;
 
+    @SuppressWarnings("unchecked")
     public FixedMaxSizeDeque(int max_size) {
         this.max_size = max_size;
         this.elements = (T[]) (new Object[max_size]);

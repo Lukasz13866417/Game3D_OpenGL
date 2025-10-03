@@ -2,6 +2,7 @@ package com.example.game3d_opengl;
 
 import android.content.Context;
 import android.opengl.GLSurfaceView;
+import android.view.Display;
 import android.view.MotionEvent;
 
 import javax.microedition.khronos.egl.EGL10;
@@ -10,6 +11,8 @@ import javax.microedition.khronos.egl.EGLConfig;
 public class MyGLSurfaceView extends GLSurfaceView {
 
     private final MyGLRenderer renderer;
+    private volatile int vsyncDivisor = 1; // 1 = render every vsync
+    private int vsyncCounter = 0;
 
     public MyGLSurfaceView(Context context){
         super(context);
@@ -49,7 +52,17 @@ public class MyGLSurfaceView extends GLSurfaceView {
             final android.view.Choreographer choreographer = android.view.Choreographer.getInstance();
             final android.view.Choreographer.FrameCallback callback = new android.view.Choreographer.FrameCallback() {
                 @Override public void doFrame(long frameTimeNanos) {
-                    requestRender();
+                    renderer.onVsync(frameTimeNanos);
+                    int div = vsyncDivisor;
+                    if (div <= 1) {
+                        requestRender();
+                    } else {
+                        vsyncCounter++;
+                        if (vsyncCounter >= div) {
+                            vsyncCounter = 0;
+                            requestRender();
+                        }
+                    }
                     choreographer.postFrameCallback(this);
                 }
             };
@@ -63,6 +76,34 @@ public class MyGLSurfaceView extends GLSurfaceView {
 
     public MyGLRenderer getRenderer() {
         return renderer;
+    }
+
+    /**
+     * Render every Nth vsync. Set to 1 to render each vsync (no below-refresh cap).
+     */
+    public void setVsyncDivisor(int divisor) {
+        if (divisor < 1) divisor = 1;
+        if (this.vsyncDivisor != divisor) {
+            this.vsyncDivisor = divisor;
+            this.vsyncCounter = 0;
+        }
+    }
+
+    /**
+     * Set a target FPS below the display refresh by skipping vsyncs.
+     * If targetFps >= refresh, caps are disabled (render each vsync).
+     */
+    public void setTargetFps(float targetFps) {
+        float refresh = 60f;
+        Display d = getDisplay();
+        if (d != null && d.getRefreshRate() > 0f) {
+            refresh = d.getRefreshRate();
+        }
+        int divisor = 1;
+        if (targetFps > 0f && targetFps < refresh - 0.5f) {
+            divisor = Math.max(1, Math.round(refresh / targetFps));
+        }
+        setVsyncDivisor(divisor);
     }
 
     float lastX=0, lastY=0;

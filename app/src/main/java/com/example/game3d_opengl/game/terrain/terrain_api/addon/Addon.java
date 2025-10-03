@@ -1,9 +1,10 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.addon;
 
+import com.example.game3d_opengl.game.PlayerInteractable;
 import com.example.game3d_opengl.game.terrain.terrain_api.TerrainElement;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
-public abstract class Addon implements TerrainElement {
+public abstract class Addon implements TerrainElement, PlayerInteractable {
 
     /**
      * Assign the owning tile's ID

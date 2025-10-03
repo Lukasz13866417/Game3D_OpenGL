@@ -1,13 +1,9 @@
 package com.example.game3d_opengl.game.player.player_state.infos.jump;
 
-import com.example.game3d_opengl.game.player.player_state.infos.PlayerInfoVisitor;
-
-public interface PlayerJumpVisitor extends PlayerInfoVisitor {
-
-    default void visit(PlayerJumpInfo jumpInfo){
-        throw new IllegalStateException("Unknown subclass - not handled");
+public interface PlayerAllJumpVisitor {
+    default void visit(PlayerAllJumpVisitor info){
+        throw new RuntimeException("Unknown subclass of PlayerJumpInfo");
     }
-
     void visit(PlayerJumpInfo.PlayerHasFooting info);
     void visit(PlayerJumpInfo.PlayerWantsJump info);
     void visit(PlayerJumpInfo.PlayerHitsGroundSoon info);

@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * Uses an automaton / finite state machine to determine if the player can jump or not
  */
-public class PlayerJumpLogicImplementation implements PlayerJumpVisitor {
+public class PlayerAllJumpLogicImplementation implements PlayerAllJumpVisitor {
 
 
     // We feed the information to the automaton in fixed order, in order to reduce number of states.
@@ -41,11 +41,11 @@ public class PlayerJumpLogicImplementation implements PlayerJumpVisitor {
     private boolean resultCalculated = false;
     
     // Inner automaton class
-    private final JumpAutomaton automaton = new JumpAutomaton();
+    private final AllJumpAutomaton automaton = new AllJumpAutomaton();
 
     // ------------------------------------- PUBLIC API --------------------------------------------
 
-    public PlayerJumpLogicImplementation(){
+    public PlayerAllJumpLogicImplementation(){
         for(int i=0;i<infos.length;++i){
             infos[i] = new InfoAndOrder(null, Integer.MAX_VALUE);
         }
@@ -140,7 +140,7 @@ public class PlayerJumpLogicImplementation implements PlayerJumpVisitor {
     /**
      * Inner automaton class that implements PlayerJumpVisitor
      */
-    private static class JumpAutomaton implements PlayerJumpVisitor {
+    private static class AllJumpAutomaton implements PlayerAllJumpVisitor {
         
         // Automaton states
         private enum State {

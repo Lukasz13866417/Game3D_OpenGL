@@ -120,11 +120,14 @@ public class GameplayStage extends Stage {
             terrain.generateChunks(1);
         }
 
+
+        // Collision moved into Tile.interactWithPlayer via jump info
+
         for(int i=0;i<terrain.getTileCount();++i){
-            Tile tile = terrain.getTile(i);
-            if(player.collidesTile(tile)){
-                player.setFooting(tile);
-            }
+            terrain.getTile(i).interactWithPlayer(player.getInteractableAPI());
+        }
+        for(int i=0;i<terrain.getAddonCount();++i){
+            terrain.getAddon(i).interactWithPlayer(player.getInteractableAPI());
         }
 
 
