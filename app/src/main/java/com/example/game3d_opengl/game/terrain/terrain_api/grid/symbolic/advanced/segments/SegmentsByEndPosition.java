@@ -35,7 +35,10 @@ public class SegmentsByEndPosition {
     }
 
     public GridSegment[] reserve(int row, int col, int length) {
-
+        assert row <= nRows;
+        assert row >= 1;
+        assert col <= nCols;
+        assert col >= 1;
         GridSegment candidate = bestFit(row, col);
         assert candidate != null;
         int cStart = vertical ? candidate.row : candidate.col, start = vertical ? row : col;
@@ -97,7 +100,7 @@ public class SegmentsByEndPosition {
 
     void printGrid(){
         char[][] grid = new char[nRows][nCols];
-        System.out.println("Rows: "+nRows+" | "+"Cols: "+nCols);
+        System.out.println("Rows: "+nRows+" | "+"Cols: "+nCols+ " "+hashCode()+","+vertical);
         for(int r=0;r<nRows;r++){
             for(int c=0;c<nCols;c++){
                 grid[r][c] = '#';

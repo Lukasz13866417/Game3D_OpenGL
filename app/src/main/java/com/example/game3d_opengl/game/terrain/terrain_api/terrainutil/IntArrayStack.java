@@ -36,6 +36,10 @@ public class IntArrayStack {
 	public void clear() {
 		size = 0;
 	}
+
+	public int peek() {
+		return data[size-1];
+	}
 }
 
 

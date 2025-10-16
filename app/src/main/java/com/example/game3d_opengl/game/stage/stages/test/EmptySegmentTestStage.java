@@ -3,7 +3,7 @@ package com.example.game3d_opengl.game.stage.stages.test;
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
-import com.example.game3d_opengl.game.player.Player;
+import com.example.game3d_opengl.game.player.player_character.PlayerAssets;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
@@ -39,7 +39,7 @@ public class EmptySegmentTestStage extends Stage {
         updateCamera();
         
         // Load player assets (needed for DeathSpike and Potion)
-        Player.LOAD_PLAYER_ASSETS(context.getAssets());
+        PlayerAssets.LOAD_PLAYER_ASSETS(context.getAssets());
         Potion.LOAD_POTION_ASSETS(context.getAssets());
         
         // Create terrain with empty segment test structure

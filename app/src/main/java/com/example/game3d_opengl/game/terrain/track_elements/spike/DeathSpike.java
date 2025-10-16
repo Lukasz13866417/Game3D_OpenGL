@@ -7,7 +7,7 @@ import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3S;
 
 import android.opengl.GLES20;
 
-import com.example.game3d_opengl.game.player.Player;
+import com.example.game3d_opengl.game.player.player_character.Player;
 import com.example.game3d_opengl.game.util.GameRandom;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;

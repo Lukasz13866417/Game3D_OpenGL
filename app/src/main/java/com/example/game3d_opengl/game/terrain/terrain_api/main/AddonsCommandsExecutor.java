@@ -63,6 +63,7 @@ public class AddonsCommandsExecutor implements CommandExecutor {
 
     private void processAddons(int baseRow, int baseCol, int length,  boolean horizontal) {
         int rOffset = terrain.rowOffsetQueue.peek();
+        System.out.println("<> PROCESSING ADDONS: "+baseRow+","+baseCol+","+length+" OFF: "+rOffset);
         for (int i = 0; i < length; ++i) {
             Addon addon = terrain.addonQueue.dequeue();
             int row = horizontal ? baseRow : baseRow + i;

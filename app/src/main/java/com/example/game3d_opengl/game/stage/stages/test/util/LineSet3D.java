@@ -130,7 +130,7 @@ public class LineSet3D {
         Mesh3DWireframe wire = new Mesh3DWireframe.Builder()
                 .verts(cubeVerts)
                 .faces(cubeFaces)
-                .edgeColor(FColor.CLR(1,1,1,1))
+                .edgeColor(color)
                 .pixelWidth(1f)
                 .buildObject();
 

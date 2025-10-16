@@ -3,6 +3,8 @@ package com.example.game3d_opengl.game.terrain.terrain_api.main;
 public abstract class BaseTerrainStructure<GridBrushType extends Terrain.BaseGridBrush> {
     protected final int tilesToMake;
 
+    public String name = "NOT SET"; // only for debug
+
     public BaseTerrainStructure(int nTiles) {
         this.tilesToMake = nTiles;
     }

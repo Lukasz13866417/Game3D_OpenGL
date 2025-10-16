@@ -1,6 +1,5 @@
-package com.example.game3d_opengl.game.player;
+package com.example.game3d_opengl.game.player.player_character;
 
-import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.game.util.GameMath.PI;
 import static com.example.game3d_opengl.game.util.GameMath.getNormal;
 import static com.example.game3d_opengl.game.util.GameMath.rayTriangleDistance;
@@ -11,20 +10,18 @@ import static java.lang.Float.max;
 import static java.lang.Math.abs;
 import static java.lang.Math.signum;
 
-import android.content.res.AssetManager;
-import android.util.Log;
-
 import com.example.game3d_opengl.game.WorldActor;
 import com.example.game3d_opengl.game.player.player_state.infos.PlayerAffectingInfo;
 import com.example.game3d_opengl.game.player.player_state.infos.PlayerAllInfoVisitor;
 import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerJumpInfo;
 import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerAllJumpLogicImplementation;
 import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
-import com.example.game3d_opengl.rendering.util3d.ModelCreator;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
 
-import java.io.IOException;
+import static com.example.game3d_opengl.game.player.player_character.PlayerConfig.*;
+import static com.example.game3d_opengl.game.player.player_character.PlayerAssets.*;
+
 
 /**
  * Represents the player character in the game world.
@@ -33,42 +30,6 @@ import java.io.IOException;
  */
 public class Player implements WorldActor , PlayerAllInfoVisitor {
 
-    // Constants for magic numbers
-    public static final float PLAYER_WIDTH = 0.132f;
-    public static final float PLAYER_HEIGHT = PLAYER_WIDTH * 3.54f;
-    
-    // Physics constants
-    private static final float FALL_ACCELERATION = 1e-6f;
-    private static final float COLLISION_THRESHOLD_MULTIPLIER = 1.05f;
-    private static final float PLAYER_SPEED = 0.04f;
-    
-    // Rotation constants
-    private static final float STICKY_ROTATION_LASTING_TIME = 42f;
-    private static final float STICKY_ROTATION_ANGLE_DECAY_RATE = 0.0575f;
-    private static final float STICKY_ROTATION_COEFFICIENT = 0.0085f;
-    private static final float ROTATION_SWIPE_SENSITIVITY = 0.00052f;
-    
-    // Movement constants
-    private static final float INITIAL_DIRECTION_X = 0f;
-    private static final float INITIAL_DIRECTION_Y = 0f;
-    private static final float INITIAL_DIRECTION_Z = -1f;
-    private static final float INITIAL_POSITION_X = 0f;
-    private static final float INITIAL_POSITION_Y = -0.5f;
-    private static final float INITIAL_POSITION_Z = -0.5f;
-    
-    // Asset loading constants
-    private static final String PLAYER_MODEL_FILENAME = "tire.obj";
-    private static final float MODEL_ROTATION_X = PI / 2;
-    private static final float MODEL_ROTATION_Y = PI / 2;
-    
-    // Error messages
-    private static final String ERROR_ASSETS_NOT_LOADED
-                                       = "Player assets not loaded. Call LOAD_PLAYER_ASSETS first.";
-    private static final String ERROR_ASSET_LOADING
-                                       = "Failed to load player assets: ";
-    private static final String TAG = "Player";
-
-    private static UnbatchedObject3DWithOutline PLAYER_OBJECT;
 
     // Instance fields
     private final UnbatchedObject3DWithOutline object3D;
@@ -82,55 +43,8 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
     // Physics state
     private Tile tileBelow;
     private long nearestTileId = -1L;
-    private boolean groundedMoveComputed = false;
 
     private final PlayerAllJumpLogicImplementation jumpLogicImplementation;
-
-    /**
-     * Loads the player's 3D model and creates the UnbatchedObject3D builder.
-     * This method must be called before creating any Player instances.
-     * 
-     * @param assetManager the Android asset manager for loading model files
-     * @throws RuntimeException if asset loading fails
-     */
-    public static void LOAD_PLAYER_ASSETS(AssetManager assetManager) {
-        if (assetManager == null) {
-            throw new IllegalArgumentException("AssetManager cannot be null");
-        }
-        
-        ModelCreator playerCreator = new ModelCreator(assetManager);
-        try {
-            // Load and process the 3D model
-            playerCreator.load(PLAYER_MODEL_FILENAME);
-            playerCreator.centerVerts();
-            playerCreator.rotateX(MODEL_ROTATION_X);
-            playerCreator.rotateY(MODEL_ROTATION_Y);
-            playerCreator.scaleX(PLAYER_WIDTH);
-            playerCreator.scaleY(PLAYER_HEIGHT);
-            playerCreator.scaleZ(PLAYER_HEIGHT);
-
-            // Build the mesh (AbstractMesh3D) and wrap it with UnbatchedObject3D for transforms
-            UnbatchedObject3DWithOutline obj = new UnbatchedObject3DWithOutline.Builder()
-                    .verts(playerCreator.getVerts())
-                    .faces(playerCreator.getFaces())
-                    .fillColor(CLR(0,0,0,1))
-                    .edgeColor(CLR(1,1,1,1))
-                    .edgePixels(1.5f)
-                    .build();
-            obj.objX = INITIAL_POSITION_X;
-            obj.objY = INITIAL_POSITION_Y;
-            obj.objZ = INITIAL_POSITION_Z;
-            PLAYER_OBJECT = obj;
-                    
-            Log.d(TAG, "Player assets loaded successfully");
-        } catch (IOException e) {
-            Log.e(TAG, ERROR_ASSET_LOADING + e.getMessage(), e);
-            throw new RuntimeException(ERROR_ASSET_LOADING + e.getMessage(), e);
-        } catch (Exception e) {
-            Log.e(TAG, "Unexpected error loading player assets: " + e.getMessage(), e);
-            throw new RuntimeException("Unexpected error loading player assets: " + e.getMessage(), e);
-        }
-    }
 
     /**
      * Private constructor to enforce factory pattern.
@@ -172,25 +86,6 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
         return dir;
     }
 
-    // Physics state
-    private float fallSpeed = 0f;
-
-    /**
-     * Handles movement when the player is falling.
-     * Applies gravity and maintains horizontal movement.
-     * 
-     * @param dtMillis time delta in milliseconds
-     */
-    private void handleFallingMovement(float dtMillis) {
-        // Maintain horizontal movement while falling
-        Vector3D dwl = dir.withLen(PLAYER_SPEED * dtMillis);
-        move = V3(dwl.x, move.y, dwl.z);
-        
-        // Apply gravity
-        move = V3(move.x, move.y - fallSpeed * dtMillis, move.z);
-        fallSpeed += FALL_ACCELERATION * dtMillis;
-    }
-
     /**
      * Calculates the determinant of the 3x3 matrix formed by three vectors.
      * Used for solving the surface projection equation.
@@ -221,6 +116,23 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
                 + n.z * tangent1.x * dir.y - n.z * tangent1.y * dir.x) / det;
     }
 
+    // Physics state
+    private float fallSpeed = 0f;
+
+    /**
+     * Handles movement when the player is falling.
+     * Applies gravity and maintains horizontal movement.
+     */
+    private void handleFallingMovement() {
+        // Maintain horizontal movement while falling
+        Vector3D dwl = dir.withLen(PLAYER_SPEED);
+        move = V3(dwl.x, move.y, dwl.z);
+
+        // Apply gravity
+        move = V3(move.x, move.y - fallSpeed, move.z);
+        fallSpeed += FALL_ACCELERATION;
+    }
+
     @Override
     public void visit(PlayerJumpInfo.PlayerHasFooting info){
         // Record footing tile (for bookkeeping like nearestTileId)
@@ -247,7 +159,7 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
             }
         }
 
-        if (hitTri != null) {
+        if (hitTri != null && bestDist < PLAYER_HEIGHT*FALL_COLLISION_SAFETY_MULTIPLIER) {
             // We are grounded on a triangle -> cancel falling and compute slide direction
             fallSpeed = 0f;
 
@@ -315,7 +227,7 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
         if(jumpLogicImplementation.shouldJump()){
             System.exit(0); // TODO actually make a jump
         } else if (tileBelow == null) {
-            handleFallingMovement(dtMillis);
+            handleFallingMovement();
         }
 
 
@@ -470,6 +382,18 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
          */
         public long getNearestTileId() {
             return player.getNearestTileId();
+        }
+
+        public float getPlayerHeight() {
+            return PLAYER_HEIGHT;
+        }
+
+        public float getPlayerFallSafetyMult() {
+            return FALL_COLLISION_SAFETY_MULTIPLIER;
+        }
+
+        public float getPlayerFallSpeed() {
+            return player.fallSpeed;
         }
 
         // Add other getters as needed for interactables

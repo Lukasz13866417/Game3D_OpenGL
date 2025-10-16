@@ -8,10 +8,13 @@ import com.example.game3d_opengl.game.util.GameRandom;
 public class PartialSegmentHandler {
 
 
+    private final int nRows, nCols;
     private final SegmentsByLength segmentsByLength;
     private final SegmentsByEndPosition segmentsByEndPosition;
 
     public PartialSegmentHandler(int nRows, int nCols, boolean vertical) {
+        this.nRows = nRows;
+        this.nCols = nCols;
         this.segmentsByLength = new PreallocatedHashedSegmentsByLengthNodes(nRows, nCols, vertical);
         this.segmentsByEndPosition = new SegmentsByEndPosition(nRows, nCols, vertical);
 
@@ -29,6 +32,10 @@ public class PartialSegmentHandler {
     }
 
     public void reserve(int row, int col, int length) {
+        assert row <= nRows;
+        assert row >= 1;
+        assert col <= nCols;
+        assert col >= 1;
         GridSegment[] reserve = segmentsByEndPosition.reserve(row, col, length);
         segmentsByLength.delete(reserve[0].row, reserve[0].col, reserve[0].length);
         if (reserve[1] != null) {
@@ -51,7 +58,7 @@ public class PartialSegmentHandler {
         segmentsByEndPosition.printGrid();
     }
 
-    public void flush(){
+    public void destroy(){
         while(!segmentsByEndPosition.tree.isEmpty()){
             GridSegment curr = segmentsByEndPosition.tree.pollFirst();
             segmentsByLength.delete(curr.row,curr.col,curr.length);

@@ -242,7 +242,7 @@ public class TileManager implements GPUResourceOwner {
         if (total <= 1) return new Vector3D[0]; // should not happen, but be safe
         Vector3D[] res = new Vector3D[total - 1];
         for (int i = 1; i < total; i++) {
-            res[i - 1] = V3(leftSideBuffer.getX(i), leftSideBuffer.getY(i), leftSideBuffer.getZ(i)).addY(0.01f);
+            res[i - 1] = V3(leftSideBuffer.getX(i), leftSideBuffer.getY(i), leftSideBuffer.getZ(i)).addY(0.1f);
         }
         return res;
     }
@@ -252,7 +252,7 @@ public class TileManager implements GPUResourceOwner {
         if (total <= 1) return new Vector3D[0];
         Vector3D[] res = new Vector3D[total - 1];
         for (int i = 1; i < total; i++) {
-            res[i - 1] = V3(rightSideBuffer.getX(i), rightSideBuffer.getY(i), rightSideBuffer.getZ(i)).addY(0.01f);
+            res[i - 1] = V3(rightSideBuffer.getX(i), rightSideBuffer.getY(i), rightSideBuffer.getZ(i)).addY(0.1f);
         }
         return res;
     }
@@ -417,8 +417,8 @@ public class TileManager implements GPUResourceOwner {
         }
 
 
-        float currLeftoverL = (lastHistory.leftoverL + lenL) % rowSpacing;
-        float currLeftoverR = (lastHistory.leftoverR + lenR) % rowSpacing;
+        float currLeftoverL = (lastLeftOverL + lenL) % rowSpacing;
+        float currLeftoverR = (lastLeftOverR + lenR) % rowSpacing;
 
         segmentHistoryBuffer.add(cntL, cntR, cntRows,
                 isFirstLiftedUp,

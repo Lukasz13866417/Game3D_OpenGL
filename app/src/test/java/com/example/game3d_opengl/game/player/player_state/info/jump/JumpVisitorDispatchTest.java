@@ -37,7 +37,7 @@ public class JumpVisitorDispatchTest {
     @Test
     public void test_HasFooting_dispatchesToTypedOverload() {
         TestVisitorAll v = new TestVisitorAll();
-        new PlayerJumpInfo.PlayerHasFooting().accept(v);
+        new PlayerJumpInfo.PlayerHasFooting(null,null).accept(v);
         assertTrue(v.footingCalled);
         assertFalse(v.baseCalled);
     }

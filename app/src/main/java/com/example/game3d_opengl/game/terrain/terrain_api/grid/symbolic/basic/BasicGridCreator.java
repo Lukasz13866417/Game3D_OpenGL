@@ -23,6 +23,10 @@ public class BasicGridCreator implements BaseGridCreator {
 
     @Override
     public GridSegment reserveVertical(int row, int col, int length) {
+        assert row <= nRows;
+        assert row >= 1;
+        assert col <= nCols;
+        assert col >= 1;
         if (parent != null && parent.content != null) {
             parent.content.reserveVertical(row + parentRowOffset, col, length);
         }
@@ -31,6 +35,10 @@ public class BasicGridCreator implements BaseGridCreator {
 
     @Override
     public GridSegment reserveHorizontal(int row, int col, int length) {
+        assert row <= nRows;
+        assert row >= 1;
+        assert col <= nCols;
+        assert col >= 1;
         if (parent != null && parent.content != null) {
             parent.content.reserveHorizontal(row + parentRowOffset, col, length);
         }

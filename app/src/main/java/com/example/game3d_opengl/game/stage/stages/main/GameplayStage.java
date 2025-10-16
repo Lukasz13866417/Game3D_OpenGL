@@ -11,6 +11,7 @@ import android.content.res.AssetManager;
 import android.util.Log;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.player.player_character.PlayerAssets;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain.terrain_structures.Terrain2DCurve;
 import com.example.game3d_opengl.game.terrain.terrain_structures.TerrainLineWithSpikeRect;
@@ -20,7 +21,7 @@ import com.example.game3d_opengl.game.terrain.track_elements.spike.DeathSpike;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
-import com.example.game3d_opengl.game.player.Player;
+import com.example.game3d_opengl.game.player.player_character.Player;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.LightSource;
 
@@ -79,7 +80,7 @@ public class GameplayStage extends Stage {
         Potion.LOAD_POTION_ASSETS(assetManager);
         DeathSpike.LOAD_DEATHSPIKE_ASSETS();
 
-        Player.LOAD_PLAYER_ASSETS(assetManager);
+        PlayerAssets.LOAD_PLAYER_ASSETS(assetManager);
         player = Player.createPlayer();
         lightSource = new LightSource(CLR(1,1,1,1));
 

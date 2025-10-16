@@ -7,7 +7,7 @@ import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced
 
 public class AdvancedGridCreator implements BaseGridCreator {
 
-    private final int nRows, nCols;
+    public final int nRows, nCols;
     private final PartialSegmentHandler vertical, horizontal;
     private final GridCreatorWrapper parent;
     private final int parentRowOffset;
@@ -27,6 +27,10 @@ public class AdvancedGridCreator implements BaseGridCreator {
 
     @Override
     public GridSegment reserveVertical(int row, int col, int length) {
+        assert row <= nRows;
+        assert row >= 1;
+        assert col <= nCols;
+        assert col >= 1;
         if (parent != null && parent.content != null) {
             parent.content.reserveVertical(row + parentRowOffset, col, length);
         }
@@ -39,6 +43,10 @@ public class AdvancedGridCreator implements BaseGridCreator {
 
     @Override
     public GridSegment reserveHorizontal(int row, int col, int length) {
+        assert row <= nRows;
+        assert row >= 1;
+        assert col <= nCols;
+        assert col >= 1;
         if (parent != null && parent.content != null) {
             parent.content.reserveHorizontal(row + parentRowOffset, col, length);
         }
@@ -73,13 +81,14 @@ public class AdvancedGridCreator implements BaseGridCreator {
 
     @Override
     public void destroy(){
-        vertical.flush();
-        horizontal.flush();
+        vertical.destroy();
+        horizontal.destroy();
     }
 
     @Override
     public void printGrid(){
-        vertical.printGrid();
+        System.out.println("Horizontal hashCode(): "+horizontal.hashCode());
+        horizontal.printGrid();
     }
 
     @Override

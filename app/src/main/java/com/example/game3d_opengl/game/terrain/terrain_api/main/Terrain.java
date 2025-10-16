@@ -474,6 +474,7 @@ public class Terrain implements GPUResourceOwner {
                 if (!waitingStructuresQueue.isEmpty()) {
                     // Only now generate commands of structures waiting for generation of commands.
                     // This is because there are no "fresh" commands to execute.
+                    // 0 = is not child structure of another structure, but rather a new structure.
                     commandBuffer.addCommand(CMD_START_STRUCTURE_LANDSCAPE, 0);
                 } else {
                     // No commands waiting to execute AND no structures with ungenerated commands.
@@ -499,6 +500,7 @@ public class Terrain implements GPUResourceOwner {
         @Override
         public void execute(float[] buffer, int offset, int length) {
             int code = (int) buffer[offset];
+            Util.printCommand(buffer,offset);
             if (landscapeCommandExecutor.canHandle(code)) {
                 landscapeCommandExecutor.execute(buffer, offset, length);
             } else if (addonsCommandExecutor.canHandle(code)) {

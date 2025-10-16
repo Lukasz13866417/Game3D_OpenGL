@@ -61,9 +61,9 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
             case CMD_START_STRUCTURE_LANDSCAPE:
                 boolean isChild = (int) (buffer[offset + 2]) != 0;
                 BaseTerrainStructure<?> what;
-                if(!isChild){
+                if (!isChild) {
                     what = terrain.waitingStructuresQueue.dequeue();
-                }else{
+                } else {
                     what = terrain.childStructuresQueue.dequeue();
                 }
                 terrain.structureStack.push(what);
@@ -77,18 +77,22 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
             case CMD_FINISH_STRUCTURE_LANDSCAPE:
                 BaseTerrainStructure<?> thatStructure = terrain.structureStack.pop();
                 int startRowCount = terrain.rowCountStack.pop();
+                int parentStartRowCount = terrain.rowCountStack.isEmpty()
+                                                                 ? 0 : terrain.rowCountStack.peek();
+                int ourRowOffsetFromParent = startRowCount - parentStartRowCount;
                 GridCreatorWrapper myGridCreatorWrapper = terrain.gridCreatorWrapperStack.pop();
                 GridCreatorWrapper parentGridCreatorWrapper = terrain.gridCreatorWrapperStack.peek();
                 int nRowsAdded = terrain.tileManager.getCurrRowCount() - startRowCount;
-                if(thatStructure instanceof AdvancedTerrainStructure) {
+                System.out.println("<> ROWS ADDED: "+nRowsAdded+" , " +terrain.tileManager.getCurrRowCount() + " , " + startRowCount+ " name: "+thatStructure.name);
+                if (thatStructure instanceof AdvancedTerrainStructure) {
                     myGridCreatorWrapper.content = new AdvancedGridCreator(
                             nRowsAdded, terrain.nCols, parentGridCreatorWrapper,
-                            startRowCount
+                            ourRowOffsetFromParent
                     );
-                }else{
+                } else {
                     myGridCreatorWrapper.content = new BasicGridCreator(
                             nRowsAdded, terrain.nCols, parentGridCreatorWrapper,
-                            startRowCount
+                            ourRowOffsetFromParent
                     );
                 }
                 terrain.gridCreatorWrapperQueue.enqueue(myGridCreatorWrapper);

@@ -6,7 +6,8 @@ import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
-import com.example.game3d_opengl.game.player.Player;
+import com.example.game3d_opengl.game.player.player_character.Player;
+import com.example.game3d_opengl.game.player.player_character.PlayerAssets;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.rendering.Camera;
 
@@ -45,7 +46,7 @@ public class TestWireframeStage extends Stage {
         Camera.setGlobalScreenSize(screenWidth, screenHeight);
 
         // Load player assets and create player
-        Player.LOAD_PLAYER_ASSETS(context.getAssets());
+        PlayerAssets.LOAD_PLAYER_ASSETS(context.getAssets());
         player = Player.createPlayer();
 
         updateCamera();
