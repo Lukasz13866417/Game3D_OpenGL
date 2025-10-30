@@ -2,6 +2,7 @@ package com.example.game3d_opengl.rendering.icon;
 
 import android.opengl.Matrix;
 
+import com.example.game3d_opengl.rendering.ScreenInfo;
 import com.example.game3d_opengl.rendering.infill.Mesh3DInfill;
 import com.example.game3d_opengl.rendering.mesh.MVPDrawArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -105,7 +106,7 @@ public class SpinningIcon extends Icon {
             float zAbs = Float.isNaN(depthZ) ? Math.max(near * 4f, rMax * 3.0f + near) : Math.abs(depthZ);
 
             // Projection params
-            float aspect = Camera.SCREEN_HEIGHT == 0 ? 1f : ((float)Camera.SCREEN_WIDTH / (float)Camera.SCREEN_HEIGHT);
+            float aspect = ScreenInfo.getScreenH() == 0 ? 1f : ((float)ScreenInfo.getScreenW() / (float)ScreenInfo.getScreenH());
             float cotHalfFovY = near / top; // because top = near * tan(fovY/2) => cot = near/top
             float A = cotHalfFovY / aspect;  // for X
             float k = cotHalfFovY;           // for Y
@@ -117,8 +118,8 @@ public class SpinningIcon extends Icon {
             float hy = srcRect.h * 0.5f;
 
             // Apply pixel margins by converting pixels -> NDC
-            float pxToNdcX = Camera.SCREEN_WIDTH  > 0 ? (2f / Camera.SCREEN_WIDTH)  : 0f;
-            float pxToNdcY = Camera.SCREEN_HEIGHT > 0 ? (2f / Camera.SCREEN_HEIGHT) : 0f;
+            float pxToNdcX = ScreenInfo.getScreenW()  > 0 ? (2f / ScreenInfo.getScreenW())  : 0f;
+            float pxToNdcY = ScreenInfo.getScreenH() > 0 ? (2f / ScreenInfo.getScreenH()) : 0f;
             float hxEff = Math.max(1e-5f, hx - marginPxX * pxToNdcX);
             float hyEff = Math.max(1e-5f, hy - marginPxY * pxToNdcY);
 

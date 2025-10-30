@@ -34,7 +34,6 @@ public class IconTestStage extends Stage {
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         // Mesh3DWireframe needs the global viewport to compute pixel thickness in the shader.
-        Camera.setGlobalScreenSize(screenWidth, screenHeight);
         // Load once per app run; throws if called twice
         PotionIcon.LOAD_POTION_ICON_ASSETS(context.getAssets());
 

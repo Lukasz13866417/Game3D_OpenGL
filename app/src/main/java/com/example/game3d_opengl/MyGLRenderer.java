@@ -11,11 +11,7 @@ import android.util.Log;
 import com.example.game3d_opengl.game.stage.stages.main.GameplayStage;
 import com.example.game3d_opengl.game.stage.stages.main.MenuStage;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
-import com.example.game3d_opengl.game.stage.stages.test.AddonPlacementTestStage;
-import com.example.game3d_opengl.game.stage.stages.test.IconTestStage;
-import com.example.game3d_opengl.game.stage.stages.test.TestGridRowsStage;
-import com.example.game3d_opengl.game.stage.stages.test.TestGridRowsStructuresStage;
-import com.example.game3d_opengl.game.stage.stages.test.TestGridRowsTileBuilderStage;
+import com.example.game3d_opengl.game.stage.stages.test.TestTileManagerStage;
 
 public class MyGLRenderer implements GLSurfaceView.Renderer {
 
@@ -71,10 +67,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
         this.currStage =
-                          //new TestGridRowsStructuresStage(stageManager);
-                          //new TestGridRowsTileBuilderStage(stageManager);
+                         // new TestGridRowsStructuresStage(stageManager);
+                          new TestTileManagerStage(stageManager);
                           //new TestGridRowsStage(stageManager);
-                          new AddonPlacementTestStage(stageManager);
+                          //new AddonPlacementTestStage(stageManager);
                           //new GameplayStage(stageManager);
                           //new TestWireframeStage(stageManager);
                           //new IconTestStage(stageManager);

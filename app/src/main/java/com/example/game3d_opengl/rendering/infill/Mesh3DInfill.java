@@ -39,7 +39,8 @@ public class Mesh3DInfill extends AbstractMesh3D<BaseMeshDrawArgs, InfillShaderP
             for (int[] f : faces) {
                 for (int idx : f) {
                     if (idx < 0 || idx >= verts.length) {
-                        throw new IllegalStateException("Face index out of range: " + idx + " (verts=" + verts.length + ")");
+                        throw new IllegalStateException("Face index out of range: "
+                                                           + idx + " (verts=" + verts.length + ")");
                     }
                 }
             }
@@ -53,9 +54,9 @@ public class Mesh3DInfill extends AbstractMesh3D<BaseMeshDrawArgs, InfillShaderP
             for (int i = 0; i < n; ++i) {
                 Vector3D v = verts[i];
                 int o = i * 3;
-                out[o    ] = (float) v.x;
-                out[o + 1] = (float) v.y;
-                out[o + 2] = (float) v.z;
+                out[o    ] =  v.x;
+                out[o + 1] =  v.y;
+                out[o + 2] =  v.z;
             }
             // Faces remain as provided; AbstractMesh3D.BaseBuilder.prepareGPUResources()
             // will fan-triangulate them into the IBO.

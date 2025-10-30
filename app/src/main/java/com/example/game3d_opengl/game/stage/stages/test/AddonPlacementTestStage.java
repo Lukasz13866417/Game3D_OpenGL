@@ -82,7 +82,6 @@ public class AddonPlacementTestStage extends Stage {
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
-        Camera.setGlobalScreenSize(screenWidth, screenHeight);
         DeathSpike.LOAD_DEATHSPIKE_ASSETS();
         // initial camera setup (no rotation); roll will be applied via VP matrix during draw
         camera.set(

@@ -1,6 +1,7 @@
 package com.example.game3d_opengl.rendering.wireframe;
 
 import com.example.game3d_opengl.rendering.Camera;
+import com.example.game3d_opengl.rendering.ScreenInfo;
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
 import com.example.game3d_opengl.rendering.mesh.BaseMeshDrawArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -33,8 +34,8 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
         vs.color = edgeColor;
         vs.mvp = args.vp;
         vs.halfPx = pixelWidth;
-        vs.viewportW = Camera.SCREEN_WIDTH;
-        vs.viewportH = Camera.SCREEN_HEIGHT;
+        vs.viewportW = ScreenInfo.getScreenW();
+        vs.viewportH = ScreenInfo.getScreenH();
         vs.uDepthBiasNDC = -5e-3f; // TODO change to builder arg.
 
         // fragment shader is easy here

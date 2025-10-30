@@ -6,6 +6,7 @@ import android.content.res.AssetManager;
 
 import com.example.game3d_opengl.MyGLRenderer.StageManager;
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
+import com.example.game3d_opengl.rendering.ScreenInfo;
 import com.example.game3d_opengl.rendering.infill.InfillShaderPair;
 import com.example.game3d_opengl.rendering.wireframe.WireframeShaderPair;
 
@@ -27,6 +28,7 @@ public abstract class Stage implements GPUResourceOwner {
         AssetManager assetManager = context.getAssets();
         InfillShaderPair.LOAD_SHADER_CODE(assetManager);
         WireframeShaderPair.LOAD_SHADER_CODE(assetManager);
+        ScreenInfo.setScreenSize(screenWidth, screenHeight);
         initScene(context, screenWidth, screenHeight);
     }
 

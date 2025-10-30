@@ -54,6 +54,11 @@ public class LineSet3D {
         this.lineColor  = lineColor;
         this.pointColor = pointColor;
 
+        for(Vector3D p : points){
+            System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$ "+p);
+        }
+        System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$");
+
         // --- 1) Build shader program once ---
         if (mProgram == 0) {
             int vShader = loadShader(GLES20.GL_VERTEX_SHADER,   VERTEX_SHADER_CODE);
@@ -121,6 +126,7 @@ public class LineSet3D {
     }
 
     private static UnbatchedObject3DWithOutline makePointCubeObject3D(Vector3D[] cubeVerts, int[][] cubeFaces, Vector3D position, FColor color) {
+        assert  position != null;
         Mesh3DInfill fill = new Mesh3DInfill.Builder()
                 .verts(cubeVerts)
                 .faces(cubeFaces)

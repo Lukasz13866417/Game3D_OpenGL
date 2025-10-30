@@ -43,8 +43,6 @@ public class TestWireframeStage extends Stage {
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         // Initialize camera
         this.camera = new Camera();
-        Camera.setGlobalScreenSize(screenWidth, screenHeight);
-
         // Load player assets and create player
         PlayerAssets.LOAD_PLAYER_ASSETS(context.getAssets());
         player = Player.createPlayer();

@@ -69,7 +69,6 @@ public class GameplayStage extends Stage {
         // --- Camera Setup ---
         this.camera = new Camera();
 
-        Camera.setGlobalScreenSize(screenWidth, screenHeight);
         this.camera.set(0f, 0f, 3f, // eye pos
                 0f, 0f, 0f, // look at
                 0f, 1f, 0f ); // which way is up

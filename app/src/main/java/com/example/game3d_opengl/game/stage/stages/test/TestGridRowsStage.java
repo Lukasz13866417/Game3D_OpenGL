@@ -84,7 +84,6 @@ public class TestGridRowsStage extends Stage {
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
-        Camera.setGlobalScreenSize(screenWidth, screenHeight);
         // initial camera setup: looking straight down
         camera.set(
                 camX, camY, camZ,   // eye position

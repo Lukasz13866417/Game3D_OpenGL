@@ -55,6 +55,10 @@ public class TileManager implements GPUResourceOwner {
     // PUBLIC CONSTRUCTOR
     // ============================================================================
 
+    private static final float BIG_LEN = 10f;
+
+
+
     public TileManager(int maxSegments, int nCols,
                        Vector3D startMid,
                        float segWidth, float segLength,
@@ -72,16 +76,19 @@ public class TileManager implements GPUResourceOwner {
         this.tiles = new FixedMaxSizeDeque<>(maxSegments + 1);
         this.segmentHistoryBuffer = new OverflowingPreallocatedSegmentHistoryBuffer();
 
+
         /*–––– guardian tile (length close to 0) ––––*/
         Vector3D startLeft = V3(startMid.sub(segWidth / 2, 0, 0));
         Vector3D startRight = V3(startMid.add(segWidth / 2, 0, 0));
 
+        Vector3D forward = V3(0,0,-BIG_LEN);
+
         this.landscapeRenderer = new TerrainLandscapeRenderer();
 
-        addTile(startLeft,
-                startRight,
-                startLeft.sub(0, 0, 0.01f),   // farLeft = nearLeft shifted a bit so len>0
-                startRight.sub(0, 0, 0.01f),  // farRight
+        addTile(startLeft.sub(forward),
+                startRight.sub(forward),
+                startLeft,   // farLeft = nearLeft shifted so len>0
+                startRight,  // farRight
                 true, false, false);
 
     }
@@ -118,7 +125,7 @@ public class TileManager implements GPUResourceOwner {
                 V3(0, 0, 0),
                 r1.sub(newL1),
                 axis,
-                PI / 2 + currVerticalAng).withLen(segLength);
+                (PI / 2 + currVerticalAng)).withLen(segLength);
 
         Vector3D l2 = newL1.add(dir);
         Vector3D r2 = r1.add(dir);
@@ -129,12 +136,14 @@ public class TileManager implements GPUResourceOwner {
         boolean wasLastLiftedUp = lastHistory.isFirstLiftedUp;
         Tile oldLast = removeLastTile();
 
+        isReAdded = true;
         if(tiles.isEmpty()){ // re-adding guardian - oldLast.isEmptySegment() -> true
             // so oldLast.isFirstLiftedUp() -> false, and isFirstLiftedUp doesn't matter
             addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), false, false);
         }else{
             addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), tiles.getLast().isEmptySegment(), wasLastLiftedUp);
         }
+        isReAdded = false;
 
         // Add the new segment tile.
         addTile(newL1.addY(pendingLift),
@@ -238,21 +247,21 @@ public class TileManager implements GPUResourceOwner {
     // ============================================================================
 
     public Vector3D[] leftSideToArrayDebug() {
-        int total = leftSideBuffer.size();
-        if (total <= 1) return new Vector3D[0]; // should not happen, but be safe
-        Vector3D[] res = new Vector3D[total - 1];
-        for (int i = 1; i < total; i++) {
-            res[i - 1] = V3(leftSideBuffer.getX(i), leftSideBuffer.getY(i), leftSideBuffer.getZ(i)).addY(0.1f);
+        int k = 0;
+        int total = leftSideBuffer.size()-k;
+        Vector3D[] res = new Vector3D[total];
+        for (int i = k; i < leftSideBuffer.size(); i++) {
+            res[i-k] = V3(leftSideBuffer.getX(i), leftSideBuffer.getY(i), leftSideBuffer.getZ(i)).addY(0.1f);
         }
         return res;
     }
 
     public Vector3D[] rightSideToArrayDebug() {
-        int total = rightSideBuffer.size();
-        if (total <= 1) return new Vector3D[0];
-        Vector3D[] res = new Vector3D[total - 1];
-        for (int i = 1; i < total; i++) {
-            res[i - 1] = V3(rightSideBuffer.getX(i), rightSideBuffer.getY(i), rightSideBuffer.getZ(i)).addY(0.1f);
+        int k=0;
+        int total = rightSideBuffer.size()-k;
+        Vector3D[] res = new Vector3D[total];
+        for (int i = k; i < rightSideBuffer.size(); i++) {
+            res[i-k] = V3(rightSideBuffer.getX(i), rightSideBuffer.getY(i), rightSideBuffer.getZ(i)).addY(0.1f);
         }
         return res;
     }
@@ -292,6 +301,8 @@ public class TileManager implements GPUResourceOwner {
 
         lastTile = tile;
     }
+
+    boolean isReAdded = false;
 
     /**
      * Removes the current last tile (never the guardian) and rolls back all
@@ -349,6 +360,7 @@ public class TileManager implements GPUResourceOwner {
         int cntL = 0, cntR = 0, cntRows = 0;
 
         if (wasPreviousEmpty || isFirstLiftedUp) {
+
             // First real tile – add bridging row along its near edge so the grid starts flush.
             leftSideBuffer.addPos(nl.x, nl.y, nl.z);
             rightSideBuffer.addPos(nr.x, nr.y, nr.z);
@@ -369,7 +381,6 @@ public class TileManager implements GPUResourceOwner {
         float lenL = (float) sqrt(eL.sqlen());
         float lenR = (float) sqrt(eR.sqlen());
 
-
         // distance from tile.near edge to first potential row position
         float firstDistL = (rowSpacing - lastLeftOverL);
         for (float d = firstDistL; d <= lenL; d += rowSpacing) {
@@ -384,10 +395,13 @@ public class TileManager implements GPUResourceOwner {
         for (float d = firstDistR; d <= lenR; d += rowSpacing) {
             float fraction = d / lenR;
             Vector3D rightP = nr.add(eR.mult(fraction));
-
             rightSideBuffer.addPos(rightP.x, rightP.y, rightP.z);
             ++cntR;
         }
+
+        String xd = isReAdded ? "RE" : "NEW";
+
+        System.out.println("<> ============================" + xd + " " + leftSideBuffer.size()+","+rightSideBuffer.size());
 
         for (; nextRowLeft < leftSideBuffer.size() && nextRowRight < rightSideBuffer.size();
              ++nextRowLeft, ++nextRowRight) {
@@ -425,6 +439,31 @@ public class TileManager implements GPUResourceOwner {
                 nextRowLeft,
                 nextRowRight,
                 currLeftoverL, currLeftoverR, nl, nr);
+
+    }
+
+    public void printTiles(){
+        System.out.println("<> TILES: ");
+        for(Tile t  :tiles){
+            System.out.println("<> "+t);
+        }
+        System.out.println("<> ====================");
+    }
+    public void printLR(){
+        System.out.println("<> LR:");
+        int l = leftSideBuffer.size(), r = rightSideBuffer.size();
+        for(int i=0;i<min(leftSideBuffer.size(),rightSideBuffer.size());++i){
+            System.out.println("<> "+leftSideBuffer.getX(i)+","+leftSideBuffer.getY(i)+","+leftSideBuffer.getZ(i)+"    "+rightSideBuffer.getX(i)+","+rightSideBuffer.getY(i)+","+rightSideBuffer.getZ(i));
+            --l;
+            --r;
+        }
+        for(int i=leftSideBuffer.size()-l;i<leftSideBuffer.size();++i){
+            System.out.println("<> "+leftSideBuffer.getX(i)+","+leftSideBuffer.getY(i)+","+leftSideBuffer.getZ(i));
+        }
+        for(int i=rightSideBuffer.size()-r;i<rightSideBuffer.size();++i){
+            System.out.println("<>                           "+rightSideBuffer.getX(i)+","+rightSideBuffer.getY(i)+","+rightSideBuffer.getZ(i));
+        }
+        System.out.println("<> ===============================");
 
     }
 

@@ -32,7 +32,6 @@ public class EmptySegmentTestStage extends Stage {
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
-        Camera.setGlobalScreenSize(screenWidth, screenHeight);
         
         // Position camera to view the terrain
         camera.setProjectionAsScreen();

@@ -26,6 +26,7 @@ public class OverflowingPreallocatedCoordinateBuffer {
      * Returns the X component of the i-th coordinate.
      */
     public float getX(int i) {
+        assert  i < size();
         return floatBuffer.get(i * 3);
     }
 
@@ -33,6 +34,7 @@ public class OverflowingPreallocatedCoordinateBuffer {
      * Returns the Y component of the i-th coordinate.
      */
     public float getY(int i) {
+        assert  i < size();
         return floatBuffer.get(i * 3 + 1);
     }
 
@@ -40,6 +42,7 @@ public class OverflowingPreallocatedCoordinateBuffer {
      * Returns the Z component of the i-th coordinate.
      */
     public float getZ(int i) {
+        assert  i < size();
         return floatBuffer.get(i * 3 + 2);
     }
 
