@@ -2,6 +2,7 @@ package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
 import static com.example.game3d_opengl.game.util.GameMath.EPSILON;
 import static com.example.game3d_opengl.game.util.GameMath.PI;
+import static com.example.game3d_opengl.game.util.GameMath.rotateAroundAxis;
 import static com.example.game3d_opengl.game.util.GameMath.rotateAroundTwoPoints;
 import static com.example.game3d_opengl.game.util.GameMath.tan;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
@@ -19,6 +20,10 @@ import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.LightSource;
+import com.example.game3d_opengl.game.stage.stages.test.util.LineSet3D;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Builds a deque of terrain tiles and, in parallel, keeps three buffers
@@ -107,15 +112,14 @@ public class TileManager implements GPUResourceOwner {
 
         Vector3D l1 = lastTile.farLeft;
         Vector3D r1 = lastTile.farRight;
-        Vector3D near_l1 = lastTile.nearLeft;
 
         Vector3D axis = V3(0, -1, 0);
 
-        Vector3D line1 = l1.sub(near_l1).setY(0);
-        Vector3D baseLen = r1.sub(l1);
-        float dLen = (float) (Math.sqrt(baseLen.sqlen()) * tan(dHorizontalAng));
+        Vector3D mid = l1.add(r1).div(2);
 
-        Vector3D newL1 = l1.sub(line1.withLen(dLen));
+        Vector3D newL1 = rotateAroundAxis(mid,axis,l1,dHorizontalAng);
+        Vector3D newR1 = rotateAroundAxis(mid,axis,r1,dHorizontalAng);
+
 
         assert abs(newL1.y - r1.y) < 0.01f;
 
@@ -123,12 +127,12 @@ public class TileManager implements GPUResourceOwner {
 
         Vector3D dir = rotateAroundTwoPoints(
                 V3(0, 0, 0),
-                r1.sub(newL1),
+                newR1.sub(newL1),
                 axis,
                 (PI / 2 + currVerticalAng)).withLen(segLength);
 
         Vector3D l2 = newL1.add(dir);
-        Vector3D r2 = r1.add(dir);
+        Vector3D r2 = newR1.add(dir);
 
 
         // Update the last tile's far edge by replacing it with [newL1,newR1].
@@ -465,6 +469,83 @@ public class TileManager implements GPUResourceOwner {
         }
         System.out.println("<> ===============================");
 
+    }
+
+    /**
+     * Build a simple debug outline of the terrain using only current tiles.
+     * Produces a {@link LineSet3D} that traces:
+     * - a cap across the near edge at the start of each visible span,
+     * - the left and right side edges of each non-empty tile,
+     * - and a cap across the far edge at the end of each visible span.
+     * A new span starts after an empty tile or whenever the seam between tiles is vertically lifted
+     * (detected when previous far edge != current near edge within EPSILON).
+     */
+    public LineSet3D getTileLineSet() {
+        List<Vector3D> points = new ArrayList<>();
+        List<int[]> edges = new ArrayList<>();
+
+        Tile prevVisible = null;
+        boolean spanActive = false;
+        int lastFarLIdx = -1, lastFarRIdx = -1;
+
+        for (Tile t : tiles) {
+            if (t.isEmptySegment()) {
+                if (spanActive) {
+                    // Close previous span with a far cap
+                    edges.add(new int[]{lastFarLIdx, lastFarRIdx});
+                    spanActive = false;
+                    prevVisible = null;
+                    lastFarLIdx = lastFarRIdx = -1;
+                }
+                continue;
+            }
+
+            boolean startNewSpan = !spanActive
+                    || prevVisible == null
+                    || !(approxEq(prevVisible.farLeft, t.nearLeft, EPSILON)
+                    && approxEq(prevVisible.farRight, t.nearRight, EPSILON));
+
+            int nearLIdx, nearRIdx;
+            if (startNewSpan) {
+                if (spanActive) {
+                    // Close the previous span before starting a new one
+                    edges.add(new int[]{lastFarLIdx, lastFarRIdx});
+                }
+                // Start cap at the near edge of this span
+                nearLIdx = points.size(); points.add(t.nearLeft);
+                nearRIdx = points.size(); points.add(t.nearRight);
+                edges.add(new int[]{nearLIdx, nearRIdx});
+            } else {
+                // Continue span: near edge matches previous far edge
+                nearLIdx = lastFarLIdx;
+                nearRIdx = lastFarRIdx;
+            }
+
+            // Sides for this tile
+            int farLIdx = points.size(); points.add(t.farLeft);
+            int farRIdx = points.size(); points.add(t.farRight);
+            edges.add(new int[]{nearLIdx, farLIdx}); // left side
+            edges.add(new int[]{nearRIdx, farRIdx}); // right side
+
+            lastFarLIdx = farLIdx;
+            lastFarRIdx = farRIdx;
+            prevVisible = t;
+            spanActive = true;
+        }
+
+        // Close the last span if open
+        if (spanActive) {
+            edges.add(new int[]{lastFarLIdx, lastFarRIdx});
+        }
+
+        Vector3D[] ptsArr = points.toArray(new Vector3D[0]);
+        int[][] edgesArr = edges.toArray(new int[0][]);
+
+        return new LineSet3D(ptsArr, edgesArr, FColor.CLR(1f, 1f, 1f), FColor.CLR(1f, 0f, 1f));
+    }
+
+    private static boolean approxEq(Vector3D a, Vector3D b, float eps) {
+        return abs(a.x - b.x) <= eps && abs(a.y - b.y) <= eps && abs(a.z - b.z) <= eps;
     }
 
     private Vector3D getGridPoint(GridRowInfo rowInfo, int c, boolean isTop) {

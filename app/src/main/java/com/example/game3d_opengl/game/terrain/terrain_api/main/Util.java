@@ -22,25 +22,25 @@ class Util {
     static void printCommand(float[] buffer, int offset) {
         int code = (int)(buffer[offset]);
         if (code == CMD_SET_H_ANG) {
-            System.out.println("^& SET H ANG " + buffer[offset + 2]);
+            System.out.println("^& tileManager.setHorizontalAngle(" + buffer[offset + 2] + ");");
         } else if (code == CMD_SET_V_ANG) {
-            System.out.println("^& SET V ANG " + buffer[offset + 2]);
+            System.out.println("^& tileManager.setVerticalAngle(" + buffer[offset + 2] + ");");
         } else if (code == CMD_ADD_V_ANG) {
-            System.out.println("^& ADD V ANG " + buffer[offset + 2]);
+            System.out.println("^& tileManager.addVerticalAngle(" + buffer[offset + 2] + ");");
         } else if (code == CMD_ADD_H_ANG) {
-            System.out.println("^& ADD H ANG " + buffer[offset + 2]);
+            System.out.println("^& tileManager.addHorizontalAngle(" + buffer[offset + 2] + ");");
         } else if (code == CMD_ADD_SEG) {
-            System.out.println("^& ADD SEG");
+            System.out.println("^& tileManager.addSegment(false);");
         } else if (code == CMD_ADD_EMPTY_SEG) {
-            System.out.println("^& ADD EMPTY SEG");
+            System.out.println("^& tileManager.addSegment(true);");
         } else if (code == CMD_LIFT_UP) {
-            System.out.println("^& LIFT UP " + buffer[offset + 2]);
+            System.out.println("^& tileManager.liftUp(" + buffer[offset + 2] + ");");
         } else if (code == CMD_START_STRUCTURE_LANDSCAPE) {
             System.out.println("^& START STRUCTURE LANDSCAPE");
         } else if (code == CMD_FINISH_STRUCTURE_LANDSCAPE) {
             System.out.println("^& FINISH STRUCTURE LANDSCAPE");
         } else if (code == CMD_SET_ALPHAS) {
-            System.out.println("^& SET ALPHAS L=" + buffer[offset + 2] + " R=" + buffer[offset + 3]);
+            System.out.println("tileManager.setUpcomingAlphas(" + buffer[offset + 2] + ", " + buffer[offset + 3] + ");");
         } else if (code == CMD_RESERVE_VERTICAL) {
             int row = (int) buffer[offset + 2];
             int col = (int) buffer[offset + 3];

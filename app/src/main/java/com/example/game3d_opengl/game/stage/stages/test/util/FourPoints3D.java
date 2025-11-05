@@ -34,10 +34,10 @@ public class FourPoints3D {
         FColor pointColor = FColor.CLR(1f, 1f, 1f);
         this.lineSet = new LineSet3D(
                 new Vector3D[]{
-                        pointsClockwise[0].addY(0.01f),
-                        pointsClockwise[1].addY(0.01f),
-                        pointsClockwise[2].addY(0.01f),
-                        pointsClockwise[3].addY(0.01f),
+                        pointsClockwise[0].addY(0.1),
+                        pointsClockwise[1].addY(0.1),
+                        pointsClockwise[2].addY(0.1),
+                        pointsClockwise[3].addY(0.1),
                 }, RECT_EDGES, lineColor, pointColor);
     }
 

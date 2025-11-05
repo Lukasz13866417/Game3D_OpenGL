@@ -228,8 +228,10 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         if (sizePairs < 2) return;
         int lastRingIndex = (headPair + sizePairs - 1) % capacityPairs;
         int prevRingIndex = (headPair + sizePairs - 2 + capacityPairs) % capacityPairs;
+        // Only mask the previous pair so the newly added pair remains visible.
+        // This breaks triangles connecting across the boundary without shortening
+        // the newly added segment.
         setPairMaskInternal(prevRingIndex, 0f, 0f);
-        setPairMaskInternal(lastRingIndex, 0f, 0f);
     }
 
     private void setPairMaskInternal(int ringIndex, float maskL, float maskR) {
