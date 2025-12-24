@@ -107,13 +107,13 @@ public class GameplayStage extends Stage {
     public void updateThenDraw(float dt) {
 
         terrain.removeOldTerrainElements(player.getNearestTileId());
-        if (terrain.getTileCount() < 400) {
+       /* if (terrain.getTileCount() < 400) {
             terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
             terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
             terrain.enqueueStructure(new TerrainStairs(50,4,2, PI/6,-1f));
             terrain.enqueueStructure(new Terrain2DCurve(50,0,PI/4f));
 
-        }
+        }*/
         if (terrain.getTileCount() < 300) {
             GameplayStage.__DEBUG_IS_TERRAIN_GENERATING = true;
             terrain.generateChunks(1);

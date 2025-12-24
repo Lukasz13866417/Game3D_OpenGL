@@ -62,27 +62,32 @@ public class TestTerrainStageSimulated extends Stage {
 
         this.lightSource = new LightSource(FColor.CLR(1,1,1));
 
-        /*for(int i=0;i<11;++i){
+        for(int i=0;i<11;++i){
             tileManager.addSegment(false);
-            tileManager.addHorizontalAngle(PI/10);
-        }*/
+            tileManager.addSegment(true);
+        }
 
+        tileManager.setUpcomingAlphas(0.2f,0.2f);
+        tileManager.addHorizontalAngle(0.1308997f);
+        tileManager.addVerticalAngle(0.0f);
         tileManager.liftUp(0.5f);
-        tileManager.addHorizontalAngle(0.1308997f);
-        tileManager.addVerticalAngle(0.0f);
         tileManager.addSegment(false);
         tileManager.addHorizontalAngle(0.1308997f);
         tileManager.addVerticalAngle(0.0f);
+        tileManager.setUpcomingAlphas(0.5f,0.5f);
         tileManager.addSegment(false);
         tileManager.addHorizontalAngle(0.1308997f);
         tileManager.addVerticalAngle(0.0f);
+        tileManager.setUpcomingAlphas(0.8f,0.8f);
         tileManager.addSegment(false);
         tileManager.addHorizontalAngle(0.1308997f);
         tileManager.addVerticalAngle(0.0f);
         tileManager.addSegment(false);
         tileManager.addVerticalAngle(-0.0f);
         tileManager.addHorizontalAngle(-0.5235988f);
-        tileManager.liftUp(0.5f);
+
+        tileManager.addSegment(true);
+        //tileManager.liftUp(0.5f);
         tileManager.addHorizontalAngle(0.1308997f);
         tileManager.addVerticalAngle(0.0f);
         tileManager.addSegment(false);
@@ -102,7 +107,6 @@ public class TestTerrainStageSimulated extends Stage {
 
         tileManager.printTiles();
         System.out.println("=================================");
-        tileManager.printLR();
 
 
         howItShouldLook = tileManager.getTileLineSet();
@@ -133,11 +137,11 @@ public class TestTerrainStageSimulated extends Stage {
         lightSource.setPosition(lightSourcePos);
         tileManager.draw(FColor.CLR(1,0,0), camera.getViewProjectionMatrix(), lightSource);
         //startSegDemo.draw(camera.getViewProjectionMatrix());
-        howItShouldLook.draw(camera.getViewProjectionMatrix());
+        //howItShouldLook.draw(camera.getViewProjectionMatrix());
 
-        /*for (FourPoints3D fp : grid) {
+        for (FourPoints3D fp : grid) {
             fp.draw(camera.getViewProjectionMatrix()); // enable when grid is drawn
-        }*/
+        }
     }
 
 

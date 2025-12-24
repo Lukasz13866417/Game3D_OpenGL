@@ -11,6 +11,8 @@ import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager;
+import com.example.game3d_opengl.game.terrain.terrain_structures.Terrain2DCurve;
+import com.example.game3d_opengl.game.terrain.terrain_structures.TerrainLineWithSpikeRect;
 import com.example.game3d_opengl.game.terrain.terrain_structures.TerrainStairs;
 import com.example.game3d_opengl.game.terrain.track_elements.potion.Potion;
 import com.example.game3d_opengl.game.terrain.track_elements.spike.DeathSpike;
@@ -23,7 +25,7 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 public class TestTerrainStage extends Stage {
 
     private Camera camera;
-   // private TileManager tileManager;
+    // private TileManager tileManager;
     private FourPoints3D[] grid;
     private LineSet3D left, right;
 
@@ -37,8 +39,13 @@ public class TestTerrainStage extends Stage {
 
     private static final Vector3D lightSourcePos = cameraPos;
 
-    private static final Vector3D firstTileStartCenter = cameraLookAt;
+    private static final Vector3D firstTileStartCenter = cameraLookAt.addY(-20).addX(-2).addZ(160);
 
+    // Pan state
+    private static final float PAN_SENSITIVITY = 0.01f; // world units per pixel
+    private Vector3D currEye = cameraPos;
+    private Vector3D currLook = cameraLookAt;
+    private boolean isPanning = false;
 
     public TestTerrainStage(MyGLRenderer.StageManager stageManager) {
         super(stageManager);
@@ -46,15 +53,25 @@ public class TestTerrainStage extends Stage {
 
     @Override
     public void onTouchDown(float x, float y) {
-
+        isPanning = true;
     }
 
     @Override
     public void onTouchUp(float x, float y) {
+        isPanning = false;
     }
 
     @Override
     public void onTouchMove(float x1, float y1, float x2, float y2) {
+        if (!isPanning) return;
+        float dx = x2 - x1;
+        float dy = y2 - y1;
+        float panX = dx * PAN_SENSITIVITY;
+        float panZ = dy * PAN_SENSITIVITY; // swipe up (negative dy) -> move forward (-z)
+        currEye = currEye.addX(panX).addZ(panZ);
+        currLook = currLook.addX(panX).addZ(panZ);
+        camera.updateEyePos(currEye);
+        camera.updateLookPos(currLook);
     }
 
     FourPoints3D xd;
@@ -66,6 +83,9 @@ public class TestTerrainStage extends Stage {
         this.camera = new Camera(cameraPos,cameraLookAt,cameraUp);
         camera.setProjectionAsScreen();
         camera.rotate180AroundForward();
+        // initialize pan state vectors
+        currEye = cameraPos;
+        currLook = cameraLookAt;
 
         DeathSpike.LOAD_DEATHSPIKE_ASSETS();
         Potion.LOAD_POTION_ASSETS(context.getAssets());
@@ -87,17 +107,21 @@ public class TestTerrainStage extends Stage {
         );*/
 
         this.terrain = new Terrain(
-                200,
-                2,
+                2000,
+                6,
                 firstTileStartCenter,
                 1f,
-                0.5f,
-                0.3f
+                3.2f * 0.33f,
+                1.4f * 0.33f
         );
 
 
 
-        terrain.enqueueStructure(new TerrainStairs(4,2,PI/3, 0.5f));
+        terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
+        terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
+        terrain.enqueueStructure(new TerrainStairs(100,4,1, PI/6,-1f));
+        terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
+        terrain.enqueueStructure(new Terrain2DCurve(50,0,PI/8f));
 
         terrain.generateChunks(-1);
 
@@ -105,7 +129,7 @@ public class TestTerrainStage extends Stage {
         //for (int i = 0; i < 3; ++i) tileManager.addSegment(false);
 
         // grid rectangles as FourPoints3D
-        int rows = Math.max(0, terrain.tileManager.getCurrRowCount());
+        /*int rows = Math.max(0, terrain.tileManager.getCurrRowCount());
         final int nCols = 2; // matches TileManager creation above
         grid = new FourPoints3D[rows * nCols];
         int idx = 0;
@@ -120,7 +144,7 @@ public class TestTerrainStage extends Stage {
             System.out.println("+_+ " +"=================================");
         }
         left = new LineSet3D(terrain.tileManager.leftSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(1, 0, 1));
-        right = new LineSet3D(terrain.tileManager.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(0, 0, 1));
+        right = new LineSet3D(terrain.tileManager.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(0, 0, 1));*/
 
         lightSource = new LightSource(FColor.CLR(1,1,1));
 
@@ -134,10 +158,10 @@ public class TestTerrainStage extends Stage {
             fp.draw(camera.getViewProjectionMatrix()); // enable when grid is drawn
         }*/
         terrain.draw(FColor.CLR(0,1,0),camera.getViewProjectionMatrix(),lightSource);
-        terrain.tileManager.getTileLineSet().draw(camera.getViewProjectionMatrix());
+        //terrain.tileManager.getTileLineSet().draw(camera.getViewProjectionMatrix());
 
-        left.draw(camera.getViewProjectionMatrix());
-        right.draw(camera.getViewProjectionMatrix());
+        //left.draw(camera.getViewProjectionMatrix());
+        //right.draw(camera.getViewProjectionMatrix());
 
     }
 

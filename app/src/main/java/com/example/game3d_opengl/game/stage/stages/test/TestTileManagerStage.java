@@ -1,5 +1,6 @@
 package com.example.game3d_opengl.game.stage.stages.test;
 
+import static com.example.game3d_opengl.game.util.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import android.content.Context;
@@ -32,7 +33,7 @@ public class TestTileManagerStage extends Stage {
 
     private static final Vector3D lightSourcePos = cameraPos;
 
-    private static final Vector3D firstTileStartCenter = cameraLookAt;
+    private static final Vector3D firstTileStartCenter = cameraLookAt.sub(0,0,-2f);
 
 
     private LineSet3D startSegDemo;
@@ -48,8 +49,8 @@ public class TestTileManagerStage extends Stage {
                 5,
                 firstTileStartCenter,
                 1f,
-                0.5f,
-                0.3f
+                0.5f * 0.5f,
+                0.3f * 0.5f
         );
         this.camera = new Camera(cameraPos,cameraLookAt,cameraUp);
         camera.setProjectionAsScreen();
@@ -58,12 +59,20 @@ public class TestTileManagerStage extends Stage {
         this.lightSource = new LightSource(FColor.CLR(1,1,1));
 
         for(int i=0;i<4;++i) this.tileManager.addSegment(false);
+        this.tileManager.addSegment(true);
+        this.tileManager.addHorizontalAngle(PI/20f);
+        for(int i=0;i<4;++i) this.tileManager.addSegment(false);
+        this.tileManager.addSegment(true);
+        this.tileManager.addHorizontalAngle(PI/20f);
+        for(int i=0;i<4;++i) this.tileManager.addSegment(false);
+        this.tileManager.addSegment(true);
+        this.tileManager.addHorizontalAngle(PI/20f);
+        for(int i=0;i<4;++i) this.tileManager.addSegment(false);
 
         System.out.println("!!!!!!!!!!!!!!!!!!" +firstTileStartCenter.addX(-0.5f)+"    "+ firstTileStartCenter.addX(0.5f));
 
         tileManager.printTiles();
         System.out.println("=================================");
-        tileManager.printLR();
 
 
         howItShouldLook = tileManager.getTileLineSet();

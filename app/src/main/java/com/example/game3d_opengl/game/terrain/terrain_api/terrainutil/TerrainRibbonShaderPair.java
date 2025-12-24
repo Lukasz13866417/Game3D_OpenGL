@@ -11,7 +11,7 @@ public final class TerrainRibbonShaderPair
     public static final TerrainRibbonShaderPair sharedShader
             = TerrainRibbonShaderPair.createDefault();
 
-    private int uMVP, uColor, aPosMask, uLightPos, uLightColor, aNormal;
+    private int uMVP, uColor, aPosition, uLightPos, uLightColor, aNormalAlpha;
 
     private TerrainRibbonShaderPair(int programHandle, String vs, String fs) {
         super(programHandle, vs, fs);
@@ -20,72 +20,67 @@ public final class TerrainRibbonShaderPair
     public static TerrainRibbonShaderPair createDefault() {
         String vs =
                 "uniform mat4 uMVPMatrix;\n" +
-                "attribute vec4 aPosMask;\n" +
-                "attribute vec4 aNormalAlpha;\n" +
-                "varying float vMask;\n" +
-                "varying vec3 vWorldPos;\n" +
-                "varying vec3 vNormal;\n" +
-                "varying float vAlpha;\n" +
-                "void main(){\n" +
-                "  gl_Position = uMVPMatrix * vec4(aPosMask.xyz, 1.0);\n" +
-                "  vMask = aPosMask.w;\n" +
-                "  vWorldPos = aPosMask.xyz;\n" +
-                "  vNormal = aNormalAlpha.xyz;\n" +
-                "  vAlpha = aNormalAlpha.w;\n" +
-                "}";
+                        "attribute vec3 aPosition;\n" +
+                        "attribute vec4 aNormalAlpha;\n" +
+                        "varying vec3 vWorldPos;\n" +
+                        "varying vec3 vNormal;\n" +
+                        "varying float vAlpha;\n" +
+                        "void main(){\n" +
+                        "  gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n" +
+                        "  vWorldPos = aPosition;\n" +
+                        "  vNormal = aNormalAlpha.xyz;\n" +
+                        "  vAlpha = aNormalAlpha.w;\n" +
+                        "}";
         String fs =
                 "precision highp float;\n" +
-                "uniform vec4 vColor;\n" +
-                "varying float vMask;\n" +
-                "varying vec3 vWorldPos;\n" +
-                "varying vec3 vNormal;\n" +
-                "varying float vAlpha;\n" +
-                "uniform vec3 uLightPos;\n" +
-                "uniform vec3 uLightColor;\n" +
-                "uniform int isDepthPass;\n" +
-                "const float MASK_EPS = 0.8;\n" +
-                "void main(){\n" +
-                "  if(vMask <= MASK_EPS) discard;\n" +
-                "  if (isDepthPass == 1) {\n" +
-                "    if (vAlpha < 1.0) discard;\n" +
-                "    return;\n" +
-                "  }\n" +
-                "  vec3 toLight = uLightPos - vWorldPos;\n" +
-                "  float distSq = dot(toLight, toLight);\n" +
-                "  float atten = 1.0 / (1.0 + 0.0000001 * distSq);\n" +
-                "  vec3 L = toLight * inversesqrt(distSq);\n" +
-                "  vec3 N = normalize(vNormal);\n" +
-                "  float diff = max(dot(L, N), 0.0);\n" +
-                "  vec3 lighting = uLightColor * diff * atten + vec3(0.2);\n" +
-                "  gl_FragColor = vec4(vColor.rgb * lighting, vColor.a * vAlpha);\n" +
-                "}";
+                        "uniform vec4 vColor;\n" +
+                        "varying vec3 vWorldPos;\n" +
+                        "varying vec3 vNormal;\n" +
+                        "varying float vAlpha;\n" +
+                        "uniform vec3 uLightPos;\n" +
+                        "uniform vec3 uLightColor;\n" +
+                        "uniform int isDepthPass;\n" +
+                        "void main(){\n" +
+                        "  if (isDepthPass == 1) {\n" +
+                        "    if (vAlpha < 1.0) discard;\n" +
+                        "    return;\n" +
+                        "  }\n" +
+                        "  vec3 toLight = uLightPos - vWorldPos;\n" +
+                        "  float distSq = dot(toLight, toLight);\n" +
+                        "  float atten = 1.0 / (1.0 + 0.0000001 * distSq);\n" +
+                        "  vec3 L = toLight * inversesqrt(distSq);\n" +
+                        "  vec3 N = normalize(vNormal);\n" +
+                        "  float diff = max(dot(L, N), 0.0);\n" +
+                        "  vec3 lighting = uLightColor * diff * atten + vec3(0.2);\n" +
+                        "  gl_FragColor = vec4(vColor.rgb * lighting, vColor.a * vAlpha);\n" +
+                        "}";
         return new Builder().fromSource(vs, fs).build();
     }
 
     @Override
     public void enableAndPointVertexAttribs() {
-        // Attribute layout: vec4 aPosMask, vec4 aNormal (pos,mask,norm,pad)
-        final int stride = 8 * 4; // 32 bytes
-        GLES20.glEnableVertexAttribArray(aPosMask);
-        GLES20.glVertexAttribPointer(aPosMask, 4, GLES20.GL_FLOAT, false, stride, 0);
-        GLES20.glEnableVertexAttribArray(aNormal);
-        GLES20.glVertexAttribPointer(aNormal, 4, GLES20.GL_FLOAT, false, stride, 16);
+        // Attribute layout: vec3 aPosition, vec4 aNormalAlpha
+        final int stride = (3 + 4) * 4; // 28 bytes
+        GLES20.glEnableVertexAttribArray(aPosition);
+        GLES20.glVertexAttribPointer(aPosition, 3, GLES20.GL_FLOAT, false, stride, 0);
+        GLES20.glEnableVertexAttribArray(aNormalAlpha);
+        GLES20.glVertexAttribPointer(aNormalAlpha, 4, GLES20.GL_FLOAT, false, stride, 12);
     }
 
     @Override
     public void disableVertexAttribs() {
-        GLES20.glDisableVertexAttribArray(aPosMask);
-        GLES20.glDisableVertexAttribArray(aNormal);
+        GLES20.glDisableVertexAttribArray(aPosition);
+        GLES20.glDisableVertexAttribArray(aNormalAlpha);
     }
 
     @Override
     protected void setupAttribLocations() {
         this.uMVP = GLES20.glGetUniformLocation(getProgramHandle(), "uMVPMatrix");
         this.uColor = GLES20.glGetUniformLocation(getProgramHandle(), "vColor");
-        this.aPosMask = GLES20.glGetAttribLocation(getProgramHandle(), "aPosMask");
+        this.aPosition = GLES20.glGetAttribLocation(getProgramHandle(), "aPosition");
         this.uLightPos = GLES20.glGetUniformLocation(getProgramHandle(), "uLightPos");
         this.uLightColor = GLES20.glGetUniformLocation(getProgramHandle(), "uLightColor");
-        this.aNormal = GLES20.glGetAttribLocation(getProgramHandle(), "aNormalAlpha");
+        this.aNormalAlpha = GLES20.glGetAttribLocation(getProgramHandle(), "aNormalAlpha");
         this.uIsDepthPass = GLES20.glGetUniformLocation(getProgramHandle(), "isDepthPass");
     }
 

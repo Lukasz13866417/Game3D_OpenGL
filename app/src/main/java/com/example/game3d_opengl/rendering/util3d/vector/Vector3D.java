@@ -1,5 +1,6 @@
 package com.example.game3d_opengl.rendering.util3d.vector;
 
+import static java.lang.Math.abs;
 import static java.lang.Math.sqrt;
 
 import androidx.annotation.NonNull;
@@ -128,7 +129,11 @@ public class Vector3D{
     }
 
     public Vector3D withLen(float len){
-        return mult((float)((double)(len) / sqrt(sqlen())));
+        float sql = (float) sqrt(sqlen());
+        if(sql<1e-8){
+            return V3(0,0,0);
+        }
+        return mult((float)((double)(len) / sql));
     }
 
     public static Vector3D normalized(Vector3D v) {

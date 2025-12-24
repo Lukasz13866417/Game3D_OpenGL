@@ -70,10 +70,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.stageManager = new StageManager();
         this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
-        this.currStage =  new TestTerrainStageSimulated(stageManager);
+        this.currStage =  //new TestTerrainStageSimulated(stageManager);
                           //new TestTerrainStage(stageManager);
                           //new TestTileManagerStage(stageManager);
-                          //new TestGridRowsStage(stageManager);
+                          new TestGridRowsStage(stageManager);
                           //new AddonPlacementTestStage(stageManager);
                           //new GameplayStage(stageManager);
                           //new TestWireframeStage(stageManager);

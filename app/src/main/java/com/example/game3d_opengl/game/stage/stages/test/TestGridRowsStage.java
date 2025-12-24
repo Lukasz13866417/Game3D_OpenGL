@@ -28,13 +28,13 @@ public class TestGridRowsStage extends Stage {
 
     private static final Vector3D cameraPos = V3(0,6f,2f);
 
-    private static final Vector3D cameraLookAt = cameraPos.addY(-10);
+    private static final Vector3D cameraLookAt = cameraPos.addY(-16);
 
     private static final Vector3D cameraUp = cameraPos.addY(100);
 
     private static final Vector3D lightSourcePos = cameraPos;
 
-    private static final Vector3D firstTileStartCenter = cameraLookAt;
+    private static final Vector3D firstTileStartCenter = cameraLookAt.addX(-2);
 
 
 
@@ -83,8 +83,8 @@ public class TestGridRowsStage extends Stage {
         //for (int i = 0; i < 6 ; ++i) {tileManager.addSegment(false); }
         //tileManager.addSegment(true);
         //tileManager.addSegment(true);
-        for (int i = 0; i < 6 ; ++i) {
-            tileManager.addSegment(false); tileManager.addHorizontalAngle(PI/60);}
+        for (int i = 0; i < 13 ; ++i) {
+            tileManager.addSegment(false); tileManager.addHorizontalAngle(PI/12);}
 
 
         tileManager.printTiles();
@@ -107,8 +107,6 @@ public class TestGridRowsStage extends Stage {
             }
             System.out.println("+_+ " +"=================================");
         }
-        left = new LineSet3D(tileManager.leftSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(1, 0, 1));
-        right = new LineSet3D(tileManager.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(0, 0, 1));
 
         lightSource = new LightSource(FColor.CLR(1,1,1));
 
@@ -121,8 +119,6 @@ public class TestGridRowsStage extends Stage {
         for (FourPoints3D fp : grid) {
            fp.draw(camera.getViewProjectionMatrix()); // enable when grid is drawn
         }
-        left.draw(camera.getViewProjectionMatrix());
-        right.draw(camera.getViewProjectionMatrix());
         tileManager.draw(FColor.CLR(0,1,0), camera.getViewProjectionMatrix(), lightSource);
         tileManager.getTileLineSet().draw(camera.getViewProjectionMatrix());
 

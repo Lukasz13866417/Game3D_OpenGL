@@ -15,6 +15,18 @@ public class GameMath {
     public static final float EPSILON = 1e-6f;
     public static final float PI = 3.1415926535f;
     public static final float INF = Float.POSITIVE_INFINITY, NINF = Float.NEGATIVE_INFINITY;
+    public static boolean testParallel(Vector3D a, Vector3D b) {
+        // Degenerate case: zero-length vectors are not directions
+        if (a.sqlen() == 0 || b.sqlen() == 0) return false;
+
+        // If cross product magnitude is ~0, vectors are parallel
+        Vector3D cross = a.crossProduct(b);
+
+        // Tolerance squared (adjust if needed)
+        final double EPS = 1e-8;
+
+        return cross.sqlen() < EPS;
+    }
 
     public static float tan(float alpha){
         return (float)(Math.tan(alpha));

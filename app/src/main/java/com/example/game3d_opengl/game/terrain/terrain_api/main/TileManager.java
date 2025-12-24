@@ -3,17 +3,13 @@ package com.example.game3d_opengl.game.terrain.terrain_api.main;
 import static com.example.game3d_opengl.game.util.GameMath.EPSILON;
 import static com.example.game3d_opengl.game.util.GameMath.PI;
 import static com.example.game3d_opengl.game.util.GameMath.rotateAroundAxis;
-import static com.example.game3d_opengl.game.util.GameMath.rotateAroundTwoPoints;
-import static com.example.game3d_opengl.game.util.GameMath.tan;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static java.lang.Math.abs;
-import static java.lang.Math.max;
-import static java.lang.Math.min;
-import static java.lang.Math.sqrt;
+
+import android.util.Pair;
 
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.FixedMaxSizeDeque;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.OverflowingPreallocatedRowInfoBuffer;
-import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.OverflowingPreallocatedCoordinateBuffer;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.OverflowingPreallocatedSegmentHistoryBuffer;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.TerrainLandscapeRenderer;
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
@@ -39,8 +35,6 @@ public class TileManager implements GPUResourceOwner {
     private final int nCols;                      // grid columns – passed to GridCreator
 
     /*––––––––––––  BUFFERS  ––––––––––––*/
-    private final OverflowingPreallocatedCoordinateBuffer leftSideBuffer;
-    private final OverflowingPreallocatedCoordinateBuffer rightSideBuffer;
     private final OverflowingPreallocatedRowInfoBuffer rowInfoBuffer;
     private final OverflowingPreallocatedSegmentHistoryBuffer segmentHistoryBuffer;
 
@@ -74,8 +68,6 @@ public class TileManager implements GPUResourceOwner {
         this.nCols = nCols;
 
         /*–––– data structures ––––*/
-        this.leftSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
-        this.rightSideBuffer = new OverflowingPreallocatedCoordinateBuffer();
         this.rowInfoBuffer = new OverflowingPreallocatedRowInfoBuffer();
 
         this.tiles = new FixedMaxSizeDeque<>(maxSegments + 1);
@@ -120,16 +112,21 @@ public class TileManager implements GPUResourceOwner {
         Vector3D newL1 = rotateAroundAxis(mid,axis,l1,dHorizontalAng);
         Vector3D newR1 = rotateAroundAxis(mid,axis,r1,dHorizontalAng);
 
-
-        assert abs(newL1.y - r1.y) < 0.01f;
-
         dHorizontalAng = 0.0f;
 
-        Vector3D dir = rotateAroundTwoPoints(
-                V3(0, 0, 0),
+        Vector3D dir = rotateAroundAxis(
+                V3(0,0,0),
+                V3(0,-1,0),
                 newR1.sub(newL1),
-                axis,
-                (PI / 2 + currVerticalAng)).withLen(segLength);
+                -PI/2
+        ).withLen(segLength);
+
+        dir = rotateAroundAxis(
+                V3(0,0,0),
+                newR1.sub(newL1),
+                dir,
+                currVerticalAng
+        );
 
         Vector3D l2 = newL1.add(dir);
         Vector3D r2 = newR1.add(dir);
@@ -143,17 +140,30 @@ public class TileManager implements GPUResourceOwner {
         isReAdded = true;
         if(tiles.isEmpty()){ // re-adding guardian - oldLast.isEmptySegment() -> true
             // so oldLast.isFirstLiftedUp() -> false, and isFirstLiftedUp doesn't matter
-            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), false, false);
+            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, newR1, oldLast.isEmptySegment(), false, false);
         }else{
-            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, r1, oldLast.isEmptySegment(), tiles.getLast().isEmptySegment(), wasLastLiftedUp);
+            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, newR1, oldLast.isEmptySegment(), tiles.getLast().isEmptySegment(), wasLastLiftedUp);
         }
         isReAdded = false;
 
+        Vector3D nL = newL1.addY(pendingLift);
+        Vector3D nR = newR1.addY(pendingLift);
+        Vector3D fL = l2.addY(pendingLift);
+        Vector3D fR = r2.addY(pendingLift);
+
+        /*assert(testParallel(
+                (fL.sub(nL)),
+                (fR.sub(nR))
+        ));*/ // this should pass for every segment right after it's created.
+        // Changing horizontal ang with addHorizontalAng and then adding a new segment should
+        // cause them to stop being parallel
+
         // Add the new segment tile.
-        addTile(newL1.addY(pendingLift),
-                r1.addY(pendingLift),
-                l2.addY(pendingLift),
-                r2.addY(pendingLift), isEmpty, oldLast.isEmptySegment(), (abs(pendingLift) > EPSILON));
+        addTile(nL,
+                nR,
+                fL,
+                fR, isEmpty, oldLast.isEmptySegment(), (abs(pendingLift) > EPSILON));
+
         pendingLift = 0;
     }
 
@@ -183,7 +193,11 @@ public class TileManager implements GPUResourceOwner {
         // If first tile is far from player, this it has been visited a long time ago
         // In that case, it can be removed because we are sure it wont be displayed anymore.
         while (tiles.size() > 1 && (playerTileId - tiles.getFirst().getID() > 50L)) {
-            landscapeRenderer.popFront();
+            // Only pop from renderer if the tile we are removing contributed geometry.
+            Tile first = tiles.getFirst();
+            if (!first.isEmptySegment()) {
+                landscapeRenderer.popFront();
+            }
             tiles.popFirst();
         }
     }
@@ -196,8 +210,6 @@ public class TileManager implements GPUResourceOwner {
         landscapeRenderer.cleanupGPUResourcesRecursivelyOnContextLoss();
 
         // TODO this should only do GPU stuff. Make separate method for buffers etc
-        leftSideBuffer.free();
-        rightSideBuffer.free();
         rowInfoBuffer.free();
         segmentHistoryBuffer.free();
     }
@@ -246,30 +258,6 @@ public class TileManager implements GPUResourceOwner {
         };
     }
 
-    // ============================================================================
-    // DEBUG AND UTILITY METHODS
-    // ============================================================================
-
-    public Vector3D[] leftSideToArrayDebug() {
-        int k = 0;
-        int total = leftSideBuffer.size()-k;
-        Vector3D[] res = new Vector3D[total];
-        for (int i = k; i < leftSideBuffer.size(); i++) {
-            res[i-k] = V3(leftSideBuffer.getX(i), leftSideBuffer.getY(i), leftSideBuffer.getZ(i)).addY(0.1f);
-        }
-        return res;
-    }
-
-    public Vector3D[] rightSideToArrayDebug() {
-        int k=0;
-        int total = rightSideBuffer.size()-k;
-        Vector3D[] res = new Vector3D[total];
-        for (int i = k; i < rightSideBuffer.size(); i++) {
-            res[i-k] = V3(rightSideBuffer.getX(i), rightSideBuffer.getY(i), rightSideBuffer.getZ(i)).addY(0.1f);
-        }
-        return res;
-    }
-
     public void setUpcomingAlphas(float alphaL, float alphaR){
         this.alphaL = alphaL;
         this.alphaR = alphaR;
@@ -287,18 +275,11 @@ public class TileManager implements GPUResourceOwner {
         Tile tile = new Tile(nl, nr, fl, fr, nextId++, isEmptySegment);
         tiles.pushBack(tile);
         if(!isEmptySegment) {
-            if (wasPreviousEmpty) {
-                // Start a new visible span: add the near edge of this tile
+            if (wasPreviousEmpty || isFirstLiftedUp) {
+                landscapeRenderer.newStrip();
                 landscapeRenderer.pushBack(nl, nr, alphaL, alphaR);
-                // Mark the gap between previous (last) pair and this new near edge so it won't render
-                landscapeRenderer.markGapBetweenLastTwoPairs();
             }
-            // Always append far edge; next tile will reuse it as its near edge
             landscapeRenderer.pushBack(fl, fr, alphaL, alphaR);
-            if (isFirstLiftedUp) {
-                // If the next tile will be vertically lifted, mask out the seam across to the next near edge
-                landscapeRenderer.markGapBetweenLastTwoPairs();
-            }
         }
 
         generateRowsForTile(tile, wasPreviousEmpty, isFirstLiftedUp);
@@ -323,18 +304,32 @@ public class TileManager implements GPUResourceOwner {
         Tile oldLast = tiles.popLast();
 
         SegmentHistory history = segmentHistoryBuffer.pop();
-        for (int i = 0; i < history.leftAddedCnt; ++i) {
-            leftSideBuffer.pop();
-        }
-        for (int i = 0; i < history.rightAddedCnt; ++i) {
-            rightSideBuffer.pop();
-        }
         for (int i = 0; i < history.rowsAddedCnt; ++i) rowInfoBuffer.removeLast();
 
-
-        landscapeRenderer.popBack();
+        // Only pop geometry from the ribbon if the removed tile actually added geometry.
+        if (!oldLast.isEmptySegment()) {
+            landscapeRenderer.popBack();
+        }
         lastTile = tiles.peekLast();
         return oldLast;
+    }
+
+
+    public Pair<Vector3D, Vector3D> getNext(
+            Vector3D nl, Vector3D nr,
+            Vector3D el, Vector3D er,
+            float elL, float elR,
+            Vector3D lastL, Vector3D lastR){
+        float distL = rowSpacing * 2.0f*elL / (elL + elR);
+        float distR = rowSpacing * 2.0f*elR / (elL + elR);
+        float distToPoint = (float)(Math.sqrt(lastL.sub(nl).sqlen()));
+        if(distToPoint + distL > elL){
+            return null;
+        }
+        return new Pair<>(
+          nl.add(el.withLen(distL)),
+          nr.add(er.withLen(distR))
+        );
     }
 
     private void generateRowsForTile(Tile tile, boolean wasPreviousEmpty, boolean isFirstLiftedUp) {
@@ -342,107 +337,116 @@ public class TileManager implements GPUResourceOwner {
         Vector3D nr = tile.nearRight;
         Vector3D fl = tile.farLeft;
         Vector3D fr = tile.farRight;
+        Vector3D el = fl.sub(nl);
+        Vector3D er = fr.sub(nr);
+        float elL = (float) Math.sqrt(el.sqlen());
+        float elR = (float) Math.sqrt(er.sqlen());
+
 
         if (tile.isEmptySegment()) {
             segmentHistoryBuffer.add(
-                    0, 0,
-                    0,
+                    true,
                     false,
-                    // segment history objects corresponding to empty segments should never be used.
-                    // hopefully these values will crash the program whenever this rule is broken
-                    -1000000000, -1000000000,
-                    0, 0,
-                    nl, nr
+                    0,
+                    nl, nr,
+                    fl, fr,
+                    null, null
             );
             return;
         }
 
-        SegmentHistory lastHistory = segmentHistoryBuffer.get(segmentHistoryBuffer.size() - 1);
+        int cntRows = 0;
 
+        // Add first row in our tile
+        Vector3D lastPointL, lastPointR;
+        float ratioOurLeft = 2*elL / (elL + elR);
+        float ratioOurRight = 2*elL / (elL + elR);
+        if(isFirstLiftedUp || wasPreviousEmpty){
+            lastPointL = nl;
+            lastPointR = nr;
+        }else{
+            int lastRowSegment = segmentHistoryBuffer.size()-1;
+            float remainingRatio = 1.0f;
+            Vector3D previousL = nl, previousR = nr;
+            while(lastRowSegment >= 0
+                    && segmentHistoryBuffer.get(lastRowSegment).rowsAddedCnt == 0
+                    && !segmentHistoryBuffer.get(lastRowSegment).isEmpty){
+                SegmentHistory thatHistory = segmentHistoryBuffer.get(lastRowSegment);
+                float leftEdgeLen = (float)(Math.sqrt(thatHistory.fLOfTile.sub(thatHistory.nLOfTile).sqlen()));
+                float rightEdgeLen = (float)(Math.sqrt(thatHistory.fROfTile.sub(thatHistory.nROfTile).sqlen()));
+                float ratioHere = leftEdgeLen / (rowSpacing * 2.0f * (leftEdgeLen / (leftEdgeLen + rightEdgeLen)));
+                remainingRatio -= ratioHere;
+                previousL = thatHistory.nLOfTile;
+                previousR = thatHistory.nROfTile;
+                --lastRowSegment;
+                if(thatHistory.isFirstLiftedUp){
+                    break;
+                }
+            }
+            if(lastRowSegment >= 0
+                    && (lastRowSegment == segmentHistoryBuffer.size()-1 || !segmentHistoryBuffer.get(lastRowSegment+1).isFirstLiftedUp)
+                    && !segmentHistoryBuffer.get(lastRowSegment).isEmpty){
+                SegmentHistory thatHistory = segmentHistoryBuffer.get(lastRowSegment);
+                float leftEdgeLen = (float)(Math.sqrt(thatHistory.fLOfTile.sub(thatHistory.nLOfTile).sqlen()));
+                float rightEdgeLen = (float)(Math.sqrt(thatHistory.fROfTile.sub(thatHistory.nROfTile).sqlen()));
+                float leftLen = (float)(Math.sqrt(thatHistory.fLOfTile.sub(thatHistory.lastL).sqlen()));
+                float ratioHere = leftLen / (rowSpacing * 2.0f * (leftEdgeLen / (leftEdgeLen + rightEdgeLen)));
+                previousL = thatHistory.lastL;
+                previousR = thatHistory.lastR;
+                remainingRatio -= ratioHere;
 
-        float lastLeftOverL = lastHistory.leftoverL, lastLeftOverR = lastHistory.leftoverR;
-        int cntL = 0, cntR = 0, cntRows = 0;
-
-        if (wasPreviousEmpty || isFirstLiftedUp) {
-
-            // First real tile – add bridging row along its near edge so the grid starts flush.
-            leftSideBuffer.addPos(nl.x, nl.y, nl.z);
-            rightSideBuffer.addPos(nr.x, nr.y, nr.z);
-            ++cntL;
-            ++cntR;
-            lastLeftOverL = 0;
-            lastLeftOverR = 0;
-        }
-
-        int nextRowLeft = (wasPreviousEmpty || isFirstLiftedUp)
-                ? leftSideBuffer.size() : lastHistory.nextRowLeftInd;
-        int nextRowRight = (wasPreviousEmpty || isFirstLiftedUp)
-                ? rightSideBuffer.size() : lastHistory.nextRowRightInd;
-
-        Vector3D eL = fl.sub(nl);
-        Vector3D eR = fr.sub(nr);
-
-        float lenL = (float) sqrt(eL.sqlen());
-        float lenR = (float) sqrt(eR.sqlen());
-
-        // distance from tile.near edge to first potential row position
-        float firstDistL = (rowSpacing - lastLeftOverL);
-        for (float d = firstDistL; d <= lenL; d += rowSpacing) {
-            float fraction = d / lenL;
-            Vector3D leftP = nl.add(eL.mult(fraction));
-            leftSideBuffer.addPos(leftP.x, leftP.y, leftP.z);
-            ++cntL;
-        }
-
-
-        float firstDistR = (rowSpacing - lastLeftOverR);
-        for (float d = firstDistR; d <= lenR; d += rowSpacing) {
-            float fraction = d / lenR;
-            Vector3D rightP = nr.add(eR.mult(fraction));
-            rightSideBuffer.addPos(rightP.x, rightP.y, rightP.z);
-            ++cntR;
-        }
-
-        String xd = isReAdded ? "RE" : "NEW";
-
-        System.out.println("<> ============================" + xd + " " + leftSideBuffer.size()+","+rightSideBuffer.size());
-
-        for (; nextRowLeft < leftSideBuffer.size() && nextRowRight < rightSideBuffer.size();
-             ++nextRowLeft, ++nextRowRight) {
-            Vector3D leftP = V3(
-                    leftSideBuffer.getX(nextRowLeft),
-                    leftSideBuffer.getY(nextRowLeft),
-                    leftSideBuffer.getZ(nextRowLeft)
-            );
-            Vector3D rightP = V3(
-                    rightSideBuffer.getX(nextRowRight),
-                    rightSideBuffer.getY(nextRowRight),
-                    rightSideBuffer.getZ(nextRowRight)
-            );
-            Vector3D lastLeftP = V3(
-                    leftSideBuffer.getX(nextRowLeft - 1),
-                    leftSideBuffer.getY(nextRowLeft - 1),
-                    leftSideBuffer.getZ(nextRowLeft - 1)
-            );
-            Vector3D lastRightP = V3(
-                    rightSideBuffer.getX(nextRowRight - 1),
-                    rightSideBuffer.getY(nextRowRight - 1),
-                    rightSideBuffer.getZ(nextRowRight - 1)
-            );
-            rowInfoBuffer.add(tile.getID(),leftP, rightP,
-                    lastLeftP, lastRightP);
+            }
+            float distL = rowSpacing * remainingRatio * ratioOurLeft;
+            float distR = rowSpacing * remainingRatio * ratioOurRight;
+            if(distL > elL){
+                segmentHistoryBuffer.add(
+                        false,
+                        isFirstLiftedUp,
+                        0,
+                        nl, nr,
+                        fl, fr,
+                        null, null);
+                return;
+            }
+            lastPointL = nl.add(el.withLen(distL));
+            lastPointR = nr.add(er.withLen(distR));
+            rowInfoBuffer.add(
+                    tile.getID(),
+                    lastPointL, lastPointR,
+                    previousL, previousR);
             ++cntRows;
         }
 
 
-        float currLeftoverL = (lastLeftOverL + lenL) % rowSpacing;
-        float currLeftoverR = (lastLeftOverR + lenR) % rowSpacing;
+        // Add remaining rows
+        while(true){
+            Pair<Vector3D, Vector3D> thisSeg = getNext(
+                    nl, nr,
+                    el, er,
+                    elL, elR,
+                    lastPointL, lastPointR
+            );
+            if(thisSeg == null){
+                break;
+            }
+            rowInfoBuffer.add(
+                    tile.getID(),
+                    thisSeg.first, thisSeg.second,
+                    lastPointL, lastPointR);
+            lastPointL = thisSeg.first;
+            lastPointR = thisSeg.second;
+            ++cntRows;
 
-        segmentHistoryBuffer.add(cntL, cntR, cntRows,
+        }
+
+
+        segmentHistoryBuffer.add(
+                false,
                 isFirstLiftedUp,
-                nextRowLeft,
-                nextRowRight,
-                currLeftoverL, currLeftoverR, nl, nr);
+                cntRows,
+                nl, nr,
+                fl, fr,
+                lastPointL, lastPointR);
 
     }
 
@@ -452,23 +456,6 @@ public class TileManager implements GPUResourceOwner {
             System.out.println("<> "+t);
         }
         System.out.println("<> ====================");
-    }
-    public void printLR(){
-        System.out.println("<> LR:");
-        int l = leftSideBuffer.size(), r = rightSideBuffer.size();
-        for(int i=0;i<min(leftSideBuffer.size(),rightSideBuffer.size());++i){
-            System.out.println("<> "+leftSideBuffer.getX(i)+","+leftSideBuffer.getY(i)+","+leftSideBuffer.getZ(i)+"    "+rightSideBuffer.getX(i)+","+rightSideBuffer.getY(i)+","+rightSideBuffer.getZ(i));
-            --l;
-            --r;
-        }
-        for(int i=leftSideBuffer.size()-l;i<leftSideBuffer.size();++i){
-            System.out.println("<> "+leftSideBuffer.getX(i)+","+leftSideBuffer.getY(i)+","+leftSideBuffer.getZ(i));
-        }
-        for(int i=rightSideBuffer.size()-r;i<rightSideBuffer.size();++i){
-            System.out.println("<>                           "+rightSideBuffer.getX(i)+","+rightSideBuffer.getY(i)+","+rightSideBuffer.getZ(i));
-        }
-        System.out.println("<> ===============================");
-
     }
 
     /**
@@ -573,33 +560,32 @@ public class TileManager implements GPUResourceOwner {
     // ============================================================================
 
     public static class SegmentHistory {
-
-        public int leftAddedCnt = 0, rightAddedCnt = 0, rowsAddedCnt = 0;
+        public boolean isEmpty = false;
         public boolean isFirstLiftedUp = false;
-        public int nextRowLeftInd = 0, nextRowRightInd = 0;
-        public float leftoverL, leftoverR;
-        public Vector3D nl = V3(0, 0, 0), nr = V3(0, 0, 0);
+        public int rowsAddedCnt = 0;
+        public Vector3D nLOfTile = V3(0,0,0), nROfTile = V3(0,0,0);
+        public Vector3D fLOfTile = V3(0,0,0), fROfTile = V3(0,0,0);
 
+        public Vector3D lastL =  V3(0,0,0), lastR = V3(0,0,0);
 
         public SegmentHistory() {
         }
 
-        public void set(int leftAddedCnt, int rightAddedCnt,
-                        int rowsAddedCnt,
+        public void set(boolean isEmpty,
                         boolean isFirstLiftedUp,
-                        int nextRowLeftInd, int nextRowRightInd,
-                        float leftoverL, float leftoverR,
-                        Vector3D nl, Vector3D nr) {
-            this.leftAddedCnt = leftAddedCnt;
-            this.rightAddedCnt = rightAddedCnt;
-            this.rowsAddedCnt = rowsAddedCnt;
+                        int rowsAddedCnt,
+                        Vector3D nLOfTile, Vector3D nROfTile,
+                        Vector3D fLOfTile, Vector3D fROfTile,
+                        Vector3D lastL, Vector3D lastR) {
+            this.isEmpty = isEmpty;
             this.isFirstLiftedUp = isFirstLiftedUp;
-            this.nextRowLeftInd = nextRowLeftInd;
-            this.nextRowRightInd = nextRowRightInd;
-            this.leftoverL = leftoverL;
-            this.leftoverR = leftoverR;
-            this.nl = nl;
-            this.nr = nr;
+            this.rowsAddedCnt = rowsAddedCnt;
+            this.nLOfTile = nLOfTile;
+            this.nROfTile = nROfTile;
+            this.fLOfTile = fLOfTile;
+            this.fROfTile = fROfTile;
+            this.lastL = lastL;
+            this.lastR = lastR;
         }
     }
 
