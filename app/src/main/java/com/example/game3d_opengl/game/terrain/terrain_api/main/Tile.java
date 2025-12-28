@@ -1,6 +1,8 @@
 
 package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
+import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
+
 import androidx.annotation.NonNull;
 
 import com.example.game3d_opengl.game.PlayerInteractable;
@@ -87,34 +89,14 @@ public class Tile implements PlayerInteractable {
     @Override
     public void interactWithPlayer(Player.InteractableAPI api) {
         if (isEmptySegment()) return;
-        // do collision test against both triangles using player position and triangle normals
-        Vector3D playerPos = new Vector3D(api.getPlayerX(), api.getPlayerY(), api.getPlayerZ());
         // Prepare jump info when collision is detected
-        if (collidesPlayer(playerPos,
-                api.getPlayerHeight(), api.getPlayerFallSafetyMult(), api.getPlayerFallSpeed())) {
+        if (api.collidesTile(this)) {
 
             PlayerJumpInfo.PlayerHasFooting info =
-                    new PlayerJumpInfo.PlayerHasFooting(this, triangles);
+                    new PlayerJumpInfo.PlayerHasFooting(this);
             api.addInfo(info);
         }
     }
 
-    private boolean collidesPlayer(Vector3D playerPos,
-                                   float player_height, float fall_safety_mult, float fall_speed){
-        // For a collision, cast ray along inverted normal direction towards the tile and test distance
-        Vector3D n1 = GameMath.getNormal(triangles[0]);
-        Vector3D n2 = GameMath.getNormal(triangles[1]);
-        float d1 = GameMath.rayTriangleDistance(
-                playerPos,
-                n1.mult(-Math.signum(n1.y)),
-                triangles[0][0], triangles[0][1], triangles[0][2]
-        );
-        if (!Float.isInfinite(d1) && d1 < fall_speed + player_height * fall_safety_mult) return true;
-        float d2 = GameMath.rayTriangleDistance(
-                playerPos,
-                n2.mult(-Math.signum(n2.y)),
-                triangles[1][0], triangles[1][1], triangles[1][2]
-        );
-        return !Float.isInfinite(d2) && d2 / fall_speed + player_height < 1.05f;
-    }
+
 }

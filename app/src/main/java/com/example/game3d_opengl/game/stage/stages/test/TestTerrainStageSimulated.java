@@ -11,6 +11,7 @@ import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.stage.stages.test.util.FourPoints3D;
 import com.example.game3d_opengl.game.stage.stages.test.util.LineSet3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.TerrainGridField;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -66,7 +67,7 @@ public class TestTerrainStageSimulated extends Stage {
             tileManager.addSegment(false);
             tileManager.addSegment(true);
         }
-
+        /*
         tileManager.setUpcomingAlphas(0.2f,0.2f);
         tileManager.addHorizontalAngle(0.1308997f);
         tileManager.addVerticalAngle(0.0f);
@@ -87,7 +88,7 @@ public class TestTerrainStageSimulated extends Stage {
         tileManager.addHorizontalAngle(-0.5235988f);
 
         tileManager.addSegment(true);
-        //tileManager.liftUp(0.5f);
+        tileManager.liftUp(0.5f);
         tileManager.addHorizontalAngle(0.1308997f);
         tileManager.addVerticalAngle(0.0f);
         tileManager.addSegment(false);
@@ -103,6 +104,7 @@ public class TestTerrainStageSimulated extends Stage {
         tileManager.addVerticalAngle(-0.0f);
         tileManager.addHorizontalAngle(-0.5235988f);
         tileManager.liftUp(0.5f);
+        */
 
 
         tileManager.printTiles();
@@ -116,11 +118,12 @@ public class TestTerrainStageSimulated extends Stage {
         int idx = 0;
         for (int r = 1; r <= rows; r++) {
             for (int c = 1; c <= nCols; c++) {
-                Vector3D[] field = tileManager.getField(r, c); // [TL, TR, BL, BR]
-                // reorder to clockwise: TL, TR, BR, BL
-                Vector3D[] cw = new Vector3D[]{field[0], field[1], field[3], field[2]};
+                TerrainGridField field = tileManager.getField(r, c);
+                // clockwise: nearLeft, nearRight, farRight, farLeft
+                Vector3D[] cw = new Vector3D[]{field.nearLeft, field.nearRight, field.farRight, field.farLeft};
                 grid[idx++] = new FourPoints3D(cw);
-                System.out.println("+_+ " + "r: "+r+" c: "+c+ " "+field[0] + " | "+field[1] + " | "+field[3] + " | "+field[2]);
+                System.out.println("+_+ " + "r: "+r+" c: "+c+ " "
+                        + field.nearLeft + " | " + field.nearRight + " | " + field.farRight + " | " + field.farLeft);
             }
             System.out.println("+_+ " +"=================================");
         }

@@ -6,6 +6,7 @@ import static org.junit.Assert.*;
 
 import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerJumpInfo;
 import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerAllJumpVisitor;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
 
 public class JumpVisitorDispatchTest {
 
@@ -37,7 +38,7 @@ public class JumpVisitorDispatchTest {
     @Test
     public void test_HasFooting_dispatchesToTypedOverload() {
         TestVisitorAll v = new TestVisitorAll();
-        new PlayerJumpInfo.PlayerHasFooting(null,null).accept(v);
+        new PlayerJumpInfo.PlayerHasFooting(null).accept(v);
         assertTrue(v.footingCalled);
         assertFalse(v.baseCalled);
     }

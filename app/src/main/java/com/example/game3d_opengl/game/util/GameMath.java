@@ -28,6 +28,15 @@ public class GameMath {
         return cross.sqlen() < EPS;
     }
 
+    public static float roundToDecimals(float value, int decimals) {
+        if (decimals < 0) {
+            throw new IllegalArgumentException("decimals must be >= 0");
+        }
+
+        double factor = Math.pow(10.0, decimals);
+        return (float) (Math.round(value * factor) / factor);
+    }
+
     public static float tan(float alpha){
         return (float)(Math.tan(alpha));
     }

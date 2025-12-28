@@ -1,13 +1,13 @@
 package com.example.game3d_opengl.game.player.player_character;
 
 import static com.example.game3d_opengl.game.util.GameMath.PI;
-import static com.example.game3d_opengl.game.util.GameMath.getNormal;
 import static com.example.game3d_opengl.game.util.GameMath.rayTriangleDistance;
 import static com.example.game3d_opengl.game.util.GameMath.rotY;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import static java.lang.Float.max;
 import static java.lang.Math.abs;
+import static java.lang.Math.min;
 import static java.lang.Math.signum;
 
 import com.example.game3d_opengl.game.WorldActor;
@@ -42,7 +42,7 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
 
     // Physics state
     private Tile tileBelow;
-    private long nearestTileId = -1L;
+    private long nearestTileId = -1;
 
     private final PlayerAllJumpLogicImplementation jumpLogicImplementation;
 
@@ -135,46 +135,29 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
 
     @Override
     public void visit(PlayerJumpInfo.PlayerHasFooting info){
-        // Record footing tile (for bookkeeping like nearestTileId)
+        // Record hitTri tile (for bookkeeping like nearestTileId)
         this.tileBelow = info.tile;
-        if (info.tile != null) { // sus. when is it ever null?
-            this.nearestTileId = info.tile.getID();
-        }
+        assert info.tile.getID() >= nearestTileId;
+        this.nearestTileId = info.tile.getID();
 
         // Compute ground sliding move using the provided contact triangles
         // Choose the closest triangle under the player
-        Vector3D origin = V3(object3D.objX, object3D.objY, object3D.objZ);
-        float bestDist = Float.POSITIVE_INFINITY;
-        Vector3D[] hitTri = null;
-        for (Vector3D[] tri : info.triangles) {
-            Vector3D nUnit = getNormal(tri);
-            float d = rayTriangleDistance(
-                    origin,
-                    nUnit.mult(-signum(nUnit.y)),
-                    tri[0], tri[1], tri[2]
-            );
-            if (!Float.isInfinite(d) && d < bestDist) {
-                bestDist = d;
-                hitTri = tri;
-            }
-        }
 
-        if (hitTri != null && bestDist < PLAYER_HEIGHT*FALL_COLLISION_SAFETY_MULTIPLIER) {
-            // We are grounded on a triangle -> cancel falling and compute slide direction
-            fallSpeed = 0f;
+        Vector3D[] hitTri = findCollisionTriangle(info.tile);
+        assert hitTri != null;
+        fallSpeed = 0f;
 
-            Vector3D u = hitTri[1].sub(hitTri[0]);
-            Vector3D w = hitTri[2].sub(hitTri[0]);
-            Vector3D n = u.crossProduct(w);
+        Vector3D u = hitTri[1].sub(hitTri[0]);
+        Vector3D w = hitTri[2].sub(hitTri[0]);
+        Vector3D n = u.crossProduct(w);
 
-            float det = calculateDeterminant(n, u, w);
-            if (Math.abs(det) > 1e-6f) {
-                float beta = calculateBeta(n,  w, dir, det);
-                float gamma = calculateGamma(n, u, dir, det);
-                move = u.mult(beta).add(w.mult(gamma)).withLen(PLAYER_SPEED);
-            } else {
-                move = dir.withLen(PLAYER_SPEED);
-            }
+        float det = calculateDeterminant(n, u, w);
+        if (Math.abs(det) > 1e-6f) {
+            float beta = calculateBeta(n,  w, dir, det);
+            float gamma = calculateGamma(n, u, dir, det);
+            move = u.mult(beta).add(w.mult(gamma)).withLen(PLAYER_SPEED);
+        } else {
+            move = dir.withLen(PLAYER_SPEED);
         }
 
         // Forward jump-related decisions to jump logic
@@ -315,6 +298,23 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
         object3D.objYaw -= dx * STICKY_ROTATION_COEFFICIENT;
     }
 
+    private Vector3D[] findCollisionTriangle(Tile tile){
+        Vector3D origin = V3(object3D.objX, object3D.objY, object3D.objZ);
+        for (Vector3D[] tri : tile.triangles) {
+            float d = rayTriangleDistance(
+                    origin,
+                    V3(0,-1,0),
+                    tri[0], tri[1], tri[2]
+            );
+            if (!Float.isInfinite(d) && d < fallSpeed + PLAYER_HEIGHT * FALL_COLLISION_SAFETY_MULTIPLIER) {
+                return tri;
+            }
+        }
+        return null;
+    }
+    private boolean collidesTile(Tile tile){
+        return findCollisionTriangle(tile) != null;
+    }
 
 
     public float getX() { return object3D.objX; }
@@ -370,30 +370,8 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
             return player.getZ();
         }
 
-        /**
-         * Gets the player's direction vector.
-         */
-        public Vector3D getPlayerDirection() {
-            return player.getDir();
-        }
-
-        /**
-         * Gets the ID of the nearest tile to the player.
-         */
-        public long getNearestTileId() {
-            return player.getNearestTileId();
-        }
-
-        public float getPlayerHeight() {
-            return PLAYER_HEIGHT;
-        }
-
-        public float getPlayerFallSafetyMult() {
-            return FALL_COLLISION_SAFETY_MULTIPLIER;
-        }
-
-        public float getPlayerFallSpeed() {
-            return player.fallSpeed;
+        public boolean collidesTile(Tile tile){
+            return player.collidesTile(tile);
         }
 
         // Add other getters as needed for interactables

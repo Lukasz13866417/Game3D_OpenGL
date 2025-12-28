@@ -6,14 +6,11 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 public abstract class PlayerJumpInfo extends PlayerAffectingInfo<PlayerAllJumpVisitor> {
     public abstract void accept(PlayerAllJumpVisitor visitor);
-
     public static class PlayerHasFooting extends PlayerJumpInfo {
         public final Tile tile;                 // tile we stand on
-        public final Vector3D[][] triangles;   // tile triangles for physics
 
-        public PlayerHasFooting(Tile tile, Vector3D[][] triangles) {
+        public PlayerHasFooting(Tile tile) {
             this.tile = tile;
-            this.triangles = triangles;
         }
 
         public void accept(PlayerAllJumpVisitor visitor) {

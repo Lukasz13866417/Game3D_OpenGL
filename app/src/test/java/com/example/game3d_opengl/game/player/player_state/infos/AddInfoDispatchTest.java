@@ -30,7 +30,7 @@ public class AddInfoDispatchTest {
     @Test
     public void testAddInfoWithPlayerJumpInfo() {
         // Test with PlayerJumpInfo subclasses
-        PlayerJumpInfo.PlayerHasFooting footingInfo = new PlayerJumpInfo.PlayerHasFooting(null,null);
+        PlayerJumpInfo.PlayerHasFooting footingInfo = new PlayerJumpInfo.PlayerHasFooting(null);
         PlayerJumpInfo.PlayerWantsJump wantsJumpInfo = new PlayerJumpInfo.PlayerWantsJump();
         PlayerJumpInfo.PlayerHasJumpCharges chargesInfo = new PlayerJumpInfo.PlayerHasJumpCharges();
 
@@ -75,7 +75,7 @@ public class AddInfoDispatchTest {
     @Test
     public void testDoubleDispatchCorrectness() {
         // Test that the double-dispatch mechanism works correctly
-        PlayerJumpInfo.PlayerHasFooting footingInfo = new PlayerJumpInfo.PlayerHasFooting(null,null);
+        PlayerJumpInfo.PlayerHasFooting footingInfo = new PlayerJumpInfo.PlayerHasFooting(null);
         
         // Clear previous calls
         testVisitor.clearCalls();

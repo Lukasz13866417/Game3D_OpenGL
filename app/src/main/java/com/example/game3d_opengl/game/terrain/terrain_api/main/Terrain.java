@@ -441,7 +441,7 @@ public class Terrain implements GPUResourceOwner {
      * This is called each frame to maintain a reasonable terrain size.
      */
     public void removeOldTerrainElements(long playerTileId) {
-        tileManager.removeOldTiles(playerTileId);
+        tileManager.removeOldTiles(playerTileId - 50L);
         removeOldAddons(playerTileId);
     }
 
@@ -500,7 +500,7 @@ public class Terrain implements GPUResourceOwner {
         @Override
         public void execute(float[] buffer, int offset, int length) {
             int code = (int) buffer[offset];
-            Util.printCommand(buffer,offset);
+            //Util.printCommand(buffer,offset);
             if (landscapeCommandExecutor.canHandle(code)) {
                 landscapeCommandExecutor.execute(buffer, offset, length);
             } else if (addonsCommandExecutor.canHandle(code)) {

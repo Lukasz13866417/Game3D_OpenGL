@@ -14,7 +14,7 @@ public class PlayerJumpLogicImplementationTest {
         PlayerAllJumpLogicImplementation impl = new PlayerAllJumpLogicImplementation();
         impl.resetFrame();
         new PlayerJumpInfo.PlayerWantsJump().accept(impl);
-        new PlayerJumpInfo.PlayerHasFooting(null,null).accept(impl);
+        new PlayerJumpInfo.PlayerHasFooting(null).accept(impl);
         assertTrue(impl.shouldJump());
         // cached result stays consistent on repeated calls
         assertTrue(impl.shouldJump());
@@ -36,7 +36,7 @@ public class PlayerJumpLogicImplementationTest {
     public void missing_want_means_no_jump_even_with_other_infos() {
         PlayerAllJumpLogicImplementation impl = new PlayerAllJumpLogicImplementation();
         impl.resetFrame();
-        new PlayerJumpInfo.PlayerHasFooting(null,null).accept(impl);
+        new PlayerJumpInfo.PlayerHasFooting(null).accept(impl);
         new PlayerJumpInfo.PlayerHasJumpCharges().accept(impl);
         assertFalse(impl.shouldJump());
     }
@@ -46,12 +46,12 @@ public class PlayerJumpLogicImplementationTest {
         PlayerAllJumpLogicImplementation impl = new PlayerAllJumpLogicImplementation();
         impl.resetFrame();
         new PlayerJumpInfo.PlayerWantsJump().accept(impl);
-        new PlayerJumpInfo.PlayerHasFooting(null,null).accept(impl);
+        new PlayerJumpInfo.PlayerHasFooting(null).accept(impl);
         assertTrue(impl.shouldJump());
 
         // Next frame: different inputs lead to different result
         impl.resetFrame();
-        new PlayerJumpInfo.PlayerHasFooting(null,null).accept(impl);
+        new PlayerJumpInfo.PlayerHasFooting(null).accept(impl);
         assertFalse(impl.shouldJump());
     }
 }

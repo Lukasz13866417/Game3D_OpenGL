@@ -11,6 +11,7 @@ import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.TerrainGridField;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.game.stage.stages.test.util.FourPoints3D;
 import com.example.game3d_opengl.game.stage.stages.test.util.LineSet3D;
@@ -35,6 +36,8 @@ public class TestGridRowsStage extends Stage {
     private static final Vector3D lightSourcePos = cameraPos;
 
     private static final Vector3D firstTileStartCenter = cameraLookAt.addX(-2);
+
+    private LineSet3D tileLineSet;
 
 
 
@@ -84,7 +87,7 @@ public class TestGridRowsStage extends Stage {
         //tileManager.addSegment(true);
         //tileManager.addSegment(true);
         for (int i = 0; i < 13 ; ++i) {
-            tileManager.addSegment(false); tileManager.addHorizontalAngle(PI/12);}
+            tileManager.addSegment((i%5 == 1)); tileManager.addHorizontalAngle(PI/12);}
 
 
         tileManager.printTiles();
@@ -99,16 +102,19 @@ public class TestGridRowsStage extends Stage {
         int idx = 0;
         for (int r = 1; r <= rows; r++) {
             for (int c = 1; c <= nCols; c++) {
-                Vector3D[] field = tileManager.getField(r, c); // [TL, TR, BL, BR]
-                // reorder to clockwise: TL, TR, BR, BL
-                Vector3D[] cw = new Vector3D[]{field[0], field[1], field[3], field[2]};
+                TerrainGridField field = tileManager.getField(r, c);
+                // clockwise: nearLeft, nearRight, farRight, farLeft
+                Vector3D[] cw = new Vector3D[]{field.nearLeft, field.nearRight, field.farRight, field.farLeft};
                 grid[idx++] = new FourPoints3D(cw);
-                System.out.println("+_+ " + "r: "+r+" c: "+c+ " "+field[0] + " | "+field[1] + " | "+field[3] + " | "+field[2]);
+                System.out.println("+_+ " + "r: "+r+" c: "+c+ " "
+                        + field.nearLeft + " | " + field.nearRight + " | " + field.farRight + " | " + field.farLeft);
             }
             System.out.println("+_+ " +"=================================");
         }
 
         lightSource = new LightSource(FColor.CLR(1,1,1));
+
+        tileLineSet = tileManager.getTileLineSet();
 
     }
 
@@ -120,7 +126,7 @@ public class TestGridRowsStage extends Stage {
            fp.draw(camera.getViewProjectionMatrix()); // enable when grid is drawn
         }
         tileManager.draw(FColor.CLR(0,1,0), camera.getViewProjectionMatrix(), lightSource);
-        tileManager.getTileLineSet().draw(camera.getViewProjectionMatrix());
+        //tileLineSet.draw(camera.getViewProjectionMatrix());
 
     }
 

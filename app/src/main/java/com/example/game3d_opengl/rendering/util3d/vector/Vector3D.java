@@ -16,6 +16,10 @@ public class Vector3D{
         this.z = z;
     }
 
+    public static boolean approxEq(Vector3D a, Vector3D b, float eps) {
+        return abs(a.x - b.x) <= eps && abs(a.y - b.y) <= eps && abs(a.z - b.z) <= eps;
+    }
+
     public Vector3D setX(float newx){
         return V3(newx,y,z);
     }

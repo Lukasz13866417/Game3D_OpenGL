@@ -91,10 +91,10 @@ public class GameplayStage extends Stage {
                 segLength,
                 1f
         );
-        terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
-        terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
-        terrain.enqueueStructure(new TerrainStairs(100,4,2, PI/6,-1f));
-        terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
+        //terrain.enqueueStructure(new TerrainLineWithSpikeRect(60));
+        terrain.enqueueStructure(new TerrainLineWithSpikeRect(70));
+        terrain.enqueueStructure(new TerrainStairs(70,4,2, PI/6,-1f));
+        terrain.enqueueStructure(new TerrainLineWithSpikeRect(70));
         terrain.enqueueStructure(new Terrain2DCurve(50,0,PI/8f));
 
         terrain.generateChunks(-1);
@@ -107,7 +107,7 @@ public class GameplayStage extends Stage {
     public void updateThenDraw(float dt) {
 
         terrain.removeOldTerrainElements(player.getNearestTileId());
-       /* if (terrain.getTileCount() < 400) {
+        /*if (terrain.getTileCount() < 400) {
             terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
             terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
             terrain.enqueueStructure(new TerrainStairs(50,4,2, PI/6,-1f));

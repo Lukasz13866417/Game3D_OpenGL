@@ -63,7 +63,7 @@ public class AddonsCommandsExecutor implements CommandExecutor {
 
     private void processAddons(int baseRow, int baseCol, int length,  boolean horizontal) {
         int rOffset = terrain.rowOffsetQueue.peek();
-        System.out.println("<> PROCESSING ADDONS: "+baseRow+","+baseCol+","+length+" OFF: "+rOffset);
+        //System.out.println("<> PROCESSING ADDONS: "+baseRow+","+baseCol+","+length+" OFF: "+rOffset);
         for (int i = 0; i < length; ++i) {
             Addon addon = terrain.addonQueue.dequeue();
             int row = horizontal ? baseRow : baseRow + i;
@@ -71,8 +71,8 @@ public class AddonsCommandsExecutor implements CommandExecutor {
             long tileId = terrain.tileManager.getTileIdForRow(row);
             addon.setTileId(tileId);
             int col = horizontal ? baseCol + i : baseCol;
-            Vector3D[] field = terrain.tileManager.getField(row,col);
-            addon.place(field[0], field[1], field[2], field[3]);
+            TerrainGridField field = terrain.tileManager.getField(row, col);
+            addon.place(field.nearLeft, field.nearRight, field.farLeft, field.farRight);
             terrain.addons.pushBack(addon);
         }
     }

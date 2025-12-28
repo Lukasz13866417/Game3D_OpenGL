@@ -13,6 +13,7 @@ import com.example.game3d_opengl.game.stage.stages.main.MenuStage;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.stage.stages.test.AddonPlacementTestStage;
 import com.example.game3d_opengl.game.stage.stages.test.TestGridRowsStage;
+import com.example.game3d_opengl.game.stage.stages.test.TestGridRowsStageWithAddons;
 import com.example.game3d_opengl.game.stage.stages.test.TestTerrainStage;
 import com.example.game3d_opengl.game.stage.stages.test.TestTerrainStageSimulated;
 import com.example.game3d_opengl.game.stage.stages.test.TestTileManagerStage;
@@ -73,9 +74,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.currStage =  //new TestTerrainStageSimulated(stageManager);
                           //new TestTerrainStage(stageManager);
                           //new TestTileManagerStage(stageManager);
-                          new TestGridRowsStage(stageManager);
+                          //new TestGridRowsStage(stageManager);
+                          //new TestGridRowsStageWithAddons(stageManager);
                           //new AddonPlacementTestStage(stageManager);
-                          //new GameplayStage(stageManager);
+                          new GameplayStage(stageManager);
                           //new TestWireframeStage(stageManager);
                           //new IconTestStage(stageManager);
     }

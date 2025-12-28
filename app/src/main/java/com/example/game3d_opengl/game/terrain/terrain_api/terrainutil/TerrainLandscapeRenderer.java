@@ -59,22 +59,28 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
             this.aL = new float[maxEdges];
             this.aR = new float[maxEdges];
         }
-        private int tailIndex() { return (head + size) % capacity; }
-        private int lastIndex() { return (head + size - 1 + capacity) % capacity; }
-        private int indexOfOffset(int off) { return (head + off) % capacity; }
+        private int tailIndex() { return Math.floorMod(head + size, capacity); }
+        private int lastIndex() { return Math.floorMod(head + size - 1, capacity); }
+        private int indexOfOffset(int off) { return Math.floorMod(head + off, capacity); }
         private int indexOfSeq(int seqId) { return indexOfOffset(seqId - seqStart); }
-        void pushBack(Vector3D left, Vector3D right, float alphaL, float alphaR) {
+        /**
+         * @return true if pushing caused eviction of the oldest element (ring overwrite).
+         */
+        boolean pushBack(Vector3D left, Vector3D right, float alphaL, float alphaR) {
             int idx = tailIndex();
             lx[idx] = left.x; ly[idx] = left.y; lz[idx] = left.z;
             rx[idx] = right.x; ry[idx] = right.y; rz[idx] = right.z;
             aL[idx] = alphaL; aR[idx] = alphaR;
+            boolean evicted = false;
             if (size < capacity) {
                 size++;
             } else {
                 // overwrite oldest (advance head and seqStart)
-                head = (head + 1) % capacity;
+                head = Math.floorMod(head + 1, capacity);
                 seqStart++;
+                evicted = true;
             }
+            return evicted;
         }
         void popBack() {
             if (size <= 0) return;
@@ -82,7 +88,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         }
         void popFront() {
             if (size <= 0) return;
-            head = (head + 1) % capacity;
+            head = Math.floorMod(head + 1, capacity);
             size--;
             seqStart++;
         }
@@ -112,9 +118,9 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
                 count[i] = 0;
             }
         }
-        private int tailIndex() { return (head + size) % capacity; }
-        private int lastIndex() { return (head + size - 1 + capacity) % capacity; }
-        private int indexOfOffset(int off) { return (head + off) % capacity; }
+        private int tailIndex() { return Math.floorMod(head + size, capacity); }
+        private int lastIndex() { return Math.floorMod(head + size - 1, capacity); }
+        private int indexOfOffset(int off) { return Math.floorMod(head + off, capacity); }
         int getSize() { return size; }
         int getStartSeqAt(int offset) { return startSeq[indexOfOffset(offset)]; }
         int getCountAt(int offset) { return count[indexOfOffset(offset)]; }
@@ -132,29 +138,37 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
                 size++;
             } else {
                 // overwrite oldest
-                head = (head + 1) % capacity;
+                head = Math.floorMod(head + 1, capacity);
                 int idx = lastIndex();
                 startSeq[idx] = seq;
                 count[idx] = 0;
             }
         }
         void incLastCount() {
-            if (size == 0) return;
+            assert size > 0;
             count[lastIndex()]++;
         }
         void decLastCountAndMaybePop() {
-            if (size == 0) return;
+            assert size > 0;
             int idx = lastIndex();
             if (count[idx] > 0) count[idx]--;
             if (count[idx] == 0) {
                 size--;
             }
         }
+        /**
+         * Consume one edge from the front-most strip.
+         * Must be called whenever the edge ring buffer removes/evicts one element from the front.
+         */
         void decFirstCountAndMaybePop() {
-            if (size == 0) return;
-            if (count[head] > 0) count[head]--;
+            assert size > 0;
+            if (count[head] > 0) {
+                count[head]--;
+                // We removed the strip's first edge, so the strip's starting seq advances.
+                startSeq[head]++;
+            }
             if (count[head] == 0) {
-                head = (head + 1) % capacity;
+                head = Math.floorMod(head + 1, capacity);
                 size--;
             }
         }
@@ -202,20 +216,24 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         if (stripBuf.getSize() == 0 || stripBuf.getCountAt(stripBuf.getSize() - 1) == 0) {
             stripBuf.startNewStrip(edgeBuf.getNextSeq());
         }
-        edgeBuf.pushBack(newLeft, newRight, alphaL, alphaR);
+        boolean evicted = edgeBuf.pushBack(newLeft, newRight, alphaL, alphaR);
+        // If the edge ring evicted the oldest element (overwrite), keep strip metadata in sync.
+        if (evicted && stripBuf.getSize() > 0) {
+            stripBuf.decFirstCountAndMaybePop();
+        }
         stripBuf.incLastCount();
     }
 
     /** Remove newest pair at the back, if any. */
     public void popBack() {
-        if (edgeBuf.getSize() <= 0) return;
+        assert edgeBuf.getSize() > 0;
         edgeBuf.popBack();
         stripBuf.decLastCountAndMaybePop();
     }
 
     /** Remove oldest pair at the front, if any. */
     public void popFront() {
-        if (edgeBuf.getSize() <= 0) return;
+        assert edgeBuf.getSize() > 0;
         edgeBuf.popFront();
         stripBuf.decFirstCountAndMaybePop();
     }
@@ -228,10 +246,6 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
      */
     public void draw(FColor color, float[] vp, LightSource light) {
         if (edgeBuf.getSize() <= 0 || stripBuf.getSize() <= 0) return;
-
-        // Ensure alpha blending is enabled for translucency
-        GLES20.glEnable(GLES20.GL_BLEND);
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
 
         // Build CPU vertex array for all sub-strips, contiguous
         int totalVertices = edgeBuf.getSize() * 2;
@@ -250,6 +264,9 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
             fsArgs.lightX = fsArgs.lightY = fsArgs.lightZ = 0f;
             fsArgs.lightColor = DEFAULT_LIGHT_COLOR;
         }
+        // We'll do a depth pre-pass first (opaque fragments only), then a blended color pass.
+        // This prevents partially transparent fragments from writing depth and causing
+        // visual "mixing"/halo artifacts at strip boundaries.
         fsArgs.isDepthPass = 0;
 
         // Flatten vertices and record draw ranges per sub-strip (no allocations)
@@ -259,7 +276,8 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         for (int si = 0; si < stripsToDraw; si++) {
             int startSeq = stripBuf.getStartSeqAt(si);
             int edgeCount = stripBuf.getCountAt(si);
-            if (edgeCount <= 0) continue;
+            // Need at least 2 edges for a triangle strip segment.
+            if (edgeCount < 2) continue;
             int firstForStrip = writtenVertices;
 
             for (int e = 0; e < edgeCount; e++) {
@@ -346,19 +364,45 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         // Bind shader and attributes
         TerrainRibbonShaderPair shader = TerrainRibbonShaderPair.sharedShader;
         shader.setAsCurrentProgram();
-        shader.setArgs(vsArgs, fsArgs);
-        shader.transferArgsToGPU();
         shader.enableAndPointVertexAttribs();
 
-        // Issue draws per sub-strip
+        // ---- Pass 1: depth pre-pass (write depth only for fully opaque fragments) ----
+        // NOTE: This relies on the fragment shader discarding when vAlpha < 1.0 and isDepthPass==1.
+        GLES20.glDisable(GLES20.GL_BLEND);
+        // Use the default depth compare for the pre-pass.
+        GLES20.glDepthFunc(GLES20.GL_LESS);
+        GLES20.glDepthMask(true);
+        GLES20.glColorMask(false, false, false, false);
+        fsArgs.isDepthPass = 1;
+        shader.setArgs(vsArgs, fsArgs);
+        shader.transferArgsToGPU();
         for (int i = 0; i < drawRangesUsed; i++) {
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, drawFirst[i], drawCount[i]);
         }
 
-        // Cleanup
+        // ---- Pass 2: color pass (blend, but don't write depth) ----
+        GLES20.glColorMask(true, true, true, true);
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+        GLES20.glDepthMask(false);
+        // IMPORTANT: after writing depth in pass 1, drawing the same geometry again needs
+        // a <= test, otherwise GL_LESS will reject equal-depth fragments and everything
+        // opaque becomes invisible.
+        GLES20.glDepthFunc(GLES20.GL_LEQUAL);
+        fsArgs.isDepthPass = 0;
+        shader.setArgs(vsArgs, fsArgs);
+        shader.transferArgsToGPU();
+        for (int i = 0; i < drawRangesUsed; i++) {
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, drawFirst[i], drawCount[i]);
+        }
+
+        // Cleanup / restore state
         shader.disableVertexAttribs();
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
         GLES20.glDisable(GLES20.GL_BLEND);
+        GLES20.glDepthMask(true);
+        GLES20.glColorMask(true, true, true, true);
+        GLES20.glDepthFunc(GLES20.GL_LESS);
     }
 
 

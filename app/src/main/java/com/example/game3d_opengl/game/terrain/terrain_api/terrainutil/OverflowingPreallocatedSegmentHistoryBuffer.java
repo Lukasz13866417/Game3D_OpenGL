@@ -93,7 +93,9 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
                     int rowsAddedCnt,
                     Vector3D nLOfTile, Vector3D nROfTile,
                     Vector3D fLOfTile, Vector3D fROfTile,
-                    Vector3D lastL, Vector3D lastR) {
+                    Vector3D lastL, Vector3D lastR,
+                    float leftover,
+                    float alphaL, float alphaR) {
         int writeIdx;
         if (size < MAX_SIZE) {
             writeIdx = (head + size) % MAX_SIZE;
@@ -107,6 +109,8 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
                 rowsAddedCnt,
                 nLOfTile, nROfTile,
                 fLOfTile, fROfTile,
-                lastL, lastR);
+                lastL, lastR,
+                leftover,
+                alphaL, alphaR);
     }
 }
