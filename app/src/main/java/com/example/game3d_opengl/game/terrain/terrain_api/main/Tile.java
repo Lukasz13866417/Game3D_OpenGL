@@ -73,7 +73,7 @@ public class Tile implements PlayerInteractable {
         // This allows for proper collision detection and physics
         this.triangles = new Vector3D[][]{
                 new Vector3D[]{this.nearLeft,this.nearRight,this.farRight},
-                new Vector3D[]{this.nearLeft,this.farLeft,this.farRight}
+                new Vector3D[]{this.nearLeft,this.farRight,this.farLeft}
         };
     }
 

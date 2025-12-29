@@ -1,8 +1,13 @@
 package com.example.game3d_opengl.game.player.player_character;
 
 import static com.example.game3d_opengl.game.util.GameMath.PI;
+import static com.example.game3d_opengl.game.util.GameMath.cos;
+import static com.example.game3d_opengl.game.util.GameMath.getNormal;
 import static com.example.game3d_opengl.game.util.GameMath.rayTriangleDistance;
 import static com.example.game3d_opengl.game.util.GameMath.rotY;
+import static com.example.game3d_opengl.game.util.GameMath.sin;
+import static com.example.game3d_opengl.game.util.GameMiscUtil.maxAll;
+import static com.example.game3d_opengl.game.util.GameMiscUtil.minAll;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import static java.lang.Float.max;
@@ -16,6 +21,7 @@ import com.example.game3d_opengl.game.player.player_state.infos.PlayerAllInfoVis
 import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerJumpInfo;
 import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerAllJumpLogicImplementation;
 import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
+import com.example.game3d_opengl.rendering.util3d.vector.Vector2D;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
 
@@ -301,12 +307,13 @@ public class Player implements WorldActor , PlayerAllInfoVisitor {
     private Vector3D[] findCollisionTriangle(Tile tile){
         Vector3D origin = V3(object3D.objX, object3D.objY, object3D.objZ);
         for (Vector3D[] tri : tile.triangles) {
+            Vector3D triNormal = getNormal(tri);
             float d = rayTriangleDistance(
                     origin,
-                    V3(0,-1,0),
+                    triNormal.mult(-1),
                     tri[0], tri[1], tri[2]
             );
-            if (!Float.isInfinite(d) && d < fallSpeed + PLAYER_HEIGHT * FALL_COLLISION_SAFETY_MULTIPLIER) {
+            if (!Float.isInfinite(d) && d < (PLAYER_HEIGHT + fallSpeed) * FALL_COLLISION_SAFETY_MULTIPLIER && d > PLAYER_HEIGHT/2) {
                 return tri;
             }
         }
