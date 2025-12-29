@@ -1,7 +1,7 @@
 package com.example.game3d_opengl.game.player.player_state.infos.jump;
 
 public interface PlayerAllJumpVisitor {
-    default void visit(PlayerAllJumpVisitor info){
+    default void visit(PlayerJumpInfo info){
         throw new RuntimeException("Unknown subclass of PlayerJumpInfo");
     }
     void visit(PlayerJumpInfo.PlayerHasFooting info);
