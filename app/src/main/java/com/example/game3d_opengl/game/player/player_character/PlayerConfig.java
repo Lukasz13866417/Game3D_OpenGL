@@ -3,14 +3,14 @@ package com.example.game3d_opengl.game.player.player_character;
 import static com.example.game3d_opengl.game.util.GameMath.PI;
 
 public class PlayerConfig {
-    static final float PLAYER_WIDTH = 0.132f;
-    static final float PLAYER_HEIGHT = PLAYER_WIDTH * 3.54f;
+    public static final float PLAYER_WIDTH = 0.132f;
+    public static final float PLAYER_HEIGHT = PLAYER_WIDTH * 3.54f;
 
     // Physics constants
-    static final float FALL_ACCELERATION = 3e-5f;
-    static final float FALL_COLLISION_SAFETY_MULTIPLIER = 1.05f;
+    public static final float FALL_ACCELERATION = 3e-5f;
+    public static final float FALL_COLLISION_SAFETY_MULTIPLIER = 1.05f;
 
-     static final float PLAYER_SPEED = 0.04f;
+    public static final float PLAYER_SPEED = 0.04f;
 
     // Rotation constants
      static final float STICKY_ROTATION_LASTING_TIME = 42f;
@@ -19,9 +19,9 @@ public class PlayerConfig {
      static final float ROTATION_SWIPE_SENSITIVITY = 0.00052f;
 
     // Movement constants
-     static final float INITIAL_DIRECTION_X = 0f;
-     static final float INITIAL_DIRECTION_Y = 0f;
-     static final float INITIAL_DIRECTION_Z = -1f;
+    public static final float INITIAL_DIRECTION_X = 0f;
+    public static final float INITIAL_DIRECTION_Y = 0f;
+    public static final float INITIAL_DIRECTION_Z = -1f;
      static final float INITIAL_POSITION_X = 0f;
      static final float INITIAL_POSITION_Y = -0.5f;
      static final float INITIAL_POSITION_Z = -0.5f;

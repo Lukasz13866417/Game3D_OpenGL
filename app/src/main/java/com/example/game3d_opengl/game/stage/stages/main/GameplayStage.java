@@ -50,7 +50,9 @@ public class GameplayStage extends Stage {
         float dx = x2 - x1;
         float dy = y2 - y1;
         if(abs(dx) > abs(dy) && abs(dx) > 2) {
-            player.rotDirOnTouch(dx);
+            if (playerInputAPI != null) {
+                playerInputAPI.swipe(dx, dy);
+            }
         }
     }
 
@@ -60,6 +62,7 @@ public class GameplayStage extends Stage {
     private int frameCounter = 0; // throttled logging counter
     private final FColor colorTheme = CLR(0.7f,0,0,1);
     private Player player;
+    private Player.PlayerInputAPI playerInputAPI;
     private LightSource lightSource;
 
     public static boolean __DEBUG_IS_TERRAIN_GENERATING = false;
@@ -81,6 +84,7 @@ public class GameplayStage extends Stage {
 
         PlayerAssets.LOAD_PLAYER_ASSETS(assetManager);
         player = Player.createPlayer();
+        playerInputAPI = player.getInputAPI();
         lightSource = new LightSource(CLR(1,1,1,1));
 
 

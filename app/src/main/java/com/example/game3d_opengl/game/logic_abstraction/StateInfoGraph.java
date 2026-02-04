@@ -38,6 +38,12 @@ public abstract class StateInfoGraph
             node.indInOriginalOrdering = nodes.size(); // Bug fix: set original index
             nodes.add(node);
             transposeGraphAdjacencyList.add(dependencies);
+            // Track "user" counts for topological ordering.
+            if (dependencies != null) {
+                for (StateInfoNode<?> dep : dependencies) {
+                    dep.nUsers++;
+                }
+            }
         }
     }
     GraphSetupAPI setupAPI;
@@ -73,7 +79,7 @@ public abstract class StateInfoGraph
             for(StateInfoNode<?> dep : users){
                 // We have processed a node that uses `dep`, so we decrement its in-degree counter.
                 // When the counter reaches the total number of users, `dep` is ready to be processed.
-                if(++dep.nReadyUsers == dep.nUsers){ // Bug fix: Use pre-increment
+                if(++dep.nReadyUsers == dep.nUsers){
                     queue.add(dep);
                 }
             }
@@ -81,7 +87,8 @@ public abstract class StateInfoGraph
 
         assert orderingCurrSize == nodeCnt : "Cycle detected in graph or logic error in sort";
 
-        // Reverse the reverse topological order to get the final topological order.
+        //Note: "ordering" is the topological ordering of the dependency graph's transposed version.
+        //To make it the dependency graph's topological ordering, we can just reverse this array.
         for (int i = 0, j = ordering.length - 1; i < j; i++, j--) {
             int tmp = ordering[i];
             ordering[i] = ordering[j];

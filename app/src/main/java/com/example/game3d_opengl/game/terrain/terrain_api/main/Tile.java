@@ -7,7 +7,6 @@ import androidx.annotation.NonNull;
 
 import com.example.game3d_opengl.game.PlayerInteractable;
 import com.example.game3d_opengl.game.player.player_character.Player;
-import com.example.game3d_opengl.game.player.player_state.infos.jump.PlayerJumpInfo;
 import com.example.game3d_opengl.game.util.GameMath;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
@@ -89,12 +88,9 @@ public class Tile implements PlayerInteractable {
     @Override
     public void interactWithPlayer(Player.InteractableAPI api) {
         if (isEmptySegment()) return;
-        // Prepare jump info when collision is detected
+        // Report footing when collision is detected
         if (api.collidesTile(this)) {
-
-            PlayerJumpInfo.PlayerHasFooting info =
-                    new PlayerJumpInfo.PlayerHasFooting(this);
-            api.addInfo(info);
+            api.setHasFooting(this);
         }
     }
 
