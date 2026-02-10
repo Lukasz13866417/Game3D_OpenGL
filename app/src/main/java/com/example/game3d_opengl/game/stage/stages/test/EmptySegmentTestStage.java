@@ -3,6 +3,7 @@ package com.example.game3d_opengl.game.stage.stages.test;
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.player.player_character.PlayerAssets;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
@@ -10,6 +11,7 @@ import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain.terrain_structures.EmptySegmentTestStructure;
 import com.example.game3d_opengl.game.terrain.track_elements.potion.Potion;
 import com.example.game3d_opengl.rendering.Camera;
+import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
@@ -43,7 +45,7 @@ public class EmptySegmentTestStage extends Stage {
         
         // Create terrain with empty segment test structure
         terrain = new Terrain(50, 10, 
-            new Vector3D(0, 0, 0), 2.0f, 2.0f, 1f);
+            new Vector3D(0, 0, 0), 2.0f, 2.0f, 1f, new LightSource(new FColor(1.0f,0,0)));
         
         // Add the test structure that alternates tiles and empty segments
         terrain.enqueueStructure(new EmptySegmentTestStructure(15));
@@ -68,6 +70,7 @@ public class EmptySegmentTestStage extends Stage {
 
     @Override
     public void updateThenDraw(float dt) {
+        processTouchEvents();
         // Slowly rotate camera around the terrain
         cameraAngle += dt * 0.0005f; // 0.5 radians per second
         updateCamera();
@@ -113,17 +116,17 @@ public class EmptySegmentTestStage extends Stage {
     public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
 
     @Override
-    public void onTouchDown(float x, float y) {
+    protected void onTouchDown(float x, float y) {
         // Nothing special needed for this test
     }
 
     @Override
-    public void onTouchUp(float x, float y) {
+    protected void onTouchUp(float x, float y) {
         // Nothing special needed for this test
     }
 
     @Override
-    public void onTouchMove(float x1, float y1, float x2, float y2) {
+    protected void onTouchMove(float x1, float y1, float x2, float y2) {
         // Nothing special needed for this test
     }
 } 

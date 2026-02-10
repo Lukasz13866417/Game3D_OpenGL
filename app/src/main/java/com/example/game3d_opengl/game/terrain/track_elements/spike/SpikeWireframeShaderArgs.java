@@ -10,6 +10,7 @@ public final class SpikeWireframeShaderArgs {
         public int viewportW;
         public int viewportH;
         public float halfPx;
+        public float capPx;
         public float uDepthBiasNDC;
 
         // per-instance spike uniforms

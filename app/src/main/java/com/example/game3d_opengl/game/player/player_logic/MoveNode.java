@@ -1,14 +1,9 @@
 package com.example.game3d_opengl.game.player.player_logic;
 
-import static com.example.game3d_opengl.game.player.player_character.PlayerConfig.FALL_ACCELERATION;
-import static com.example.game3d_opengl.game.player.player_character.PlayerConfig.FALL_COLLISION_SAFETY_MULTIPLIER;
-import static com.example.game3d_opengl.game.player.player_character.PlayerConfig.PLAYER_HEIGHT;
-import static com.example.game3d_opengl.game.player.player_character.PlayerConfig.PLAYER_SPEED;
-import static com.example.game3d_opengl.game.util.GameMath.getNormal;
-import static com.example.game3d_opengl.game.util.GameMath.rayTriangleDistance;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import com.example.game3d_opengl.game.logic_abstraction.StateInfoNode;
+import com.example.game3d_opengl.game.player.player_character.PlayerConfig;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
@@ -19,20 +14,14 @@ public final class MoveNode extends StateInfoNode<MoveNode.Data> {
     }
 
     private final InputNode input;
-    private final EffectsNode effects;
-    private final JumpLogicNode jumpLogic;
-    private Data data = new Data();
+    private final PlayerConfig config;
+    private final Data data = new Data();
 
-    public MoveNode(InputNode input, EffectsNode effects, JumpLogicNode jumpLogic) {
+    public MoveNode(InputNode input, PlayerConfig config) {
         this.input = input;
-        this.effects = effects;
-        this.jumpLogic = jumpLogic;
+        this.config = config;
     }
 
-    @Override
-    public void setData(Data what) {
-        this.data = what;
-    }
 
     @Override
     public Data getData() {
@@ -41,32 +30,24 @@ public final class MoveNode extends StateInfoNode<MoveNode.Data> {
 
     @Override
     public void calc() {
-        InputNode.Data in = input.getData();
-        JumpLogicNode.Data jump = jumpLogic.getData();
+        FrameStartPlayerState in = input.getData();
 
         Vector3D move;
         float nextFallSpeed;
-        Vector3D dir = input.getDir();
-        Vector3D lastMove = input.getLastMove();
-        float fallSpeed = input.getFallSpeed();
-        Tile tileBelow = input.getTileBelow();
+        Vector3D dir = in.getMoveDir();
+        Vector3D lastMove = in.getLastMove();
+        float fallSpeed = in.getFallSpeed();
+        Tile tileBelow = in.getTileBelow();
 
-        if (jump != null && jump.shouldJump) {
-            // TODO: real jump implementation.
-            move = lastMove != null ? lastMove : dir.withLen(PLAYER_SPEED);
-            nextFallSpeed = fallSpeed;
-        } else if (tileBelow == null) {
+        if (tileBelow == null) {
             // Falling
-            Vector3D dwl = dir.withLen(PLAYER_SPEED);
+            Vector3D dwl = dir.withLen(config.playerSpeed);
             Vector3D last = lastMove != null ? lastMove : V3(0, 0, 0);
             move = V3(dwl.x, last.y, dwl.z);
             move = V3(move.x, move.y - fallSpeed, move.z);
-            nextFallSpeed = fallSpeed + FALL_ACCELERATION;
+            nextFallSpeed = fallSpeed + config.fallAcceleration;
         } else {
-            Vector3D[] hitTri = input.getCollisionTriangle();
-            if (hitTri == null) {
-                hitTri = findCollisionTriangle(in, tileBelow, fallSpeed);
-            }
+            Vector3D[] hitTri = in.getCollisionTriangle();
             if (hitTri != null) {
                 Vector3D u = hitTri[1].sub(hitTri[0]);
                 Vector3D w = hitTri[2].sub(hitTri[0]);
@@ -75,36 +56,18 @@ public final class MoveNode extends StateInfoNode<MoveNode.Data> {
                 if (Math.abs(det) > 1e-6f) {
                     float beta = calculateBeta(n, w, dir, det);
                     float gamma = calculateGamma(n, u, dir, det);
-                    move = u.mult(beta).add(w.mult(gamma)).withLen(PLAYER_SPEED);
+                    move = u.mult(beta).add(w.mult(gamma)).withLen(config.playerSpeed);
                 } else {
-                    move = dir.withLen(PLAYER_SPEED);
+                    move = dir.withLen(config.playerSpeed);
                 }
             } else {
-                move = dir.withLen(PLAYER_SPEED);
+                move = dir.withLen(config.playerSpeed);
             }
             nextFallSpeed = 0f;
         }
 
         data.move = move;
         data.nextFallSpeed = nextFallSpeed;
-    }
-
-    private static Vector3D[] findCollisionTriangle(InputNode.Data in, Tile tileBelow, float fallSpeed) {
-        if (tileBelow == null || in == null || in.position == null) return null;
-        for (Vector3D[] tri : tileBelow.triangles) {
-            Vector3D triNormal = getNormal(tri);
-            float d = rayTriangleDistance(
-                    in.position,
-                    triNormal.mult(-1),
-                    tri[0], tri[1], tri[2]
-            );
-            if (!Float.isInfinite(d)
-                    && d < (PLAYER_HEIGHT + fallSpeed) * FALL_COLLISION_SAFETY_MULTIPLIER
-                    && d > PLAYER_HEIGHT / 2) {
-                return tri;
-            }
-        }
-        return null;
     }
 
     private static float calculateDeterminant(Vector3D n, Vector3D u, Vector3D w) {

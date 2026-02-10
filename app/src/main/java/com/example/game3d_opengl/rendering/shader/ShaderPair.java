@@ -85,10 +85,10 @@ public abstract class ShaderPair<VS extends ShaderArgValues, FS extends ShaderAr
         this.fsArgs = fs;
     }
 
-    protected abstract void transferArgsToGPU(VS vs, FS fs);
+    protected abstract void transferUniformArgsToGPU(VS vs, FS fs);
 
-    public void transferArgsToGPU(){
-        transferArgsToGPU(vsArgs, fsArgs);
+    public void transferUniformArgsToGPU(){
+        transferUniformArgsToGPU(vsArgs, fsArgs);
     }
 
 

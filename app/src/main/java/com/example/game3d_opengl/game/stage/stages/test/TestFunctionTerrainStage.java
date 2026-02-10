@@ -8,10 +8,12 @@ import static java.lang.Math.sqrt;
 import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain.terrain_structures.TerrainFunction;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
+import com.example.game3d_opengl.rendering.util3d.FColor;
 
 public class TestFunctionTerrainStage extends Stage {
 
@@ -23,15 +25,15 @@ public class TestFunctionTerrainStage extends Stage {
 
 
     @Override
-    public void onTouchDown(float x, float y) {
+    protected void onTouchDown(float x, float y) {
     }
 
     @Override
-    public void onTouchUp(float x, float y) {
+    protected void onTouchUp(float x, float y) {
     }
 
     @Override
-    public void onTouchMove(float x1, float y1, float x2, float y2) {
+    protected void onTouchMove(float x1, float y1, float x2, float y2) {
     }
 
 
@@ -46,7 +48,8 @@ public class TestFunctionTerrainStage extends Stage {
                 200, 4,
                 V3(-1f, -0.5f, -5.5f),
                 2.5f, 1.5f,
-                0.5f
+                0.5f,
+                new LightSource(new FColor(1.0f,0,0))
         );
 
         terrain.enqueueStructure(new TerrainFunction(20,x -> 0.1f*(float)sqrt(x),0,2));
@@ -60,6 +63,7 @@ public class TestFunctionTerrainStage extends Stage {
 
     @Override
     public void updateThenDraw(float dt) {
+        processTouchEvents();
         terrain.generateChunks(1);
         try {
             Thread.sleep(20);

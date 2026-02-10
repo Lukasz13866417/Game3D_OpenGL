@@ -23,13 +23,13 @@ public class IconTestStage extends Stage {
     }
 
     @Override
-    public void onTouchDown(float x, float y) {}
+    protected void onTouchDown(float x, float y) {}
 
     @Override
-    public void onTouchUp(float x, float y) {}
+    protected void onTouchUp(float x, float y) {}
 
     @Override
-    public void onTouchMove(float x1, float y1, float x2, float y2) {}
+    protected void onTouchMove(float x1, float y1, float x2, float y2) {}
 
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
@@ -62,6 +62,7 @@ public class IconTestStage extends Stage {
 
     @Override
     public void updateThenDraw(float dt) {
+        processTouchEvents();
         rectOverlay.draw();
         spinningIcon.draw();
     }

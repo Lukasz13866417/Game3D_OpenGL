@@ -1,6 +1,7 @@
 package com.example.game3d_opengl.game.player.player_logic;
 
 import com.example.game3d_opengl.game.logic_abstraction.StateInfoNode;
+import com.example.game3d_opengl.game.player.player_character.PlayerConfig;
 
 public final class EffectsNode extends StateInfoNode<EffectsNode.Data> {
     public static final class Data {
@@ -9,15 +10,12 @@ public final class EffectsNode extends StateInfoNode<EffectsNode.Data> {
     }
 
     private final InputNode input;
+    private final PlayerConfig config;
     private Data data = new Data();
 
-    public EffectsNode(InputNode input) {
+    public EffectsNode(InputNode input, PlayerConfig config) {
         this.input = input;
-    }
-
-    @Override
-    public void setData(Data what) {
-        this.data = what;
+        this.config = config;
     }
 
     @Override
@@ -28,7 +26,7 @@ public final class EffectsNode extends StateInfoNode<EffectsNode.Data> {
     @Override
     public void calc() {
         // Placeholder: later inspect input.infos for potions/effects.
-        InputNode.Data in = input.getData();
+        FrameStartPlayerState in = input.getData();
         if (in != null) {
             // TODO: convert infos into effects
         }

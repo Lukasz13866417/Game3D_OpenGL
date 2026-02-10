@@ -7,6 +7,7 @@ import android.content.Context;
 import android.opengl.Matrix;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.AdvancedTerrainStructure;
@@ -14,6 +15,7 @@ import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
 import com.example.game3d_opengl.game.terrain.terrain_structures.TerrainLine;
 import com.example.game3d_opengl.game.terrain.track_elements.spike.DeathSpike;
 import com.example.game3d_opengl.rendering.Camera;
+import com.example.game3d_opengl.rendering.util3d.FColor;
 
 public class AddonPlacementTestStage extends Stage {
 
@@ -43,7 +45,7 @@ public class AddonPlacementTestStage extends Stage {
     }
 
     @Override
-    public void onTouchDown(float x, float y) {
+    protected void onTouchDown(float x, float y) {
         touchStartX = x;
         touchStartY = y;
         lastTouchX = x;
@@ -52,12 +54,12 @@ public class AddonPlacementTestStage extends Stage {
     }
 
     @Override
-    public void onTouchUp(float x, float y) {
+    protected void onTouchUp(float x, float y) {
         activeSwipeAxis = SwipeAxis.NONE;
     }
 
     @Override
-    public void onTouchMove(float x1, float y1, float x2, float y2) {
+    protected void onTouchMove(float x1, float y1, float x2, float y2) {
         float incDx = x2 - lastTouchX;
         float incDy = y2 - lastTouchY;
 
@@ -95,7 +97,8 @@ public class AddonPlacementTestStage extends Stage {
                 V3(0, -0.5f, -3f),
                 segWidth,
                 segLength,
-                1f
+                1f,
+                new LightSource(new FColor(1.0f,0,0))
         );
         terrain.enqueueStructure(new AdvancedTerrainStructure(100) {
             @Override
@@ -125,6 +128,7 @@ public class AddonPlacementTestStage extends Stage {
 
     @Override
     public void updateThenDraw(float dt) {
+        processTouchEvents();
         camZ -= moveSpeed;
         // apply world roll around Z by modifying the VP matrix
         float[] vp = camera.getViewProjectionMatrix();

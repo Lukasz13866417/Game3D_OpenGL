@@ -114,6 +114,14 @@ public class Potion extends Addon {
     }
 
     @Override
+    public void rebasePosition(Vector3D delta) {
+        if (delta == null || object3D == null) return;
+        object3D.objX += delta.x;
+        object3D.objY += delta.y;
+        object3D.objZ += delta.z;
+    }
+
+    @Override
     public void cleanupGPUResourcesRecursivelyOnContextLoss() {
         sharedFill.cleanupGPUResourcesRecursivelyOnContextLoss();
         sharedWire.cleanupGPUResourcesRecursivelyOnContextLoss();
@@ -127,7 +135,7 @@ public class Potion extends Addon {
 
 
     @Override
-    public void interactWithPlayer(Player.InteractableAPI api) {
-
+    public void accept(Player player) {
+        player.interactWith(this);
     }
 }

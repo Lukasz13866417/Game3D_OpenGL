@@ -77,7 +77,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
                           //new TestGridRowsStage(stageManager);
                           //new TestGridRowsStageWithAddons(stageManager);
                           //new AddonPlacementTestStage(stageManager);
-                          new GameplayStage(stageManager);
+                          //gameplayStage;
+                          menuStage;
                           //new TestWireframeStage(stageManager);
                           //new IconTestStage(stageManager);
     }

@@ -1,7 +1,6 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.BaseGridCreator;
-import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.AdvancedGridCreator;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridSegment;
@@ -15,10 +14,11 @@ public class AddonsCommandsExecutor implements CommandExecutor {
     public static final int CMD_RESERVE_RANDOM_VERTICAL = 35;
     public static final int CMD_RESERVE_RANDOM_HORIZONTAL = 36;
     public static final int CMD_START_STRUCTURE_ADDONS = 37;
-    public static final int CMD_ADDONS_USER_LAST = 37;
+    public static final int CMD_RESERVE_K_RANDOM_FIELDS = 38;
+    public static final int CMD_ADDONS_USER_LAST = 38;
 
     // Internal commands
-    public static final int CMD_FINISH_STRUCTURE_ADDONS = 38;
+    public static final int CMD_FINISH_STRUCTURE_ADDONS = 39;
 
     private final Terrain terrain;
 
@@ -42,6 +42,9 @@ public class AddonsCommandsExecutor implements CommandExecutor {
                 break;
             case CMD_RESERVE_RANDOM_HORIZONTAL:
                 handleReserveRandomHorizontal(buffer, offset);
+                break;
+            case CMD_RESERVE_K_RANDOM_FIELDS:
+                handleReserveKRandomFields(buffer, offset);
                 break;
             case CMD_FINISH_STRUCTURE_ADDONS:
                 terrain.gridCreatorWrapperQueue.dequeue().content.destroy();
@@ -100,6 +103,16 @@ public class AddonsCommandsExecutor implements CommandExecutor {
         AdvancedGridCreator latest = (AdvancedGridCreator) terrain.gridCreatorWrapperQueue.peek().content;
         GridSegment found = latest.reserveRandomFittingHorizontal(segLength);
         processAddons(found.row, found.col, segLength, true);
+    }
+
+    private void handleReserveKRandomFields(float[] buffer, int offset) {
+        int k = (int) buffer[offset + 2];
+        assert terrain.gridCreatorWrapperQueue.peek().content instanceof AdvancedGridCreator;
+        AdvancedGridCreator latest = (AdvancedGridCreator) terrain.gridCreatorWrapperQueue.peek().content;
+        GridSegment[] found = latest.reserveKRandomFields(k);
+        for (GridSegment seg : found) {
+            processAddons(seg.row, seg.col, 1, false);
+        }
     }
 
     @Override

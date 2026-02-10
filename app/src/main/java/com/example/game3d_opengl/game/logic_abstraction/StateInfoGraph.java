@@ -14,28 +14,22 @@ public abstract class StateInfoGraph
     private boolean isOrderingSet;
 
     private int[] ordering;
-    private final int nodeCnt;
+    private int nodeCnt;
 
-    private final StateInfoNode<InputDataType> inputNode;
-    private final StateInfoNode<OutputDataType> outputNode;
+    private LogicInputNode<InputDataType> inputNode;
+    private StateInfoNode<OutputDataType> outputNode;
 
     public StateInfoGraph(){
         nodes = new ArrayList<>();
         transposeGraphAdjacencyList = new ArrayList<>();
         this.isOrderingSet = false;
         this.setupAPI = new GraphSetupAPI();
-        Pair<StateInfoNode<InputDataType>, StateInfoNode<OutputDataType>>
-                                                    inputAndOutputNodes = setupNodes(this.setupAPI);
-        this.inputNode = inputAndOutputNodes.first;
-        this.outputNode = inputAndOutputNodes.second;
-        this.nodeCnt = nodes.size(); // Bug fix: nodeCnt must be set after setup.
     }
 
     // The purpose of this is to only allow subclasses to add nodes.
-    // That way, they'll have to provide an input node & output node.
     public class GraphSetupAPI {
-        public void addNode(StateInfoNode<?> node, List<? extends StateInfoNode<?>> dependencies) { // Renamed for clarity
-            node.indInOriginalOrdering = nodes.size(); // Bug fix: set original index
+        public void addNode(StateInfoNode<?> node, List<? extends StateInfoNode<?>> dependencies) {
+            node.indInOriginalOrdering = nodes.size();
             nodes.add(node);
             transposeGraphAdjacencyList.add(dependencies);
             // Track "user" counts for topological ordering.
@@ -47,14 +41,14 @@ public abstract class StateInfoGraph
         }
     }
     GraphSetupAPI setupAPI;
-    protected abstract Pair<StateInfoNode<InputDataType>, StateInfoNode<OutputDataType>>
+    protected abstract Pair<LogicInputNode<InputDataType>, StateInfoNode<OutputDataType>>
                                                             setupNodes(GraphSetupAPI graphSetupAPI);
 
     private void setOrdering(){
         assert !isOrderingSet : "Ordering is already set. Can't be set again.";
+
         this.ordering = new int[nodeCnt];
 
-        // Reset nReadyUsers before sorting to ensure correctness
         for(StateInfoNode<?> node : nodes) {
             node.nReadyUsers = 0;
         }
@@ -85,7 +79,7 @@ public abstract class StateInfoGraph
             }
         }
 
-        assert orderingCurrSize == nodeCnt : "Cycle detected in graph or logic error in sort";
+        assert orderingCurrSize == nodeCnt : "Cycle in dependency graph";
 
         //Note: "ordering" is the topological ordering of the dependency graph's transposed version.
         //To make it the dependency graph's topological ordering, we can just reverse this array.
@@ -99,8 +93,14 @@ public abstract class StateInfoGraph
 
     public OutputDataType runLogic(InputDataType input){
         if(!isOrderingSet){
+            Pair<LogicInputNode<InputDataType>, StateInfoNode<OutputDataType>>
+                    inputAndOutputNodes = setupNodes(this.setupAPI);
+            this.inputNode = inputAndOutputNodes.first;
+            this.outputNode = inputAndOutputNodes.second;
+            this.nodeCnt = nodes.size();
             setOrdering();
         }
+        assert isOrderingSet;
         this.inputNode.setData(input);
         for(int i=0;i<nodeCnt;++i){
             nodes.get(ordering[i]).calc();

@@ -8,6 +8,7 @@ public final class SpikeWireframeDrawArgs extends BaseMeshDrawArgs {
     public int viewportW;
     public int viewportH;
     public float halfPx;
+    public float capPx;
     public float uDepthBiasNDC;
 
     public float[] uNL;
@@ -25,6 +26,7 @@ public final class SpikeWireframeDrawArgs extends BaseMeshDrawArgs {
         this.viewportW = ScreenInfo.getScreenW();
         this.viewportH = ScreenInfo.getScreenH();
         this.halfPx = halfPx;
+        this.capPx = halfPx;
         this.uDepthBiasNDC = uDepthBiasNDC;
         this.uNL = uNL; this.uNR = uNR; this.uFR = uFR; this.uFL = uFL;
         this.uApex = uApex; this.uNormal = uNormal; this.uBaseOffset = uBaseOffset;

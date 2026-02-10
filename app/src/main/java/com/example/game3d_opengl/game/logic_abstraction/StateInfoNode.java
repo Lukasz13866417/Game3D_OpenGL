@@ -6,7 +6,6 @@ public abstract class StateInfoNode<DataClass> {
     int nReadyUsers; // only for bookkeeping in StateInfoGraph
     int indInOriginalOrdering; // only for bookkeeping in StateInfoGraph
 
-    public abstract void setData(DataClass what);
     public abstract DataClass getData();
 
     public abstract void calc();

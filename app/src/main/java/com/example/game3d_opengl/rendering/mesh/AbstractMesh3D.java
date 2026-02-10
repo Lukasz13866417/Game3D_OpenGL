@@ -59,7 +59,7 @@ public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends Shade
         shader.enableAndPointVertexAttribs();
 
         setVariableArgsValues(args, shader);
-        shader.transferArgsToGPU();
+        shader.transferUniformArgsToGPU();
 
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, iboFillId);
         GLES20.glDrawElements(GLES20.GL_TRIANGLES, fillIndexCount, GLES20.GL_UNSIGNED_SHORT, 0);

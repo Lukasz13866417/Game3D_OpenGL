@@ -12,7 +12,7 @@ import com.example.game3d_opengl.rendering.shader.ShaderPair;
 public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS, WireframeShaderArgs.FS> {
 
     // Uniforms
-    private int uMVP, uViewport, uColor, uHalfPx, uDepthBiasNDC;
+    private int uMVP, uViewport, uColor, uHalfPx, uCapPx, uDepthBiasNDC;
     // Attributes
     private int aPosA, aPosB, aEnd, aSide;
     // Instance to use
@@ -42,9 +42,12 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
                 "uniform mat4 uMVP;\n" +
                 "uniform vec2 uViewport; // (VW, VH)\n" +
                 "uniform float uHalfPx;  // half thickness in pixels\n" +
+                "uniform float uCapPx;   // extra length at ends in pixels\n" +
                 "uniform float uDepthBiasNDC;"+
                 "\n" +
                 "vec2 ndc(vec4 clip){ return clip.xy / clip.w; }\n" +
+                "varying vec2 vA_ndc;\n" +
+                "varying vec2 vB_ndc;\n" +
                 "\n" +
                 "void main(){\n" +
                 "    // Transform both endpoints to clip\n" +
@@ -59,14 +62,22 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
                 "    vec2 d_pix = (B_ndc - A_ndc) * ndc2px;\n" +
                 "    float l2 = dot(d_pix, d_pix);\n" +
                 "    vec2 n_pix = (l2 > 1e-8) ? normalize(vec2(-d_pix.y, d_pix.x)) : vec2(0.0);\n" +
+                "    vec2 dir_pix = (l2 > 1e-8) ? normalize(d_pix) : vec2(0.0);\n" +
                 "\n" +
-                "    // Convert pixel offset back to NDC\n" +
+                "    // Convert pixel offsets back to NDC\n" +
                 "    vec2 delta_ndc = (uHalfPx * n_pix) / ndc2px;\n" +
+                "    vec2 cap_ndc = (uCapPx * dir_pix) / ndc2px;\n" +
+                "\n" +
+                "    // Extend endpoints for overlap, keep originals for cap clipping\n" +
+                "    vec2 A_ext = A_ndc - cap_ndc;\n" +
+                "    vec2 B_ext = B_ndc + cap_ndc;\n" +
                 "\n" +
                 "    // Pick endpoint, apply ± offset in NDC, reinflate to clip (exact)\n" +
                 "    vec4 P_clip = mix(A_clip, B_clip, aEnd);\n" +
-                "    vec2 P_ndc  = mix(A_ndc,  B_ndc,  aEnd);\n" +
+                "    vec2 P_ndc  = mix(A_ext,  B_ext,  aEnd);\n" +
                 "    vec2 out_ndc = P_ndc + aSide * delta_ndc;\n" +
+                "    vA_ndc = A_ndc;\n" +
+                "    vB_ndc = B_ndc;\n" +
                 "\n" +
                 "    gl_Position = vec4(out_ndc * P_clip.w, P_clip.z, P_clip.w);\n" +
                 "gl_Position.z += uDepthBiasNDC * gl_Position.w;\n"+
@@ -76,7 +87,31 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
         String fs =
                 "precision mediump float;\n" +
                         "uniform vec4 uColor;\n" +
-                        "void main(){ gl_FragColor = uColor; }";
+                        "uniform vec2 uViewport;\n" +
+                        "uniform float uHalfPx;\n" +
+                        "varying vec2 vA_ndc;\n" +
+                        "varying vec2 vB_ndc;\n" +
+                        "void main(){\n" +
+                        "  vec2 A_px = (vA_ndc * 0.5 + 0.5) * uViewport;\n" +
+                        "  vec2 B_px = (vB_ndc * 0.5 + 0.5) * uViewport;\n" +
+                        "  vec2 P_px = gl_FragCoord.xy;\n" +
+                        "  vec2 AB = B_px - A_px;\n" +
+                        "  float len2 = dot(AB, AB);\n" +
+                        "  float t = 0.0;\n" +
+                        "  if (len2 > 1e-6) {\n" +
+                        "    t = dot(P_px - A_px, AB) / len2;\n" +
+                        "  }\n" +
+                        "  float dist;\n" +
+                        "  if (t < 0.0) {\n" +
+                        "    dist = length(P_px - A_px);\n" +
+                        "  } else if (t > 1.0) {\n" +
+                        "    dist = length(P_px - B_px);\n" +
+                        "  } else {\n" +
+                        "    float area = abs(AB.x * (P_px.y - A_px.y) - AB.y * (P_px.x - A_px.x));\n" +
+                        "    dist = area / sqrt(len2 + 1e-6);\n" +
+                        "  }\n" +
+                        "  if (dist > uHalfPx) discard;\n" +
+                        "  gl_FragColor = uColor; }\n";
         sharedShader = new Builder().fromSource(vs, fs).build();
     }
 
@@ -86,6 +121,7 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
         uMVP = GLES20.glGetUniformLocation(p, "uMVP");
         uViewport = GLES20.glGetUniformLocation(p, "uViewport");
         uHalfPx = GLES20.glGetUniformLocation(p, "uHalfPx");
+        uCapPx = GLES20.glGetUniformLocation(p, "uCapPx");
         uColor = GLES20.glGetUniformLocation(p, "uColor");
         uDepthBiasNDC = GLES20.glGetUniformLocation(p, "uDepthBiasNDC");
 
@@ -120,10 +156,11 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
     }
 
     @Override
-    protected void transferArgsToGPU(WireframeShaderArgs.VS v, WireframeShaderArgs.FS f) {
+    protected void transferUniformArgsToGPU(WireframeShaderArgs.VS v, WireframeShaderArgs.FS f) {
         GLES20.glUniformMatrix4fv(uMVP, 1, false, v.mvp, 0);
         GLES20.glUniform2f(uViewport, v.viewportW, v.viewportH);
         GLES20.glUniform1f(uHalfPx, v.halfPx);
+        GLES20.glUniform1f(uCapPx, v.capPx);
         GLES20.glUniform4f(uColor, f.color.r(), f.color.g(), f.color.b(), f.color.a());
         GLES20.glUniform1f(uDepthBiasNDC, v.uDepthBiasNDC);
     }

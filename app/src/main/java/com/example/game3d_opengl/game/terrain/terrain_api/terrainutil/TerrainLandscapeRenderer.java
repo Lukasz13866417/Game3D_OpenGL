@@ -13,8 +13,6 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * A ring-buffer (deque) of (left,right) points rendered as a triangle strip ribbon.
@@ -100,6 +98,21 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
             out.lx = lx[idx]; out.ly = ly[idx]; out.lz = lz[idx];
             out.rx = rx[idx]; out.ry = ry[idx]; out.rz = rz[idx];
             out.aL = aL[idx]; out.aR = aR[idx];
+        }
+
+        void addOffset(float dx, float dy, float dz) {
+            if (size <= 0) return;
+            int idx = head;
+            for (int i = 0; i < size; i++) {
+                lx[idx] += dx;
+                ly[idx] += dy;
+                lz[idx] += dz;
+                rx[idx] += dx;
+                ry[idx] += dy;
+                rz[idx] += dz;
+                idx++;
+                if (idx >= capacity) idx = 0;
+            }
         }
     }
 
@@ -240,6 +253,15 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
 
     public int getSize() { return edgeBuf.getSize(); }
 
+    public void rebasePosition(Vector3D delta) {
+        if (delta == null) return;
+        float dx = delta.x;
+        float dy = delta.y;
+        float dz = delta.z;
+        if (dx == 0f && dy == 0f && dz == 0f) return;
+        edgeBuf.addOffset(dx, dy, dz);
+    }
+
     /**
      * Draw as a triangle strip ribbon using the currently bound InfillShaderPair.
      * Assumes the caller has bound the program and uploaded uniforms.
@@ -375,7 +397,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         GLES20.glColorMask(false, false, false, false);
         fsArgs.isDepthPass = 1;
         shader.setArgs(vsArgs, fsArgs);
-        shader.transferArgsToGPU();
+        shader.transferUniformArgsToGPU();
         for (int i = 0; i < drawRangesUsed; i++) {
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, drawFirst[i], drawCount[i]);
         }
@@ -391,7 +413,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         GLES20.glDepthFunc(GLES20.GL_LEQUAL);
         fsArgs.isDepthPass = 0;
         shader.setArgs(vsArgs, fsArgs);
-        shader.transferArgsToGPU();
+        shader.transferUniformArgsToGPU();
         for (int i = 0; i < drawRangesUsed; i++) {
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, drawFirst[i], drawCount[i]);
         }

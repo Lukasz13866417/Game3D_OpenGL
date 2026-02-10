@@ -106,30 +106,35 @@ public class MyGLSurfaceView extends GLSurfaceView {
         setVsyncDivisor(divisor);
     }
 
-    float lastX=0, lastY=0;
+    private float lastX = 0f;
+    private float lastY = 0f;
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         float x = event.getX();
         float y = event.getY();
-        switch (event.getAction()) {
+        switch (event.getActionMasked()) {
             case MotionEvent.ACTION_MOVE:
-                if ((x != lastX || y != lastY) && renderer.getCurrentStage().isInitialized()) {
-                    renderer.getCurrentStage().onTouchMove(lastX, lastY, x, y);
-                }
+                if (!renderer.getCurrentStage().isInitialized()) break;
+                if (x == lastX && y == lastY) break;
+                renderer.getCurrentStage().enqueueTouchMove(lastX, lastY, x, y);
+                lastX = x;
+                lastY = y;
                 break;
             case MotionEvent.ACTION_DOWN:
+                lastX = x;
+                lastY = y;
                 if(renderer.getCurrentStage().isInitialized()) {
-                    renderer.getCurrentStage().onTouchDown(x, y);
+                    renderer.getCurrentStage().enqueueTouchDown(x, y);
                 }
                 break;
             case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
                 if(renderer.getCurrentStage().isInitialized()) {
-                    renderer.getCurrentStage().onTouchUp(x, y);
+                    renderer.getCurrentStage().enqueueTouchUp(x, y);
                 }
                 break;
         }
-        lastX = x;
-        lastY = y;
         return true;
     }
 }

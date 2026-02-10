@@ -42,6 +42,7 @@ public class TerrainStairs extends AdvancedTerrainStructure {
                     gridBrush.reserveHorizontal(1, 1, nCols, spikes);
                 }
             });
+            brush.addHorizontalAng(angHorPerTile*tilesPerStair);
             // add empty tiles between levels (not after the last level)
             if (i < cntStairs - 1) {
                 for (int e = 0; e < emptyBetween; ++e) {

@@ -85,7 +85,7 @@ public final class SpikeInfillShaderPair
     }
 
     @Override
-    protected void transferArgsToGPU(InfillShaderArgs.VS vertexArgs, InfillShaderArgs.FS fragmentArgs) {
+    protected void transferUniformArgsToGPU(InfillShaderArgs.VS vertexArgs, InfillShaderArgs.FS fragmentArgs) {
         if (vertexArgs == null || fragmentArgs == null
                 || vertexArgs.mvp == null || fragmentArgs.color == null
                 || vertexArgs.uNL == null || vertexArgs.uNR == null

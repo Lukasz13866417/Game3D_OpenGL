@@ -27,13 +27,13 @@ public class TestPlayerStage extends Stage {
     }
 
     @Override
-    public void onTouchDown(float x, float y) {}
+    protected void onTouchDown(float x, float y) {}
     
     @Override
-    public void onTouchUp(float x, float y) {}
+    protected void onTouchUp(float x, float y) {}
     
     @Override
-    public void onTouchMove(float x1, float y1, float x2, float y2) {
+    protected void onTouchMove(float x1, float y1, float x2, float y2) {
         // Allow rotating the camera around the player
         float dx = x2 - x1;
         rotationY += dx * 0.01f; // adjust sensitivity
@@ -67,6 +67,7 @@ public class TestPlayerStage extends Stage {
 
     @Override
     public void updateThenDraw(float dt) {
+        processTouchEvents();
         // Update camera position
        // updateCamera();
         

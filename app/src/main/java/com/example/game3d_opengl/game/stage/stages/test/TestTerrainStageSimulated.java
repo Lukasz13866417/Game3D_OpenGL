@@ -137,6 +137,7 @@ public class TestTerrainStageSimulated extends Stage {
 
     @Override
     public void updateThenDraw(float dt) {
+        processTouchEvents();
         lightSource.setPosition(lightSourcePos);
         tileManager.draw(FColor.CLR(1,0,0), camera.getViewProjectionMatrix(), lightSource);
         //startSegDemo.draw(camera.getViewProjectionMatrix());
@@ -151,15 +152,15 @@ public class TestTerrainStageSimulated extends Stage {
 
 
     @Override
-    public void onTouchDown(float x, float y) {
+    protected void onTouchDown(float x, float y) {
 
     }
     @Override
-    public void onTouchUp(float x, float y) {
+    protected void onTouchUp(float x, float y) {
 
     }
     @Override
-    public void onTouchMove(float x1, float y1, float x2, float y2) {
+    protected void onTouchMove(float x1, float y1, float x2, float y2) {
 
     }
     @Override

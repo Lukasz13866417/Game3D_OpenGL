@@ -7,7 +7,6 @@ import androidx.annotation.NonNull;
 
 import com.example.game3d_opengl.game.PlayerInteractable;
 import com.example.game3d_opengl.game.player.player_character.Player;
-import com.example.game3d_opengl.game.util.GameMath;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
@@ -39,7 +38,7 @@ public class Tile implements PlayerInteractable {
      * These vertices are already de-facto in world space.
      * The terrain doesn't move, the player does. And the camera follows him around.
      */
-    public final Vector3D nearLeft, nearRight, farLeft, farRight;
+    public Vector3D nearLeft, nearRight, farLeft, farRight;
     
     /**
      * The two triangles that make up this tile's surface.
@@ -76,6 +75,20 @@ public class Tile implements PlayerInteractable {
         };
     }
 
+    public void rebasePosition(Vector3D delta) {
+        if (delta == null) return;
+        nearLeft = nearLeft.add(delta);
+        nearRight = nearRight.add(delta);
+        farLeft = farLeft.add(delta);
+        farRight = farRight.add(delta);
+        triangles[0][0] = nearLeft;
+        triangles[0][1] = nearRight;
+        triangles[0][2] = farRight;
+        triangles[1][0] = nearLeft;
+        triangles[1][1] = farRight;
+        triangles[1][2] = farLeft;
+    }
+
     @NonNull
     @Override
     public String toString() {
@@ -86,12 +99,8 @@ public class Tile implements PlayerInteractable {
     }
 
     @Override
-    public void interactWithPlayer(Player.InteractableAPI api) {
-        if (isEmptySegment()) return;
-        // Report footing when collision is detected
-        if (api.collidesTile(this)) {
-            api.setHasFooting(this);
-        }
+    public void accept(Player player) {
+        player.interactWith(this);
     }
 
 

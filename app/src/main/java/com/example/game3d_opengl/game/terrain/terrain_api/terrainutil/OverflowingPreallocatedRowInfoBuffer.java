@@ -1,13 +1,12 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.terrainutil;
 
 import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager.GridRowInfo;
-import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
  * All objects are pre-allocated once and then reused.
- * A call to add(Vector3D, Vector3D, Vector3D, Vector3D, Vector3D) updates the fields of the
- * next buffer slot instead of allocating a new helper instance. This eliminates per-row object
- * creation while retaining constant-time FIFO behaviour.
+ * A call to add(...) updates the fields of the next buffer slot using raw float components
+ * instead of allocating new Vector3D instances. This eliminates per-row object creation while
+ * retaining constant-time FIFO behaviour.
  */
 public class OverflowingPreallocatedRowInfoBuffer {
 
@@ -92,8 +91,10 @@ public class OverflowingPreallocatedRowInfoBuffer {
      * Acts like a push-back; overwrites the oldest entry when the buffer is full.
      */
     public void add(long tileID,
-                    Vector3D LS, Vector3D RS,
-                    Vector3D LS_last, Vector3D RS_last) {
+                    float LSx, float LSy, float LSz,
+                    float RSx, float RSy, float RSz,
+                    float LS_lastx, float LS_lasty, float LS_lastz,
+                    float RS_lastx, float RS_lasty, float RS_lastz) {
         int writeIdx;
         if (size < MAX_SIZE) {
             writeIdx = (head + size) % MAX_SIZE;
@@ -103,6 +104,10 @@ public class OverflowingPreallocatedRowInfoBuffer {
             head = (head + 1) % MAX_SIZE; // drop oldest
         }
         GridRowInfo helper = myBuffer[writeIdx];
-        helper.set(tileID, LS, RS, LS_last, RS_last);
+        helper.set(tileID,
+                LSx, LSy, LSz,
+                RSx, RSy, RSz,
+                LS_lastx, LS_lasty, LS_lastz,
+                RS_lastx, RS_lasty, RS_lastz);
     }
 }

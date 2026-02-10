@@ -2,6 +2,7 @@ package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_FINISH_STRUCTURE_LANDSCAPE;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_K_RANDOM_FIELDS;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_VERTICAL;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_VERTICAL;
@@ -16,6 +17,7 @@ import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeC
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
 
 import com.example.game3d_opengl.game.LightSource;
+import com.example.game3d_opengl.game.WorldActor;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.ArrayQueue;
@@ -23,11 +25,11 @@ import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.ArrayStack
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.IntArrayQueue;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.IntArrayStack;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.FixedMaxSizeDeque;
-import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.execbuffer.CommandExecutor;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.execbuffer.PreallocatedCommandBuffer;
+
 
 /**
  * Terrain with a fixed-size deque of tiles. We keep a `lastTile` pointer
@@ -42,7 +44,7 @@ import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.execbuffer
  * 3. Commands are executed in chunks to control frame time
  * 4. This allows for complex terrain generation without blocking the main thread
  */
-public class Terrain implements GPUResourceOwner {
+public class Terrain implements WorldActor {
 
     private static final int DEFAULT_QUEUE_CAPACITY = 100_000;
 
@@ -50,12 +52,15 @@ public class Terrain implements GPUResourceOwner {
     private static final String ERROR_INVALID_TILE_INDEX = "Invalid tile index: ";
     private static final String ERROR_INVALID_ADDON_INDEX = "Invalid addon index: ";
 
-
     /**
      * The tile builder responsible for creating and managing individual tiles.
      * Handles the geometry generation and GPU resource management for tiles.
      */
     public final TileManager tileManager;
+
+    private LightSource lightSource = null;
+    private FColor colorTheme = null;
+
 
     /**
      * Gets the total number of tiles currently in the terrain.
@@ -331,6 +336,19 @@ public class Terrain implements GPUResourceOwner {
                 addonQueue.enqueue(addon);
             }
         }
+
+        /**
+         * Reserves k random single-cell fields and places addons in sorted order of
+         * selected fields (row, then col).
+         */
+        public void reserveKRandomFields(Addon[] addons) {
+            assert addons != null;
+            assert addons.length > 0 : "Addon count must be > 0";
+            commandBuffer.addCommand(CMD_RESERVE_K_RANDOM_FIELDS, addons.length);
+            for (Addon addon : addons) {
+                addonQueue.enqueue(addon);
+            }
+        }
     }
 
     // Data structures for managing terrain generation state
@@ -369,7 +387,9 @@ public class Terrain implements GPUResourceOwner {
     private final LandscapeCommandsExecutor landscapeCommandExecutor;
     private final AddonsCommandsExecutor addonsCommandExecutor;
 
-    public Terrain(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength, float rowSpacing) {
+    private static final FColor DEFAULT_COLOR_THEME = FColor.CLR(0.8f,0,0);
+
+    public Terrain(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength, float rowSpacing, LightSource lightSource) {
         this.nCols = nCols;
 
         // Initialize the tile builder with the specified parameters
@@ -402,6 +422,9 @@ public class Terrain implements GPUResourceOwner {
 
         // Initialize the tile brush
         this.tileBrush = new TileBrush();
+
+        this.lightSource = lightSource;
+        this.colorTheme = DEFAULT_COLOR_THEME;
     }
 
     public void updateBeforeDraw(float dt) {
@@ -411,18 +434,45 @@ public class Terrain implements GPUResourceOwner {
         tileManager.updateBeforeDraw(dt);
     }
 
-    public void draw(FColor colorTheme, float[] vp, LightSource light) {
-        tileManager.draw(colorTheme, vp, light);
-        for (int i = 0; i < getAddonCount(); ++i) {
-            getAddon(i).draw(vp);
+    public void setLightSource(LightSource lightSource){
+        this.lightSource = lightSource;
+    }
+
+    public void setColorTheme(FColor colorTheme){
+        this.colorTheme = colorTheme;
+    }
+
+    public void draw( float[] vp) {
+        draw(vp, true);
+    }
+
+    public void draw(float[] vp, boolean includeAddons) {
+        tileManager.draw(colorTheme, vp, lightSource);
+        if (includeAddons) {
+            for (int i = 0; i < getAddonCount(); ++i) {
+                getAddon(i).draw(vp);
+            }
         }
     }
 
+    @Override
     public void updateAfterDraw(float dt) {
         for (int i = 0; i < getAddonCount(); ++i) {
             getAddon(i).updateBeforeDraw(dt);
         }
         tileManager.updateAfterDraw(dt);
+    }
+
+    @Override
+    public void rebasePosition(Vector3D delta) {
+        if (delta == null) return;
+        tileManager.rebasePosition(delta);
+        for (int i = 0; i < getAddonCount(); ++i) {
+            getAddon(i).rebasePosition(delta);
+        }
+        if (lightSource != null && lightSource.position != null) {
+            lightSource.setPosition(lightSource.position.add(delta));
+        }
     }
 
     /**

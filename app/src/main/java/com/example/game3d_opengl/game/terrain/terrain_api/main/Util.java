@@ -2,6 +2,7 @@ package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_K_RANDOM_FIELDS;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_VERTICAL;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_VERTICAL;
@@ -55,6 +56,8 @@ class Util {
             System.out.println("^& RESERVE RANDOM VERTICAL " + buffer[offset + 2]);
         } else if (code == CMD_RESERVE_RANDOM_HORIZONTAL) {
             System.out.println("^& RESERVE RANDOM HORIZONTAL " + buffer[offset + 2]);
+        } else if (code == CMD_RESERVE_K_RANDOM_FIELDS) {
+            System.out.println("^& RESERVE " + (int) buffer[offset + 2] + " RANDOM FIELDS");
         } else if (code == CMD_FINISH_STRUCTURE_ADDONS) {
             System.out.println("^& FINISH STRUCTURE ADDONS");
         } else if (code == CMD_START_STRUCTURE_ADDONS) {

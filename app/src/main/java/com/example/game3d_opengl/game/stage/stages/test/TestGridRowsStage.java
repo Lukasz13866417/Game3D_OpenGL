@@ -46,16 +46,16 @@ public class TestGridRowsStage extends Stage {
     }
 
     @Override
-    public void onTouchDown(float x, float y) {
+    protected void onTouchDown(float x, float y) {
 
     }
 
     @Override
-    public void onTouchUp(float x, float y) {
+    protected void onTouchUp(float x, float y) {
     }
 
     @Override
-    public void onTouchMove(float x1, float y1, float x2, float y2) {
+    protected void onTouchMove(float x1, float y1, float x2, float y2) {
     }
 
     FourPoints3D xd;
@@ -120,6 +120,7 @@ public class TestGridRowsStage extends Stage {
 
     @Override
     public void updateThenDraw(float dt) {
+        processTouchEvents();
         lightSource.setPosition(lightSourcePos);
 
         for (FourPoints3D fp : grid) {

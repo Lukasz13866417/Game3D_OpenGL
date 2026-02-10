@@ -53,17 +53,17 @@ public class TestTerrainStage extends Stage {
     }
 
     @Override
-    public void onTouchDown(float x, float y) {
+    protected void onTouchDown(float x, float y) {
         isPanning = true;
     }
 
     @Override
-    public void onTouchUp(float x, float y) {
+    protected void onTouchUp(float x, float y) {
         isPanning = false;
     }
 
     @Override
-    public void onTouchMove(float x1, float y1, float x2, float y2) {
+    protected void onTouchMove(float x1, float y1, float x2, float y2) {
         if (!isPanning) return;
         float dx = x2 - x1;
         float dy = y2 - y1;
@@ -107,13 +107,16 @@ public class TestTerrainStage extends Stage {
                 0.3f
         );*/
 
+        lightSource = new LightSource(FColor.CLR(1,1,1));
+
         this.terrain = new Terrain(
                 2000,
                 6,
                 firstTileStartCenter,
                 1f,
                 3.2f * 0.33f,
-                1.4f * 0.33f
+                1.4f * 0.33f,
+                lightSource
         );
 
 
@@ -148,18 +151,19 @@ public class TestTerrainStage extends Stage {
         left = new LineSet3D(terrain.tileManager.leftSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(1, 0, 1));
         right = new LineSet3D(terrain.tileManager.rightSideToArrayDebug(), new int[][]{}, FColor.CLR(1, 1, 1), FColor.CLR(0, 0, 1));*/
 
-        lightSource = new LightSource(FColor.CLR(1,1,1));
 
     }
 
     @Override
     public void updateThenDraw(float dt) {
+        processTouchEvents();
         lightSource.setPosition(lightSourcePos);
 
         /*for (FourPoints3D fp : grid) {
             fp.draw(camera.getViewProjectionMatrix()); // enable when grid is drawn
         }*/
-        terrain.draw(FColor.CLR(0,1,0),camera.getViewProjectionMatrix(),lightSource);
+        terrain.setColorTheme(FColor.CLR(0,1,0));
+        terrain.draw(camera.getViewProjectionMatrix());
         //terrain.tileManager.getTileLineSet().draw(camera.getViewProjectionMatrix());
 
         //left.draw(camera.getViewProjectionMatrix());

@@ -53,7 +53,7 @@ public final class InfillShaderPair extends ShaderPair<InfillShaderArgs.VS, Infi
     }
 
     @Override
-    protected void transferArgsToGPU(InfillShaderArgs.VS vertexArgs, InfillShaderArgs.FS fragmentArgs) {
+    protected void transferUniformArgsToGPU(InfillShaderArgs.VS vertexArgs, InfillShaderArgs.FS fragmentArgs) {
         GLES20.glUniformMatrix4fv(uMVP, 1, false, vertexArgs.mvp, 0);
         GLES20.glUniform4fv(uColor, 1, fragmentArgs.color.rgba, 0);
     }

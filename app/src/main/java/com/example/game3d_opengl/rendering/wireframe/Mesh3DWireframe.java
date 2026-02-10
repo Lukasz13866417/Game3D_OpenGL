@@ -34,6 +34,7 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
         vs.color = edgeColor;
         vs.mvp = args.vp;
         vs.halfPx = pixelWidth;
+        vs.capPx = pixelWidth;
         vs.viewportW = ScreenInfo.getScreenW();
         vs.viewportH = ScreenInfo.getScreenH();
         vs.uDepthBiasNDC = -5e-3f; // TODO change to builder arg.
@@ -101,7 +102,9 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
                 vFloat = putEdgeVert(out, vFloat, A, B, 1f, -1f); // base+2
                 vFloat = putEdgeVert(out, vFloat, A, B, 1f, +1f); // base+3
 
-                newFaces[e] = new int[]{ vBase + 0, vBase + 1, vBase + 2, vBase + 3 };
+                // Order vertices so the diagonal spans across the line width (A- -> B+),
+                // avoiding a split along the line direction.
+                newFaces[e] = new int[]{ vBase + 0, vBase + 1, vBase + 3, vBase + 2 };
 
                 vBase += 4;
             }

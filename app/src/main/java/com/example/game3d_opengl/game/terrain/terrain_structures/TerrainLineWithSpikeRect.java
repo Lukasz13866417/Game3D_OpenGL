@@ -4,6 +4,9 @@ import static java.lang.Math.min;
 
 import com.example.game3d_opengl.game.terrain.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
+import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
+import com.example.game3d_opengl.game.terrain.track_elements.portal.ExitPortal;
+import com.example.game3d_opengl.game.terrain.track_elements.portal.Portal;
 import com.example.game3d_opengl.game.terrain.track_elements.potion.Potion;
 import com.example.game3d_opengl.game.terrain.track_elements.spike.DeathSpike;
 
@@ -52,5 +55,9 @@ public class TerrainLineWithSpikeRect extends AdvancedTerrainStructure {
             }
             brush.reserveRandomFittingVertical(1, potions);
         }
+
+        ExitPortal exitPortal = ExitPortal.createExitPortal();
+        Portal entrancePortal = Portal.createPortal(exitPortal);
+        brush.reserveKRandomFields(new Addon[]{entrancePortal, exitPortal});
     }
 }

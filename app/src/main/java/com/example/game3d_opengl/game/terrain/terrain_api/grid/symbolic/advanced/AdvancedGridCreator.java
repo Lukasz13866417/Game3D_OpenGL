@@ -5,6 +5,8 @@ import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCrea
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridSegment;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.PartialSegmentHandler;
 
+import java.util.Arrays;
+
 public class AdvancedGridCreator implements BaseGridCreator {
 
     public final int nRows, nCols;
@@ -77,6 +79,27 @@ public class AdvancedGridCreator implements BaseGridCreator {
             vertical.reserve(res.row, c, 1);
         }
         return res;
+    }
+
+    /**
+     * Reserves {@code k} random unoccupied single-cell fields.
+     * Returned segments are sorted by (row, col).
+     */
+    public GridSegment[] reserveKRandomFields(int k) {
+        if (k <= 0) {
+            throw new IllegalArgumentException("k must be > 0");
+        }
+        GridSegment[] reserved = new GridSegment[k];
+        for (int i = 0; i < k; ++i) {
+            reserved[i] = reserveRandomFittingVertical(1);
+        }
+        Arrays.sort(reserved, (a, b) -> {
+            if (a.row != b.row) {
+                return Integer.compare(a.row, b.row);
+            }
+            return Integer.compare(a.col, b.col);
+        });
+        return reserved;
     }
 
     @Override

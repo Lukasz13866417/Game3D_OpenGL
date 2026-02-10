@@ -2,13 +2,12 @@ package com.example.game3d_opengl.game.terrain.terrain_api.terrainutil;
 
 
 import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager.SegmentHistory;
-import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
  * All objects are pre-allocated once and then reused.
- * A call to add(Vector3D, Vector3D, Vector3D, Vector3D, Vector3D) updates the fields of the
- * next buffer slot instead of allocating a new helper instance. This eliminates per-row object
- * creation while retaining constant-time FIFO behaviour.
+ * A call to add(...) updates the fields of the next buffer slot using raw float components
+ * instead of allocating new Vector3D instances. This eliminates per-row object creation while
+ * retaining constant-time FIFO behaviour.
  */
 public class OverflowingPreallocatedSegmentHistoryBuffer {
 
@@ -91,9 +90,12 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
      */
     public void add(boolean isEmpty, boolean isFirstLiftedUp,
                     int rowsAddedCnt,
-                    Vector3D nLOfTile, Vector3D nROfTile,
-                    Vector3D fLOfTile, Vector3D fROfTile,
-                    Vector3D lastL, Vector3D lastR,
+                    float nLx, float nLy, float nLz,
+                    float nRx, float nRy, float nRz,
+                    float fLx, float fLy, float fLz,
+                    float fRx, float fRy, float fRz,
+                    float lastLx, float lastLy, float lastLz,
+                    float lastRx, float lastRy, float lastRz,
                     float leftover,
                     float alphaL, float alphaR) {
         int writeIdx;
@@ -107,9 +109,12 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
         SegmentHistory helper = myBuffer[writeIdx];
         helper.set(isEmpty, isFirstLiftedUp,
                 rowsAddedCnt,
-                nLOfTile, nROfTile,
-                fLOfTile, fROfTile,
-                lastL, lastR,
+                nLx, nLy, nLz,
+                nRx, nRy, nRz,
+                fLx, fLy, fLz,
+                fRx, fRy, fRz,
+                lastLx, lastLy, lastLz,
+                lastRx, lastRy, lastRz,
                 leftover,
                 alphaL, alphaR);
     }

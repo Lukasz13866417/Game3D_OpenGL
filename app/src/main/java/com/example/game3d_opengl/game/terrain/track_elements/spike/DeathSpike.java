@@ -84,10 +84,10 @@ public class DeathSpike extends Addon {
                                         Vector3D fieldFarLeft, Vector3D fieldFarRight) {
         Vector3D fieldMid = fieldFarLeft.add(fieldFarRight)
                 .add(fieldNearRight).add(fieldNearLeft).div(4);
-        Vector3D myNL = fieldMid.add(fieldNearLeft.sub(fieldMid).mult(0.8f));
-        Vector3D myNR = fieldMid.add(fieldFarLeft.sub(fieldMid).mult(0.8f));
-        Vector3D myFL = fieldMid.add(fieldNearRight.sub(fieldMid).mult(0.8f));
-        Vector3D myFR = fieldMid.add(fieldFarRight.sub(fieldMid).mult(0.8f));
+        Vector3D myNL = fieldNearLeft;//fieldMid.add(fieldNearLeft.sub(fieldMid).mult(0.8f));
+        Vector3D myNR = fieldNearRight;//fieldMid.add(fieldNearRight.sub(fieldMid).mult(0.8f));
+        Vector3D myFL = fieldFarLeft;//fieldMid.add(fieldFarLeft.sub(fieldMid).mult(0.8f));
+        Vector3D myFR = fieldFarRight;//fieldMid.add(fieldFarRight.sub(fieldMid).mult(0.8f));
         return V3S(myNL, myNR, myFR, myFL);
     }
 
@@ -101,7 +101,8 @@ public class DeathSpike extends Addon {
         Vector3D fieldMid = fieldFarLeft.add(fieldFarRight).add(fieldNearRight).add(fieldNearLeft).div(4);
         Vector3D normal = getNormal(fieldNearLeft, fieldFarLeft, fieldFarRight);
         Vector3D unitNormal = normal.withLen(1f);
-        Vector3D apex = fieldMid.add(unitNormal.withLen(height));
+        Vector3D apex = fieldMid.sub(unitNormal.withLen(height));
+        Vector3D baseNormal = unitNormal.mult(-1f);
 
         final float[] uNL = new float[3],
                       uNR = new float[3],
@@ -114,7 +115,7 @@ public class DeathSpike extends Addon {
         uFR[0]=corners[2].x; uFR[1]=corners[2].y; uFR[2]=corners[2].z;
         uFL[0]=corners[3].x; uFL[1]=corners[3].y; uFL[2]=corners[3].z;
         uApex[0]=apex.x; uApex[1]=apex.y; uApex[2]=apex.z;
-        uNormal[0]=unitNormal.x; uNormal[1]=unitNormal.y; uNormal[2]=unitNormal.z;
+        uNormal[0]=baseNormal.x; uNormal[1]=baseNormal.y; uNormal[2]=baseNormal.z;
 
         // Per-instance args only (shared geometry)
         this.infillArgs = new SpikeInfillDrawArgs(uNL, uNR, uFR, uFL, uApex, uNormal, baseOffset);
@@ -139,6 +140,39 @@ public class DeathSpike extends Addon {
     }
 
     @Override
+    public void rebasePosition(Vector3D delta) {
+        if (delta == null) return;
+        float[] uNL = infillArgs != null ? infillArgs.uNL : (wireArgs != null ? wireArgs.uNL : null);
+        float[] uNR = infillArgs != null ? infillArgs.uNR : (wireArgs != null ? wireArgs.uNR : null);
+        float[] uFR = infillArgs != null ? infillArgs.uFR : (wireArgs != null ? wireArgs.uFR : null);
+        float[] uFL = infillArgs != null ? infillArgs.uFL : (wireArgs != null ? wireArgs.uFL : null);
+        float[] uApex = infillArgs != null ? infillArgs.uApex : (wireArgs != null ? wireArgs.uApex : null);
+        if (uNL == null || uNR == null || uFR == null || uFL == null || uApex == null) return;
+        addOffset(uNL, delta);
+        addOffset(uNR, delta);
+        addOffset(uFR, delta);
+        addOffset(uFL, delta);
+        addOffset(uApex, delta);
+    }
+
+    public boolean writeHazardPoint(float[] out) {
+        if (out == null || out.length < 3) return false;
+        float[] apex = infillArgs != null ? infillArgs.uApex : (wireArgs != null ? wireArgs.uApex : null);
+        if (apex == null) return false;
+        out[0] = apex[0];
+        out[1] = apex[1];
+        out[2] = apex[2];
+        return true;
+    }
+
+    private static void addOffset(float[] v, Vector3D delta) {
+        if (v == null) return;
+        v[0] += delta.x;
+        v[1] += delta.y;
+        v[2] += delta.z;
+    }
+
+    @Override
     public void cleanupGPUResourcesRecursivelyOnContextLoss() {
         SHARED_FILL_MESH.cleanupGPUResourcesRecursivelyOnContextLoss();
         SHARED_WIRE_MESH.cleanupGPUResourcesRecursivelyOnContextLoss();
@@ -152,7 +186,7 @@ public class DeathSpike extends Addon {
 
 
     @Override
-    public void interactWithPlayer(Player.InteractableAPI api) {
-
+    public void accept(Player player) {
+        player.interactWith(this);
     }
 }

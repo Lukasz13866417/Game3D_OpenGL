@@ -53,6 +53,7 @@ public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDra
         vs.viewportW = args.viewportW;
         vs.viewportH = args.viewportH;
         vs.halfPx = args.halfPx;
+        vs.capPx = args.capPx;
         vs.uDepthBiasNDC = args.uDepthBiasNDC;
         vs.uNL = args.uNL; vs.uNR = args.uNR; vs.uFR = args.uFR; vs.uFL = args.uFL; vs.uApex = args.uApex; vs.uNormal = args.uNormal;
         vs.uBaseOffset = args.uBaseOffset;
@@ -123,7 +124,10 @@ public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDra
             // Replace faces by quads per edge so base class triangulates them
             int nEdges = edges.length;
             int[][] newFaces = new int[nEdges][];
-            for (int i = 0; i < nEdges; i++) newFaces[i] = new int[]{ i*4+0, i*4+1, i*4+2, i*4+3 };
+            for (int i = 0; i < nEdges; i++) {
+                // Order vertices so the quad diagonal spans across the line width.
+                newFaces[i] = new int[]{ i*4+0, i*4+1, i*4+3, i*4+2 };
+            }
             this.faces = newFaces;
 
             // Provide dummy verts array to satisfy builder contract (not used by shader)

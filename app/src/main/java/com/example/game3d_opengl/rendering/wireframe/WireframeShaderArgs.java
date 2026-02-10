@@ -10,6 +10,7 @@ public final class WireframeShaderArgs {
         public int viewportW;
         public int viewportH;
         public float halfPx;
+        public float capPx;
 
         public FColor color;
 

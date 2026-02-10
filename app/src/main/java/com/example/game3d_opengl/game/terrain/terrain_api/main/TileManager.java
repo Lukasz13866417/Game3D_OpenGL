@@ -275,9 +275,11 @@ public class TileManager implements GPUResourceOwner {
     /**
      * Returns a named-corner view of the grid cell at (row, col).
      *
-     * Historical note: this used to return a {@code Vector3D[]} with a confusing implicit order.
-     * We keep the mapping consistent with the previous behavior:
-     * array[0]=nearLeft, array[1]=farLeft, array[2]=farRight, array[3]=nearRight.
+     * Mapped to the actual geometry:
+     * nearLeft = (row, col-1) top
+     * nearRight = (row, col) top
+     * farLeft = (row, col-1) bottom
+     * farRight = (row, col) bottom
      */
     public TerrainGridField getField(int row, int col) {
         GridRowInfo info = rowInfoBuffer.get(row - 1);
@@ -286,12 +288,11 @@ public class TileManager implements GPUResourceOwner {
         Vector3D p2 = getGridPoint(info, col, false);
         Vector3D p3 = getGridPoint(info, col - 1, false);
 
-        // Preserve the previous implicit ordering semantics:
-        // nearLeft=p0, farLeft=p1, farRight=p2, nearRight=p3.
+        // nearLeft=p0, nearRight=p1, farLeft=p3, farRight=p2.
         return new TerrainGridField(
                 p0, /* nearLeft */
-                p3, /* nearRight */
-                p1, /* farLeft */
+                p1, /* nearRight */
+                p3, /* farLeft */
                 p2  /* farRight */
         );
     }
@@ -385,9 +386,12 @@ public class TileManager implements GPUResourceOwner {
                     true,
                     false,
                     0,
-                    nl, nr,
-                    fl, fr,
-                    fl, fr,
+                    nl.x, nl.y, nl.z,
+                    nr.x, nr.y, nr.z,
+                    fl.x, fl.y, fl.z,
+                    fr.x, fr.y, fr.z,
+                    fl.x, fl.y, fl.z,
+                    fr.x, fr.y, fr.z,
                     0,
                     alphaLUsed, alphaRUsed
             );
@@ -413,7 +417,8 @@ public class TileManager implements GPUResourceOwner {
             longerLen = elR;
         }
 
-        Vector3D lastNL = lastSegmentInfo.lastL, lastNR = lastSegmentInfo.lastR;
+        Vector3D lastNL = V3(lastSegmentInfo.lastLx, lastSegmentInfo.lastLy, lastSegmentInfo.lastLz);
+        Vector3D lastNR = V3(lastSegmentInfo.lastRx, lastSegmentInfo.lastRy, lastSegmentInfo.lastRz);
         if(wasPreviousEmpty || isFirstLiftedUp){
             lastNL = nl;
             lastNR = nr;
@@ -431,10 +436,10 @@ public class TileManager implements GPUResourceOwner {
             distShorter += spacingShorter;
             rowInfoBuffer.add(
                     tile.getID(),
-                    lastNL,
-                    lastNR,
-                    currNL,
-                    currNR
+                    lastNL.x, lastNL.y, lastNL.z,
+                    lastNR.x, lastNR.y, lastNR.z,
+                    currNL.x, currNL.y, currNL.z,
+                    currNR.x, currNR.y, currNR.z
             );
             lastNL = currNL;
             lastNR = currNR;
@@ -448,9 +453,12 @@ public class TileManager implements GPUResourceOwner {
                 false,
                 isFirstLiftedUp,
                 cntRows,
-                nl, nr,
-                fl, fr,
-                lastNL, lastNR,
+                nl.x, nl.y, nl.z,
+                nr.x, nr.y, nr.z,
+                fl.x, fl.y, fl.z,
+                fr.x, fr.y, fr.z,
+                lastNL.x, lastNL.y, lastNL.z,
+                lastNR.x, lastNR.y, lastNR.z,
                 ourLeftover,
                 alphaLUsed, alphaRUsed);
     }
@@ -538,11 +546,31 @@ public class TileManager implements GPUResourceOwner {
 
     private Vector3D getGridPoint(GridRowInfo rowInfo, int c, boolean isTop) {
         if (isTop) {
-            Vector3D edge = rowInfo.RS.sub(rowInfo.LS);
-            return rowInfo.LS.add(edge.mult((float) c / nCols));
+            float t = (float) c / nCols;
+            float lx = rowInfo.LSx;
+            float ly = rowInfo.LSy;
+            float lz = rowInfo.LSz;
+            float rx = rowInfo.RSx;
+            float ry = rowInfo.RSy;
+            float rz = rowInfo.RSz;
+            return V3(
+                    lx + (rx - lx) * t,
+                    ly + (ry - ly) * t,
+                    lz + (rz - lz) * t
+            );
         }
-        Vector3D edge = rowInfo.RS_last.sub(rowInfo.LS_last);
-        return rowInfo.LS_last.add(edge.mult((float) c / nCols));
+        float t = (float) c / nCols;
+        float lx = rowInfo.LS_lastx;
+        float ly = rowInfo.LS_lasty;
+        float lz = rowInfo.LS_lastz;
+        float rx = rowInfo.RS_lastx;
+        float ry = rowInfo.RS_lasty;
+        float rz = rowInfo.RS_lastz;
+        return V3(
+                lx + (rx - lx) * t,
+                ly + (ry - ly) * t,
+                lz + (rz - lz) * t
+        );
     }
 
     public void updateBeforeDraw(float dt){
@@ -556,6 +584,56 @@ public class TileManager implements GPUResourceOwner {
     public void updateAfterDraw(float dt){
     }
 
+    public void rebasePosition(Vector3D delta) {
+        if (delta == null) return;
+        float dx = delta.x;
+        float dy = delta.y;
+        float dz = delta.z;
+        if (dx == 0f && dy == 0f && dz == 0f) return;
+        for (Tile tile : tiles) {
+            if (tile != null) {
+                tile.rebasePosition(delta);
+            }
+        }
+        for (int i = 0; i < rowInfoBuffer.size(); i++) {
+            GridRowInfo info = rowInfoBuffer.get(i);
+            info.LSx += dx;
+            info.LSy += dy;
+            info.LSz += dz;
+            info.RSx += dx;
+            info.RSy += dy;
+            info.RSz += dz;
+            info.LS_lastx += dx;
+            info.LS_lasty += dy;
+            info.LS_lastz += dz;
+            info.RS_lastx += dx;
+            info.RS_lasty += dy;
+            info.RS_lastz += dz;
+        }
+        for (int i = 0; i < segmentHistoryBuffer.size(); i++) {
+            SegmentHistory info = segmentHistoryBuffer.get(i);
+            info.nLx += dx;
+            info.nLy += dy;
+            info.nLz += dz;
+            info.nRx += dx;
+            info.nRy += dy;
+            info.nRz += dz;
+            info.fLx += dx;
+            info.fLy += dy;
+            info.fLz += dz;
+            info.fRx += dx;
+            info.fRy += dy;
+            info.fRz += dz;
+            info.lastLx += dx;
+            info.lastLy += dy;
+            info.lastLz += dz;
+            info.lastRx += dx;
+            info.lastRy += dy;
+            info.lastRz += dz;
+        }
+        landscapeRenderer.rebasePosition(delta);
+    }
+
     // ============================================================================
     // INNER CLASSES
     // ============================================================================
@@ -566,10 +644,13 @@ public class TileManager implements GPUResourceOwner {
         public int rowsAddedCnt = 0;
         /** Alphas used for this tile's ribbon vertices (left/right). */
         public float alphaL = 1f, alphaR = 1f;
-        public Vector3D nLOfTile = V3(0,0,0), nROfTile = V3(0,0,0);
-        public Vector3D fLOfTile = V3(0,0,0), fROfTile = V3(0,0,0);
+        public float nLx = 0f, nLy = 0f, nLz = 0f;
+        public float nRx = 0f, nRy = 0f, nRz = 0f;
+        public float fLx = 0f, fLy = 0f, fLz = 0f;
+        public float fRx = 0f, fRy = 0f, fRz = 0f;
 
-        public Vector3D lastL =  V3(0,0,0), lastR = V3(0,0,0);
+        public float lastLx = 0f, lastLy = 0f, lastLz = 0f;
+        public float lastRx = 0f, lastRy = 0f, lastRz = 0f;
 
         public float leftover = 0.0f;
 
@@ -579,20 +660,35 @@ public class TileManager implements GPUResourceOwner {
         public void set(boolean isEmpty,
                         boolean isFirstLiftedUp,
                         int rowsAddedCnt,
-                        Vector3D nLOfTile, Vector3D nROfTile,
-                        Vector3D fLOfTile, Vector3D fROfTile,
-                        Vector3D lastL, Vector3D lastR,
+                        float nLx, float nLy, float nLz,
+                        float nRx, float nRy, float nRz,
+                        float fLx, float fLy, float fLz,
+                        float fRx, float fRy, float fRz,
+                        float lastLx, float lastLy, float lastLz,
+                        float lastRx, float lastRy, float lastRz,
                         float leftover,
                         float alphaL, float alphaR) {
             this.isEmpty = isEmpty;
             this.isFirstLiftedUp = isFirstLiftedUp;
             this.rowsAddedCnt = rowsAddedCnt;
-            this.nLOfTile = nLOfTile;
-            this.nROfTile = nROfTile;
-            this.fLOfTile = fLOfTile;
-            this.fROfTile = fROfTile;
-            this.lastL = lastL;
-            this.lastR = lastR;
+            this.nLx = nLx;
+            this.nLy = nLy;
+            this.nLz = nLz;
+            this.nRx = nRx;
+            this.nRy = nRy;
+            this.nRz = nRz;
+            this.fLx = fLx;
+            this.fLy = fLy;
+            this.fLz = fLz;
+            this.fRx = fRx;
+            this.fRy = fRy;
+            this.fRz = fRz;
+            this.lastLx = lastLx;
+            this.lastLy = lastLy;
+            this.lastLz = lastLz;
+            this.lastRx = lastRx;
+            this.lastRy = lastRy;
+            this.lastRz = lastRz;
             this.leftover = leftover;
             this.alphaL = alphaL;
             this.alphaR = alphaR;
@@ -602,20 +698,32 @@ public class TileManager implements GPUResourceOwner {
     public static class GridRowInfo {
 
         public long tileID = -1;
-        public Vector3D LS = V3(0, 0, 0), RS = V3(0, 0, 0);
-        public Vector3D LS_last = V3(0, 0, 0), RS_last = V3(0, 0, 0);
+        public float LSx = 0f, LSy = 0f, LSz = 0f;
+        public float RSx = 0f, RSy = 0f, RSz = 0f;
+        public float LS_lastx = 0f, LS_lasty = 0f, LS_lastz = 0f;
+        public float RS_lastx = 0f, RS_lasty = 0f, RS_lastz = 0f;
 
         public GridRowInfo() {
         }
 
         public void set(long tileID,
-                        Vector3D LS, Vector3D RS,
-                        Vector3D LS_last, Vector3D RS_last) {
+                        float LSx, float LSy, float LSz,
+                        float RSx, float RSy, float RSz,
+                        float LS_lastx, float LS_lasty, float LS_lastz,
+                        float RS_lastx, float RS_lasty, float RS_lastz) {
             this.tileID = tileID;
-            this.LS = LS;
-            this.RS = RS;
-            this.LS_last = LS_last;
-            this.RS_last = RS_last;
+            this.LSx = LSx;
+            this.LSy = LSy;
+            this.LSz = LSz;
+            this.RSx = RSx;
+            this.RSy = RSy;
+            this.RSz = RSz;
+            this.LS_lastx = LS_lastx;
+            this.LS_lasty = LS_lasty;
+            this.LS_lastz = LS_lastz;
+            this.RS_lastx = RS_lastx;
+            this.RS_lasty = RS_lasty;
+            this.RS_lastz = RS_lastz;
         }
     }
 }
