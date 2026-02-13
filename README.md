@@ -9,7 +9,7 @@ The codebase has since evolved into a **full OpenGL** rendering solution, comple
 - **Custom 3D Rendering Pipeline**: Built on OpenGL, encapsulated in clean classes like `Camera`, `Object3D`, and more.
 - **Modular Terrain API**: Create subclasses of `TerrainStructure` to define tiles, place “addons” (like spikes or potions), and customize your landscape.
 - **Lazy Terrain Generation**: Terrain structures can have child structures, which are compiled into commands and then “interpreted” at runtime to generate the environment as needed.
-- **Tons of Data structures&optimization**: Custom red-black trees, hashing, segment trees, pre-alloacted data structures.
+- **Tons of Data structures&optimization**: Custom treap, hashing, segment trees, pre-alloacted data structures.
 - **Performance-Focused**: Preallocation, minimal heap allocations, specialized data structures, shader tricks, efficient use of GPU resources.
 
 ## Project Structure
