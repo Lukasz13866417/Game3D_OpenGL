@@ -2,8 +2,10 @@ package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_FINISH_STRUCTURE_LANDSCAPE;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL_REGION;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_K_RANDOM_FIELDS;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL_REGION;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_VERTICAL;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_VERTICAL;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_H_ANG;
@@ -17,9 +19,11 @@ import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeC
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
 
 import com.example.game3d_opengl.game.LightSource;
+import com.example.game3d_opengl.game.pooling.PooledSlotLease;
 import com.example.game3d_opengl.game.WorldActor;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCreatorWrapper;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.tilemanager.TileManager;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.ArrayQueue;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.ArrayStack;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.IntArrayQueue;
@@ -56,6 +60,7 @@ public class Terrain implements WorldActor {
      * The tile builder responsible for creating and managing individual tiles.
      * Handles the geometry generation and GPU resource management for tiles.
      */
+    final GridResourcePack gridResourcePack;
     public final TileManager tileManager;
 
     private LightSource lightSource = null;
@@ -91,12 +96,12 @@ public class Terrain implements WorldActor {
      * Should be called when the OpenGL context is being destroyed.
      */
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
 
         // TODO this should only do GPU stuff. Make separate method for command buffers etc
 
-        commandBuffer.free();
-        tileManager.cleanupGPUResourcesRecursivelyOnContextLoss();
+        tileManager.cleanupGPUResourcesRecursively();
+        commandBuffer.release();
 
         gridCreatorWrapperQueue.clear();
         gridCreatorWrapperStack.clear();
@@ -109,7 +114,7 @@ public class Terrain implements WorldActor {
         childStructuresQueue.clear();
 
         for (Addon addon : addons) {
-            addon.cleanupGPUResourcesRecursivelyOnContextLoss();
+            addon.cleanupGPUResourcesRecursively();
         }
         addons.clear();
     }
@@ -349,6 +354,29 @@ public class Terrain implements WorldActor {
                 addonQueue.enqueue(addon);
             }
         }
+
+        /**
+         * Reserves a specific horizontal region and places one addon over the full region.
+         */
+        public void reserveHorizontalRegion(int row, int col, int length, Addon addon) {
+            assert addon != null;
+            assert row > 0;
+            assert col > 0;
+            assert col <= nCols;
+            assert length > 0;
+            commandBuffer.addCommand(CMD_RESERVE_HORIZONTAL_REGION, row, col, length);
+            addonQueue.enqueue(addon);
+        }
+
+        /**
+         * Reserves a random horizontal region and places one addon over the full region.
+         */
+        public void reserveRandomHorizontalRegion(int length, Addon addon) {
+            assert addon != null;
+            assert length > 0;
+            commandBuffer.addCommand(CMD_RESERVE_RANDOM_HORIZONTAL_REGION, length);
+            addonQueue.enqueue(addon);
+        }
     }
 
     // Data structures for managing terrain generation state
@@ -390,41 +418,71 @@ public class Terrain implements WorldActor {
     private static final FColor DEFAULT_COLOR_THEME = FColor.CLR(0.8f,0,0);
 
     public Terrain(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength, float rowSpacing, LightSource lightSource) {
-        this.nCols = nCols;
+        this(maxSegments, nCols, startMid, segWidth, segLength, rowSpacing, lightSource,
+                TerrainResourcePack.defaultInstance());
+    }
 
-        // Initialize the tile builder with the specified parameters
-        this.tileManager = new TileManager(maxSegments, nCols, startMid, segWidth, segLength, rowSpacing);
+    private Terrain(int maxSegments, int nCols, Vector3D startMid, float segWidth, float segLength,
+                    float rowSpacing, LightSource lightSource, TerrainResourcePack resourcePack) {
+        TileManager createdTileManager = null;
+        PreallocatedCommandBuffer createdCommandBuffer = null;
+        try {
+            this.nCols = nCols;
+            this.gridResourcePack = resourcePack.gridResourcePack();
 
-        // Initialize the addons collection
-        this.addons = new FixedMaxSizeDeque<>(maxSegments + 1);
+            PooledSlotLease<float[]> commandBufferLease = resourcePack.commandBufferPool().acquire();
+            createdCommandBuffer = new PreallocatedCommandBuffer(commandBufferLease);
+            createdCommandBuffer.resetAfterAcquire();
+            this.commandBuffer = createdCommandBuffer;
 
-        // Initialize the command buffer for terrain generation
-        this.commandBuffer = new PreallocatedCommandBuffer();
+            // Initialize the tile builder with the specified parameters
+            createdTileManager = new TileManager(
+                    maxSegments,
+                    nCols,
+                    startMid,
+                    segWidth,
+                    segLength,
+                    rowSpacing,
+                    resourcePack.tileManagerResourcePack()
+            );
+            this.tileManager = createdTileManager;
 
-        // Initialize the command execution system
-        this.generalExecutor = new GeneralExecutor();
-        this.landscapeCommandExecutor = new LandscapeCommandsExecutor(this);
-        this.addonsCommandExecutor = new AddonsCommandsExecutor(this);
+            // Initialize the addons collection
+            this.addons = new FixedMaxSizeDeque<>(maxSegments + 1);
 
-        // Initialize data structures with appropriate capacities
-        this.rowOffsetQueue = new IntArrayQueue(DEFAULT_QUEUE_CAPACITY);
-        this.rowCountStack = new IntArrayStack(DEFAULT_QUEUE_CAPACITY);
-        this.gridCreatorWrapperStack = new ArrayStack<>();
-        this.gridCreatorWrapperQueue = new ArrayQueue<>();
-        this.addonQueue = new ArrayQueue<>();
-        this.structureStack = new ArrayStack<>();
-        this.waitingStructuresQueue = new ArrayQueue<>();
-        this.childStructuresQueue = new ArrayQueue<>();
+            // Initialize the command execution system
+            this.generalExecutor = new GeneralExecutor();
+            this.landscapeCommandExecutor = new LandscapeCommandsExecutor(this);
+            this.addonsCommandExecutor = new AddonsCommandsExecutor(this);
 
-        // Initialize the grid brushes
-        this.advancedGridBrush = new AdvancedGridBrush();
-        this.basicGridBrush = new BasicGridBrush();
+            // Initialize data structures with appropriate capacities
+            this.rowOffsetQueue = new IntArrayQueue(DEFAULT_QUEUE_CAPACITY);
+            this.rowCountStack = new IntArrayStack(DEFAULT_QUEUE_CAPACITY);
+            this.gridCreatorWrapperStack = new ArrayStack<>();
+            this.gridCreatorWrapperQueue = new ArrayQueue<>();
+            this.addonQueue = new ArrayQueue<>();
+            this.structureStack = new ArrayStack<>();
+            this.waitingStructuresQueue = new ArrayQueue<>();
+            this.childStructuresQueue = new ArrayQueue<>();
 
-        // Initialize the tile brush
-        this.tileBrush = new TileBrush();
+            // Initialize the grid brushes
+            this.advancedGridBrush = new AdvancedGridBrush();
+            this.basicGridBrush = new BasicGridBrush();
 
-        this.lightSource = lightSource;
-        this.colorTheme = DEFAULT_COLOR_THEME;
+            // Initialize the tile brush
+            this.tileBrush = new TileBrush();
+
+            this.lightSource = lightSource;
+            this.colorTheme = DEFAULT_COLOR_THEME;
+        } catch (Throwable t) {
+            if (createdTileManager != null) {
+                createdTileManager.cleanupGPUResourcesRecursively();
+            }
+            if (createdCommandBuffer != null) {
+                createdCommandBuffer.release();
+            }
+            throw t;
+        }
     }
 
     public void updateBeforeDraw(float dt) {

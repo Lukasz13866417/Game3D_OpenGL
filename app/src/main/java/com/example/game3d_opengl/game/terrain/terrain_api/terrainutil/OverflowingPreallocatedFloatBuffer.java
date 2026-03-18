@@ -1,21 +1,19 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.terrainutil;
 
-public class OverflowingPreallocatedFloatBuffer {
+import com.example.game3d_opengl.game.pooling.FixedPool;
+import com.example.game3d_opengl.game.pooling.PooledResourcesOwner;
+import com.example.game3d_opengl.game.pooling.PooledSlotLease;
+
+public class OverflowingPreallocatedFloatBuffer extends PooledResourcesOwner {
     private static final int MAX_SIZE = 100_000;
     private static final int MAX_BUFFER_COUNT = 4;
-    private static final float[][] BUFFERS = new float[MAX_BUFFER_COUNT][MAX_SIZE];
-    private static final boolean[] isTaken = new boolean[MAX_BUFFER_COUNT];
+    private static final FixedPool<float[]> POOL = new FixedPool<>(
+            MAX_BUFFER_COUNT,
+            () -> new float[MAX_SIZE],
+            "No more available preallocated buffers."
+    );
 
-    private static int findFreeSlot() {
-        for (int i = 0; i < MAX_BUFFER_COUNT; i++) {
-            if (!isTaken[i]) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private final int mySlot;
+    private final PooledSlotLease<float[]> bufferLease;
     private final float[] myBuffer;
 
     // Tracks the “start” (front) of the buffer in myBuffer (cyclic index).
@@ -23,21 +21,21 @@ public class OverflowingPreallocatedFloatBuffer {
     // Number of elements currently stored in the buffer.
     private int mySize = 0;
 
-    public OverflowingPreallocatedFloatBuffer() {
-        int slot = findFreeSlot();
-        if (slot == -1) {
-            throw new IllegalStateException("No more available preallocated buffers.");
-        }
-        mySlot = slot;
-        myBuffer = BUFFERS[mySlot];
-        isTaken[mySlot] = true;
+    private OverflowingPreallocatedFloatBuffer(PooledSlotLease<float[]> bufferLease) {
+        super(null);
+        this.bufferLease = bufferLease;
+        this.myBuffer = bufferLease.get();
+    }
+
+    public static OverflowingPreallocatedFloatBuffer acquire() {
+        return new OverflowingPreallocatedFloatBuffer(POOL.acquire());
     }
 
     /**
      * Releases this buffer slot so it can be reused by another instance.
      */
     public void free() {
-        isTaken[mySlot] = false;
+        releasePooledResourcesRecursively();
     }
 
     /**
@@ -94,5 +92,11 @@ public class OverflowingPreallocatedFloatBuffer {
         float value = myBuffer[idx];
         mySize--;
         return value;
+    }
+
+    @Override
+    public void releasePooledResourcesRecursively() {
+        clear();
+        bufferLease.release();
     }
 }

@@ -1,15 +1,21 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.terrainutil;
 
-public class OverflowingPreallocatedCoordinateBuffer {
+import com.example.game3d_opengl.game.pooling.PooledResourcesOwner;
+
+public class OverflowingPreallocatedCoordinateBuffer extends PooledResourcesOwner {
     private final OverflowingPreallocatedFloatBuffer floatBuffer;
 
     public void free(){
-        clear();
-        floatBuffer.free();
+        releasePooledResourcesRecursively();
     }
 
-    public OverflowingPreallocatedCoordinateBuffer() {
-        this.floatBuffer = new OverflowingPreallocatedFloatBuffer();
+    private OverflowingPreallocatedCoordinateBuffer(OverflowingPreallocatedFloatBuffer floatBuffer) {
+        super(null);
+        this.floatBuffer = floatBuffer;
+    }
+
+    public static OverflowingPreallocatedCoordinateBuffer acquire() {
+        return new OverflowingPreallocatedCoordinateBuffer(OverflowingPreallocatedFloatBuffer.acquire());
     }
 
     /**
@@ -70,5 +76,11 @@ public class OverflowingPreallocatedCoordinateBuffer {
                 floatBuffer.pop(),
                 floatBuffer.pop()
         };
+    }
+
+    @Override
+    public void releasePooledResourcesRecursively() {
+        clear();
+        floatBuffer.releasePooledResourcesRecursively();
     }
 }

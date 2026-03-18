@@ -45,13 +45,17 @@ public final class TerrainRibbonShaderPair
                         "    if (vAlpha < 1.0) discard;\n" +
                         "    return;\n" +
                         "  }\n" +
+                        "  const float AMBIENT = 0.08;\n" +
+                        "  const float CONTRAST = 1.35;\n" +
+                        "  const float HIGHLIGHT_GAIN = 1.25;\n" +
                         "  vec3 toLight = uLightPos - vWorldPos;\n" +
                         "  float distSq = dot(toLight, toLight);\n" +
                         "  float atten = 1.0 / (1.0 + 0.0000001 * distSq);\n" +
                         "  vec3 L = toLight * inversesqrt(distSq);\n" +
                         "  vec3 N = normalize(vNormal);\n" +
                         "  float diff = max(dot(L, N), 0.0);\n" +
-                        "  vec3 lighting = uLightColor * diff * atten + vec3(0.2);\n" +
+                        "  float lit = clamp((diff * atten - 0.5) * CONTRAST + 0.5, 0.0, 1.0);\n" +
+                        "  vec3 lighting = uLightColor * (lit * HIGHLIGHT_GAIN) + vec3(AMBIENT);\n" +
                         "  gl_FragColor = vec4(vColor.rgb * lighting, vColor.a * vAlpha);\n" +
                         "}";
         return new Builder().fromSource(vs, fs).build();

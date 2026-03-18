@@ -1,4 +1,4 @@
-package com.example.game3d_opengl.game.terrain.terrain_api.main;
+package com.example.game3d_opengl.game.terrain.terrain_api.main.tilemanager;
 
 import static com.example.game3d_opengl.game.util.GameMath.EPSILON;
 import static com.example.game3d_opengl.game.util.GameMath.NINF;
@@ -10,6 +10,9 @@ import static java.lang.Math.abs;
 import static java.lang.Math.max;
 import static java.lang.Math.round;
 
+import com.example.game3d_opengl.game.pooling.PooledSlotLease;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.TerrainGridField;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.FixedMaxSizeDeque;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.OverflowingPreallocatedRowInfoBuffer;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.OverflowingPreallocatedSegmentHistoryBuffer;
@@ -69,32 +72,58 @@ public class TileManager implements GPUResourceOwner {
                        Vector3D startMid,
                        float segWidth, float segLength,
                        float rowSpacing) {
+        this(maxSegments, nCols, startMid, segWidth, segLength, rowSpacing,
+                TileManagerResourcePack.defaultInstance());
+    }
 
-        this.rowSpacing = rowSpacing;
-        this.segLength = segLength;
-        this.nCols = nCols;
+    public TileManager(int maxSegments, int nCols,
+                Vector3D startMid,
+                float segWidth, float segLength,
+                float rowSpacing,
+                TileManagerResourcePack resourcePack) {
+        OverflowingPreallocatedRowInfoBuffer createdRowInfoBuffer = null;
+        OverflowingPreallocatedSegmentHistoryBuffer createdSegmentHistoryBuffer = null;
+        try {
+            this.rowSpacing = rowSpacing;
+            this.segLength = segLength;
+            this.nCols = nCols;
 
-        /*–––– data structures ––––*/
-        this.rowInfoBuffer = new OverflowingPreallocatedRowInfoBuffer();
+            PooledSlotLease<GridRowInfo[]> rowInfoLease = resourcePack.rowInfoPool().acquire();
+            createdRowInfoBuffer = new OverflowingPreallocatedRowInfoBuffer(rowInfoLease);
+            this.rowInfoBuffer = createdRowInfoBuffer;
 
-        this.tiles = new FixedMaxSizeDeque<>(maxSegments + 1);
-        this.segmentHistoryBuffer = new OverflowingPreallocatedSegmentHistoryBuffer();
+            /*–––– data structures ––––*/
+            this.tiles = new FixedMaxSizeDeque<>(maxSegments + 1);
+
+            PooledSlotLease<SegmentHistory[]> segmentHistoryLease =
+                    resourcePack.segmentHistoryPool().acquire();
+            createdSegmentHistoryBuffer =
+                    new OverflowingPreallocatedSegmentHistoryBuffer(segmentHistoryLease);
+            this.segmentHistoryBuffer = createdSegmentHistoryBuffer;
 
 
-        /*–––– guardian tile (length close to 0) ––––*/
-        Vector3D startLeft = V3(startMid.sub(segWidth / 2, 0, 0));
-        Vector3D startRight = V3(startMid.add(segWidth / 2, 0, 0));
+            /*–––– guardian tile (length close to 0) ––––*/
+            Vector3D startLeft = V3(startMid.sub(segWidth / 2, 0, 0));
+            Vector3D startRight = V3(startMid.add(segWidth / 2, 0, 0));
 
-        Vector3D forward = V3(0,0,-BIG_LEN);
+            Vector3D forward = V3(0,0,-BIG_LEN);
 
-        this.landscapeRenderer = new TerrainLandscapeRenderer();
+            this.landscapeRenderer = new TerrainLandscapeRenderer();
 
-        addTile(startLeft.sub(forward),
-                startRight.sub(forward),
-                startLeft,   // farLeft = nearLeft shifted so len>0
-                startRight,  // farRight
-                true, false, false);
-
+            addTile(startLeft.sub(forward),
+                    startRight.sub(forward),
+                    startLeft,   // farLeft = nearLeft shifted so len>0
+                    startRight,  // farRight
+                    true, false, false);
+        } catch (Throwable t) {
+            if (createdSegmentHistoryBuffer != null) {
+                createdSegmentHistoryBuffer.release();
+            }
+            if (createdRowInfoBuffer != null) {
+                createdRowInfoBuffer.release();
+            }
+            throw t;
+        }
     }
 
     // ============================================================================
@@ -227,15 +256,15 @@ public class TileManager implements GPUResourceOwner {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         while (!tiles.isEmpty()) {
             tiles.popFirst();
         }
-        landscapeRenderer.cleanupGPUResourcesRecursivelyOnContextLoss();
+        landscapeRenderer.cleanupGPUResourcesRecursively();
 
         // TODO this should only do GPU stuff. Make separate method for buffers etc
-        rowInfoBuffer.free();
-        segmentHistoryBuffer.free();
+        segmentHistoryBuffer.release();
+        rowInfoBuffer.release();
     }
 
     /**
@@ -294,6 +323,29 @@ public class TileManager implements GPUResourceOwner {
                 p1, /* nearRight */
                 p3, /* farLeft */
                 p2  /* farRight */
+        );
+    }
+
+    /**
+     * Returns a named-corner region for a horizontal strip of {@code length} cells,
+     * starting at {@code (row, startCol)}.
+     *
+     * <p>The returned corners describe the entire region footprint and can be used
+     * for addons that span multiple neighboring fields.
+     */
+    public TerrainGridField getHorizontalRegionField(int row, int startCol, int length) {
+        assert row >= 1 && row <= rowInfoBuffer.size();
+        assert startCol >= 1 && startCol <= nCols;
+        assert length >= 1;
+        assert startCol + length - 1 <= nCols;
+
+        TerrainGridField left = getField(row, startCol);
+        TerrainGridField right = getField(row, startCol + length - 1);
+        return new TerrainGridField(
+                left.nearLeft,
+                right.nearRight,
+                left.farLeft,
+                right.farRight
         );
     }
 

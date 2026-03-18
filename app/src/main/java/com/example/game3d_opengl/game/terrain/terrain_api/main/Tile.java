@@ -59,7 +59,7 @@ public class Tile implements PlayerInteractable {
      * @param l unique identifier for this tile
      * @param isEmptySegment whether this tile represents empty space
      */
-    Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, long l, boolean isEmptySegment) {
+    public Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, long l, boolean isEmptySegment) {
         this.nearLeft = nl;
         this.nearRight = nr;
         this.farLeft = fl;

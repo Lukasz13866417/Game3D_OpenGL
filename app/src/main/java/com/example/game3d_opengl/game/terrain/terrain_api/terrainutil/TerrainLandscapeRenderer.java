@@ -433,7 +433,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         if (vboId != 0) {
             int[] ids = new int[]{vboId};
             GLES20.glDeleteBuffers(1, ids, 0);
