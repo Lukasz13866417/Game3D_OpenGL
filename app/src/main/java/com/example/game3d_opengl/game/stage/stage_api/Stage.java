@@ -7,6 +7,7 @@ import android.content.res.AssetManager;
 import com.example.game3d_opengl.MyGLRenderer.StageManager;
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.ScreenInfo;
+import com.example.game3d_opengl.rendering.infill.FlatLitShaderPair;
 import com.example.game3d_opengl.rendering.infill.InfillShaderPair;
 import com.example.game3d_opengl.rendering.wireframe.WireframeShaderPair;
 
@@ -63,13 +64,17 @@ public abstract class Stage implements GPUResourceOwner {
 
     protected abstract void onTouchMove(float x1, float y1, float x2, float y2);
 
+    protected abstract void setupAssets(AssetManager assetManager);
+
     protected abstract void initScene(Context context, int screenWidth, int screenHeight);
 
     public final void init(Context context, int screenWidth, int screenHeight){
         AssetManager assetManager = context.getAssets();
         InfillShaderPair.LOAD_SHADER_CODE(assetManager);
+        FlatLitShaderPair.LOAD_SHADER_CODE();
         WireframeShaderPair.LOAD_SHADER_CODE(assetManager);
         ScreenInfo.setScreenSize(screenWidth, screenHeight);
+        setupAssets(assetManager);
         initScene(context, screenWidth, screenHeight);
     }
 
@@ -118,7 +123,7 @@ public abstract class Stage implements GPUResourceOwner {
 
     public abstract void reloadGPUResourcesRecursivelyOnContextLoss();
 
-    public abstract void cleanupGPUResourcesRecursivelyOnContextLoss();
+    public abstract void cleanupGPUResourcesRecursively();
 
     protected abstract void onPause();
 

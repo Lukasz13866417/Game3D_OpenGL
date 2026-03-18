@@ -13,6 +13,7 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  * Stride: 12 floats per vertex.
  */
 public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDrawArgs, SpikeWireframeShaderPair> {
+    private static final int[] VIEWPORT_TMP = new int[4];
 
     private final FColor edgeColor;
     private final float pixelWidth;
@@ -50,8 +51,9 @@ public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDra
     @Override
     protected void setVariableArgsValues(SpikeWireframeDrawArgs args, SpikeWireframeShaderPair shader) {
         vs.mvp = args.vp;
-        vs.viewportW = args.viewportW;
-        vs.viewportH = args.viewportH;
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, VIEWPORT_TMP, 0);
+        vs.viewportW = Math.max(1, VIEWPORT_TMP[2]);
+        vs.viewportH = Math.max(1, VIEWPORT_TMP[3]);
         vs.halfPx = args.halfPx;
         vs.capPx = args.capPx;
         vs.uDepthBiasNDC = args.uDepthBiasNDC;

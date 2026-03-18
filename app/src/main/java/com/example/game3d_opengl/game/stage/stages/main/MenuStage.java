@@ -11,7 +11,8 @@ import com.example.game3d_opengl.rendering.text.TextRenderer;
 /**
  * Extremely lightweight start screen. Shows nothing visually (black screen)
  * and waits for the user to tap anywhere. The first tap switches to
- * {@link GameplayStage}. This is enough to let developers attach the
+ * {@link LoadingStage}, which then transitions into {@link GameplayStage}.
+ * This is enough to let developers attach the
  * Android Studio Profiler before heavy rendering starts.
  */
 public class MenuStage extends Stage {
@@ -30,7 +31,7 @@ public class MenuStage extends Stage {
     protected void onTouchDown(float x, float y) {
         // Start the game immediately on first touch
         // TODO make an actual menu
-        stageManager.toGameplay();
+        stageManager.toLoadingThenGameplay();
     }
 
     @Override
@@ -41,6 +42,11 @@ public class MenuStage extends Stage {
     @Override
     protected void onTouchMove(float x1, float y1, float x2, float y2) {
         // No-op
+    }
+
+    @Override
+    protected void setupAssets(android.content.res.AssetManager assetManager) {
+        // No-op.
     }
 
     @Override
@@ -103,9 +109,9 @@ public class MenuStage extends Stage {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         if (textRenderer != null) {
-            textRenderer.cleanupGPUResourcesRecursivelyOnContextLoss();
+            textRenderer.cleanupGPUResourcesRecursively();
         }
     }
 }

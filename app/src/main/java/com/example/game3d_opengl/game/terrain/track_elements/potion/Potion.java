@@ -10,7 +10,6 @@ import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.ModelCreator;
 import com.example.game3d_opengl.rendering.infill.Mesh3DInfill;
-import com.example.game3d_opengl.rendering.wireframe.Mesh3DWireframe;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 
@@ -25,9 +24,8 @@ public class Potion extends Addon {
     public static FColor POTION_FILL_COLOR = CLR(0.8f,0,0.8f,1);
     public static FColor POTION_EDGE_COLOR = CLR(1,1,1,1);
     
-    // Shared meshes for all potions
+    // Shared mesh for all potions
     private static Mesh3DInfill sharedFill;
-    private static Mesh3DWireframe sharedWire;
     private static boolean assetsLoaded = false;
     
     // Instance-specific transform wrapper
@@ -53,15 +51,12 @@ public class Potion extends Addon {
                     .verts(modelCreator.getVerts())
                     .faces(modelCreator.getFaces())
                     .fillColor(POTION_FILL_COLOR)
+                    .ambient(0.5f)
+                    .diffuse(0.7f)
+                    .specular(2.0f)
+                    .shininess(64f)
                     .buildObject();
 
-            sharedWire = new Mesh3DWireframe.Builder()
-                    .verts(modelCreator.getVerts())
-                    .faces(modelCreator.getFaces())
-                    .edgeColor(POTION_EDGE_COLOR)
-                    .pixelWidth(POTION_MODEL_LINE_THICKNESS)
-                    .buildObject();
-            
             assetsLoaded = true;
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -70,11 +65,9 @@ public class Potion extends Addon {
 
 
     public static Potion createPotion(){
-        assert sharedWire != null && sharedFill != null;
-        // This doesn't actually create any GPU resources or CPU buffers.
-        // Every such thing used by this obj3d is shared and already created;
+        assert sharedFill != null;
         UnbatchedObject3DWithOutline obj3d =
-                                          UnbatchedObject3DWithOutline.wrap(sharedFill, sharedWire);
+                                          UnbatchedObject3DWithOutline.wrap(sharedFill, null);
         return new Potion(obj3d);
     }
     
@@ -122,15 +115,13 @@ public class Potion extends Addon {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
-        sharedFill.cleanupGPUResourcesRecursivelyOnContextLoss();
-        sharedWire.cleanupGPUResourcesRecursivelyOnContextLoss();
+    public void cleanupGPUResourcesRecursively() {
+        sharedFill.cleanupGPUResourcesRecursively();
     }
 
     @Override
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
         sharedFill.reloadGPUResourcesRecursivelyOnContextLoss();
-        sharedWire.reloadGPUResourcesRecursivelyOnContextLoss();
     }
 
 

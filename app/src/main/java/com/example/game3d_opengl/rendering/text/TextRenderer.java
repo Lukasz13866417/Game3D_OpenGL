@@ -310,12 +310,12 @@ public final class TextRenderer implements GPUResourceOwner {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         if (vboId != 0) {
             GLES20.glDeleteBuffers(1, new int[]{vboId}, 0);
             vboId = 0;
         }
-        font.cleanupGPUResourcesRecursivelyOnContextLoss();
-        shader.cleanupGPUResourcesRecursivelyOnContextLoss();
+        font.cleanupGPUResourcesRecursively();
+        shader.cleanupGPUResourcesRecursively();
     }
 }

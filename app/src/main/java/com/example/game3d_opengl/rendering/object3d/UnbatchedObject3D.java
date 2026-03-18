@@ -27,5 +27,5 @@ public abstract class UnbatchedObject3D implements GPUResourceOwner {
 
     protected abstract void drawUnderlying(float[] mMat, float[] vpMat);
     public abstract void reloadGPUResourcesRecursivelyOnContextLoss();
-    public abstract void cleanupGPUResourcesRecursivelyOnContextLoss();
+    public abstract void cleanupGPUResourcesRecursively();
 }

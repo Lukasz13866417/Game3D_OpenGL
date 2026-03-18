@@ -8,28 +8,28 @@ import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
-// TODO remove unused stuff.
 public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends ShaderPair<?, ?>> implements GPUResourceOwner {
 
-    // Constants and static fields
     private static final int BYTES_PER_FLOAT = 4;
     private static final int BYTES_PER_SHORT = 2;
+    private static final int BYTES_PER_INT = 4;
 
-    // Instance fields
-    private final FloatBuffer vertexData; // for reload
+    private final FloatBuffer vertexData;
     private int vboId;
     private final boolean ownsVbo;
 
-    private final ShortBuffer fillIndexData; // for reload
+    private final Buffer fillIndexData;
+    private final boolean use32BitIndices;
     private int iboFillId;
     private final int fillIndexCount;
     private final boolean ownsIbo;
-
 
     protected S shader;
 
@@ -37,7 +37,8 @@ public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends Shade
         this.vertexData = builder.vertexData;
         this.vboId = builder.vboId;
         this.ownsVbo = builder.ownsVbo;
-        this.fillIndexData = builder.indexData;
+        this.fillIndexData = builder.indexBuffer;
+        this.use32BitIndices = builder.use32BitIndices;
         this.iboFillId = builder.iboId;
         this.fillIndexCount = builder.indexCount;
         this.ownsIbo = builder.ownsIbo;
@@ -46,14 +47,7 @@ public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends Shade
 
     protected abstract void setVariableArgsValues(A meshDrawArgs, S targetShader);
 
-
-    // Public methods (API)
-
-    /**
-     * Draws the object using the given view-projection matrix.
-     */
     public void draw(A args) {
-        // Bind shared program and VBO once
         shader.setAsCurrentProgram();
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId);
         shader.enableAndPointVertexAttribs();
@@ -62,20 +56,16 @@ public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends Shade
         shader.transferUniformArgsToGPU();
 
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, iboFillId);
-        GLES20.glDrawElements(GLES20.GL_TRIANGLES, fillIndexCount, GLES20.GL_UNSIGNED_SHORT, 0);
+        int indexType = use32BitIndices ? GLES20.GL_UNSIGNED_INT : GLES20.GL_UNSIGNED_SHORT;
+        GLES20.glDrawElements(GLES20.GL_TRIANGLES, fillIndexCount, indexType, 0);
 
-        // cleanup state
         shader.disableVertexAttribs();
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
-    /**
-     * Re-uploads buffers after a GL context loss.
-     */
     private void reload() {
         int[] bufs = new int[1];
-        // VBO
         if (ownsVbo) {
             GLES20.glGenBuffers(1, bufs, 0);
             vboId = bufs[0];
@@ -84,19 +74,16 @@ public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends Shade
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
         }
 
-        // Fill IBO
         if (ownsIbo) {
             GLES20.glGenBuffers(1, bufs, 0);
             iboFillId = bufs[0];
+            int bytesPerElement = use32BitIndices ? BYTES_PER_INT : BYTES_PER_SHORT;
             GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, iboFillId);
-            GLES20.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, fillIndexData.capacity() * BYTES_PER_SHORT, fillIndexData, GLES20.GL_STATIC_DRAW);
+            GLES20.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, fillIndexData.capacity() * bytesPerElement, fillIndexData, GLES20.GL_STATIC_DRAW);
             GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
         }
     }
 
-    /**
-     * Deletes GL buffers.
-     */
     private void cleanup() {
         if (ownsVbo) GLES20.glDeleteBuffers(1, new int[]{vboId}, 0);
         if (ownsIbo) GLES20.glDeleteBuffers(1, new int[]{iboFillId}, 0);
@@ -109,26 +96,22 @@ public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends Shade
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         cleanup();
-        shader.cleanupGPUResourcesRecursivelyOnContextLoss();
+        shader.cleanupGPUResourcesRecursively();
     }
 
-    // 5) Protected methods
-
-    /**
-     * Base class for Builders of 3D objects
-     */
     protected static abstract class BaseBuilder<T extends AbstractMesh3D<?, S>,
             B extends BaseBuilder<T, B, S>,
             S extends ShaderPair<?, ?>> {
         protected Vector3D[] verts;
-        protected int[][] faces; // each face is a simple, planar polygon given by ordered vertex indices
+        protected int[][] faces;
 
         protected int vboId = ID_NOT_SET, iboId = ID_NOT_SET;
         protected boolean ownsVbo = true, ownsIbo = true;
         protected FloatBuffer vertexData;
-        protected ShortBuffer indexData;
+        protected Buffer indexBuffer;
+        protected boolean use32BitIndices;
         protected int indexCount;
 
         protected S shader;
@@ -178,13 +161,8 @@ public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends Shade
 
         protected abstract float[] setVertexData();
 
-
-        /**
-         * Prepares VBO/IBOs using current vertex data + fan triangulation of `faces`.
-         * Assumptions: each face is simple & ordered; quads become two tris; n-gons become (n-2) tris.
-         */
         protected void prepareGPUResources() {
-            float[] vertexDataAsFloats = setVertexData(); // <- subclasses can mutate `faces` here
+            float[] vertexDataAsFloats = setVertexData();
             vertexData = ByteBuffer
                     .allocateDirect(vertexDataAsFloats.length * BYTES_PER_FLOAT)
                     .order(ByteOrder.nativeOrder())
@@ -209,33 +187,57 @@ public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends Shade
             for (int[] face : faces) {
                 if (face != null && face.length >= 3) totalFillTris += (face.length - 2);
             }
-            short[] fillIdx = new short[totalFillTris * 3];
 
-            int w = 0;
+            int maxIndex = 0;
             for (int[] face : faces) {
-                if (face == null || face.length < 3) continue;
-
+                if (face == null) continue;
                 for (int idx : face) {
-                    if (idx < 0 || idx > 0xFFFF) {
-                        throw new IllegalStateException("Index exceeds 16-bit range: " + idx);
-                    }
-                }
-
-                int i0 = face[0];
-                for (int i = 1; i < face.length - 1; ++i) {
-                    fillIdx[w++] = (short) i0;
-                    fillIdx[w++] = (short) face[i];
-                    fillIdx[w++] = (short) face[i + 1];
+                    if (idx > maxIndex) maxIndex = idx;
                 }
             }
 
-            indexData = ByteBuffer
-                    .allocateDirect(fillIdx.length * BYTES_PER_SHORT)
-                    .order(ByteOrder.nativeOrder())
-                    .asShortBuffer();
-            indexData.put(fillIdx).position(0);
-            indexCount = fillIdx.length;
+            use32BitIndices = maxIndex > 0xFFFF;
+            indexCount = totalFillTris * 3;
 
+            if (use32BitIndices) {
+                int[] fillIdx = new int[indexCount];
+                int w = 0;
+                for (int[] face : faces) {
+                    if (face == null || face.length < 3) continue;
+                    int i0 = face[0];
+                    for (int i = 1; i < face.length - 1; ++i) {
+                        fillIdx[w++] = i0;
+                        fillIdx[w++] = face[i];
+                        fillIdx[w++] = face[i + 1];
+                    }
+                }
+                IntBuffer ib = ByteBuffer
+                        .allocateDirect(fillIdx.length * BYTES_PER_INT)
+                        .order(ByteOrder.nativeOrder())
+                        .asIntBuffer();
+                ib.put(fillIdx).position(0);
+                indexBuffer = ib;
+            } else {
+                short[] fillIdx = new short[indexCount];
+                int w = 0;
+                for (int[] face : faces) {
+                    if (face == null || face.length < 3) continue;
+                    int i0 = face[0];
+                    for (int i = 1; i < face.length - 1; ++i) {
+                        fillIdx[w++] = (short) i0;
+                        fillIdx[w++] = (short) face[i];
+                        fillIdx[w++] = (short) face[i + 1];
+                    }
+                }
+                ShortBuffer sb = ByteBuffer
+                        .allocateDirect(fillIdx.length * BYTES_PER_SHORT)
+                        .order(ByteOrder.nativeOrder())
+                        .asShortBuffer();
+                sb.put(fillIdx).position(0);
+                indexBuffer = sb;
+            }
+
+            int bytesPerElement = use32BitIndices ? BYTES_PER_INT : BYTES_PER_SHORT;
             if (iboId == ID_NOT_SET) {
                 GLES20.glGenBuffers(1, buf, 0);
                 iboId = buf[0];
@@ -243,13 +245,12 @@ public abstract class AbstractMesh3D<A extends BaseMeshDrawArgs, S extends Shade
             GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, iboId);
             GLES20.glBufferData(
                     GLES20.GL_ELEMENT_ARRAY_BUFFER,
-                    indexData.capacity() * BYTES_PER_SHORT,
-                    indexData,
+                    indexBuffer.capacity() * bytesPerElement,
+                    indexBuffer,
                     GLES20.GL_STATIC_DRAW
             );
             GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
         }
-
 
     }
 }

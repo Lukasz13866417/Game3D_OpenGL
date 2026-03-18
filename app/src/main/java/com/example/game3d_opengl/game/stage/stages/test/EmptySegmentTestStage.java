@@ -32,6 +32,11 @@ public class EmptySegmentTestStage extends Stage {
     }
 
     @Override
+    protected void setupAssets(android.content.res.AssetManager assetManager) {
+        // No-op.
+    }
+
+    @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
         
@@ -84,7 +89,7 @@ public class EmptySegmentTestStage extends Stage {
 
     @Override
     public void onClose() {
-        terrain.cleanupGPUResourcesRecursivelyOnContextLoss();
+        terrain.cleanupGPUResourcesRecursively();
     }
 
     @Override
@@ -113,7 +118,7 @@ public class EmptySegmentTestStage extends Stage {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
+    public void cleanupGPUResourcesRecursively() {}
 
     @Override
     protected void onTouchDown(float x, float y) {

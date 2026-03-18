@@ -4,20 +4,29 @@ import static java.lang.Math.min;
 
 import com.example.game3d_opengl.game.terrain.terrain_api.main.AdvancedTerrainStructure;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain.track_elements.portal.ExitPortal;
 import com.example.game3d_opengl.game.terrain.track_elements.portal.Portal;
+import com.example.game3d_opengl.game.terrain.track_elements.portal.PortalConfig;
+import com.example.game3d_opengl.game.util.GameRandom;
 import com.example.game3d_opengl.game.terrain.track_elements.potion.Potion;
 import com.example.game3d_opengl.game.terrain.track_elements.spike.DeathSpike;
 
 public class TerrainLineWithSpikeRect extends AdvancedTerrainStructure {
 
+    private final ExitPortal exitPortal;
+    private final Portal entrancePortal;
+    private final ExitPortalStructure exitPortalStructure;
+
     public TerrainLineWithSpikeRect(int nTiles) {
         super(nTiles);
+        this.exitPortal = ExitPortal.createExitPortal();
+        this.entrancePortal = Portal.createPortal(exitPortal);
+        this.exitPortalStructure = new ExitPortalStructure(PortalConfig.EXIT_STRUCTURE_ROWS, exitPortal);
     }
 
     @Override
     protected void generateTiles(Terrain.TileBrush brush) {
+        addChild(exitPortalStructure, brush);
         for (int i = 0; i < tilesToMake; ++i) {
             brush.addSegment();
         }
@@ -56,8 +65,13 @@ public class TerrainLineWithSpikeRect extends AdvancedTerrainStructure {
             brush.reserveRandomFittingVertical(1, potions);
         }
 
-        ExitPortal exitPortal = ExitPortal.createExitPortal();
-        Portal entrancePortal = Portal.createPortal(exitPortal);
-        brush.reserveKRandomFields(new Addon[]{entrancePortal, exitPortal});
+        int portalSegLen = Math.max(1, min(PortalConfig.CELLS_PER_PORTAL_SEGMENT, nCols));
+        if (PortalConfig.EXIT_STRUCTURE_ROWS < PortalConfig.MIN_ENTRANCE_EXIT_ROW_GAP) {
+            throw new IllegalStateException(
+                    "EXIT_STRUCTURE_ROWS must be >= MIN_ENTRANCE_EXIT_ROW_GAP");
+        }
+        if (GameRandom.nextFloat() < PortalConfig.ENTRANCE_PORTAL_CHANCE) {
+            brush.reserveRandomHorizontalRegion(portalSegLen, entrancePortal);
+        }
     }
 }

@@ -224,12 +224,12 @@ public final class BitmapFont implements GPUResourceOwner {
 
     @Override
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
-        cleanupGPUResourcesRecursivelyOnContextLoss();
+        cleanupGPUResourcesRecursively();
         ensureTexture();
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         if (textureId != 0) {
             GLES20.glDeleteTextures(1, new int[]{textureId}, 0);
             textureId = 0;

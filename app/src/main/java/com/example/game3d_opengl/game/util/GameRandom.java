@@ -13,6 +13,11 @@ public class GameRandom {
     }
     private static Random RANDOM = new Random(seed);
 
+    /** Returns a float in [0, 1), equivalent to (float) Math.random(). */
+    public static float nextFloat() {
+        return RANDOM.nextFloat();
+    }
+
     public static int randInt(int l, int r){
         return l+RANDOM.nextInt(r-l+1);
     }
@@ -24,8 +29,7 @@ public class GameRandom {
         if(min==max){
             return min;
         }
-        Random random = new Random();
-        double randomValue = min + (random.nextDouble() * (max - min));
+        double randomValue = min + (RANDOM.nextDouble() * (max - min));
         double scaleFactor = pow(10, decimalDigits);
 
         return (float) (Math.round(randomValue * scaleFactor) / scaleFactor);

@@ -5,9 +5,12 @@ public final class MVPDrawArgs extends BaseMeshDrawArgs {
         this.vp = mvp;
     }
 
+    public MVPDrawArgs(float[] modelMatrix, float[] vpMatrix) {
+        this.model = modelMatrix;
+        this.vp = vpMatrix;
+    }
+
     public void setMvp(float[] mvp){
         this.vp = mvp;
     }
 }
-
-

@@ -7,6 +7,7 @@ public final class InfillShaderArgs {
 
     public static final class VS extends ShaderArgValues {
         public float[] mvp; // not owned
+        public float[] modelMatrix; // separate model matrix for world-space normals/positions
         // Spike-specific per-instance uniforms (optional for other infill shaders)
         public float[] uNL;      // length 3
         public float[] uNR;      // length 3
@@ -15,15 +16,17 @@ public final class InfillShaderArgs {
         public float[] uApex;    // length 3
         public float[] uNormal;  // length 3
         public float   uBaseOffset;
-     
     }
 
     public static final class FS extends ShaderArgValues {
         public FColor color;
         public float lightX, lightY, lightZ;
         public FColor lightColor;
+        public float cameraX, cameraY, cameraZ;
+        public float ambient;
+        public float diffuse;
+        public float specular;
+        public float shininess;
         public int isDepthPass;
     }
 }
-
-

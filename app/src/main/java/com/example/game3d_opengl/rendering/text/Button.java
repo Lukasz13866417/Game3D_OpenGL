@@ -73,9 +73,9 @@ public final class Button implements GPUResourceOwner {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
-        if (fillMesh != null) fillMesh.cleanupGPUResourcesRecursivelyOnContextLoss();
-        if (outline != null) outline.cleanupGPUResourcesRecursivelyOnContextLoss();
+    public void cleanupGPUResourcesRecursively() {
+        if (fillMesh != null) fillMesh.cleanupGPUResourcesRecursively();
+        if (outline != null) outline.cleanupGPUResourcesRecursively();
     }
 
     public static final class Builder {

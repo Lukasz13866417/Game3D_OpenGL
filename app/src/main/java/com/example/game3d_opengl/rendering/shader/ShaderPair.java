@@ -140,7 +140,7 @@ public abstract class ShaderPair<VS extends ShaderArgValues, FS extends ShaderAr
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         // Programs are managed by GL; nothing to cleanup explicitly here
     }
 }

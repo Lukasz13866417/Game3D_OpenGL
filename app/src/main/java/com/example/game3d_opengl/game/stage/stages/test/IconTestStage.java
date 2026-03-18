@@ -32,6 +32,11 @@ public class IconTestStage extends Stage {
     protected void onTouchMove(float x1, float y1, float x2, float y2) {}
 
     @Override
+    protected void setupAssets(android.content.res.AssetManager assetManager) {
+        // No-op.
+    }
+
+    @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         // Mesh3DWireframe needs the global viewport to compute pixel thickness in the shader.
         // Load once per app run; throws if called twice
@@ -90,10 +95,10 @@ public class IconTestStage extends Stage {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
-          rectOverlay.cleanupGPUResourcesRecursivelyOnContextLoss();
-          icon.cleanupGPUResourcesRecursivelyOnContextLoss();
-          if (spinningIcon != null) spinningIcon.cleanupGPUResourcesRecursivelyOnContextLoss();
+    public void cleanupGPUResourcesRecursively() {
+          rectOverlay.cleanupGPUResourcesRecursively();
+          icon.cleanupGPUResourcesRecursively();
+          if (spinningIcon != null) spinningIcon.cleanupGPUResourcesRecursively();
     }
 }
 

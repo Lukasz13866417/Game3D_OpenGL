@@ -126,7 +126,7 @@ public final class PortalRenderTarget implements RenderTarget {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         cleanup();
     }
 }

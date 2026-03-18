@@ -1,7 +1,8 @@
 package com.example.game3d_opengl.rendering.wireframe;
 
+import android.opengl.GLES20;
+
 import com.example.game3d_opengl.rendering.Camera;
-import com.example.game3d_opengl.rendering.ScreenInfo;
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
 import com.example.game3d_opengl.rendering.mesh.BaseMeshDrawArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -23,6 +24,7 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
     }
 
     private final WireframeShaderArgs.VS vs;
+    private static final int[] VIEWPORT_TMP = new int[4];
 
     // Fragment shader args are easy
     private final WireframeShaderArgs.FS fs;
@@ -35,8 +37,9 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
         vs.mvp = args.vp;
         vs.halfPx = pixelWidth;
         vs.capPx = pixelWidth;
-        vs.viewportW = ScreenInfo.getScreenW();
-        vs.viewportH = ScreenInfo.getScreenH();
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, VIEWPORT_TMP, 0);
+        vs.viewportW = Math.max(1, VIEWPORT_TMP[2]);
+        vs.viewportH = Math.max(1, VIEWPORT_TMP[3]);
         vs.uDepthBiasNDC = -5e-3f; // TODO change to builder arg.
 
         // fragment shader is easy here

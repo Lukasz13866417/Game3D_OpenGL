@@ -40,6 +40,11 @@ public class TestWireframeStage extends Stage {
     }
 
     @Override
+    protected void setupAssets(android.content.res.AssetManager assetManager) {
+        // No-op.
+    }
+
+    @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         // Initialize camera
         this.camera = new Camera();
@@ -107,5 +112,5 @@ public class TestWireframeStage extends Stage {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
+    public void cleanupGPUResourcesRecursively() {}
 }

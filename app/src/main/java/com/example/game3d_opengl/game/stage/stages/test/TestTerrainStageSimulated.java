@@ -10,7 +10,7 @@ import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.stage.stages.test.util.FourPoints3D;
 import com.example.game3d_opengl.game.stage.stages.test.util.LineSet3D;
-import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.tilemanager.TileManager;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.TerrainGridField;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -44,6 +44,11 @@ public class TestTerrainStageSimulated extends Stage {
 
     private FourPoints3D[] grid;
 
+
+    @Override
+    protected void setupAssets(android.content.res.AssetManager assetManager) {
+        // No-op.
+    }
 
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
@@ -180,7 +185,7 @@ public class TestTerrainStageSimulated extends Stage {
 
     }
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
 
     }
     @Override
