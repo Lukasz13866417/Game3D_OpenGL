@@ -41,6 +41,11 @@ public class Player implements WorldActor {
     private float pendingSwipeDx = 0f;
     private float pendingSwipeDy = 0f;
     private final float[] spikeHazardPointTmp = new float[3];
+    private static final float SPIKE_KILL_RADIUS_FACTOR = 1.4f;
+    private static final float SPIKE_KILL_MIN_RADIUS = 0.16f;
+    private static final float SPIKE_KILL_HEIGHT_FACTOR = 0.60f;
+    private static final float SPIKE_KILL_MIN_HEIGHT = 0.16f;
+    private boolean dead = false;
 
     private final PlayerHUDAPI hudAPI;
     private final PlayerConfig config ;
@@ -63,7 +68,15 @@ public class Player implements WorldActor {
     }
 
     public static Player createPlayer() {
-        return new Player(getObject3D());
+        UnbatchedObject3DWithOutline obj = getObject3D();
+        // Reset transform so restarts always begin from a clean initial state.
+        obj.objX = INITIAL_POSITION_X;
+        obj.objY = INITIAL_POSITION_Y;
+        obj.objZ = INITIAL_POSITION_Z;
+        obj.objYaw = 0f;
+        obj.objPitch = 0f;
+        obj.objRoll = 0f;
+        return new Player(obj);
     }
 
     public void beginFrame(float dtMillis) {
@@ -97,6 +110,7 @@ public class Player implements WorldActor {
         object3D.objY += move.y * dtMillis;
         object3D.objZ += move.z * dtMillis;
         object3D.objPitch -= dtMillis * PLAYER_SPEED / (PI * PLAYER_HEIGHT) * 2 * PI;
+        updateDeathSpikeCollisionState();
 
     }
 
@@ -124,9 +138,9 @@ public class Player implements WorldActor {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         if (object3D != null) {
-            object3D.cleanupGPUResourcesRecursivelyOnContextLoss();
+            object3D.cleanupGPUResourcesRecursively();
         }
     }
 
@@ -147,6 +161,14 @@ public class Player implements WorldActor {
 
     public long getNearestTileId() {
         return frameStartState.getNearestTileId();
+    }
+
+    public boolean isDead() {
+        return dead;
+    }
+
+    public boolean isAlive() {
+        return !dead;
     }
 
     public PlayerInputAPI getInputAPI() {
@@ -242,6 +264,33 @@ public class Player implements WorldActor {
             return true;
         }
         return false;
+    }
+
+    private void updateDeathSpikeCollisionState() {
+        if (dead) return;
+        int spikeCount = frameStartState.getNearbyDeathSpikeCount();
+        if (spikeCount <= 0) return;
+
+        float hazardRadius = max(config.playerWidth * SPIKE_KILL_RADIUS_FACTOR, SPIKE_KILL_MIN_RADIUS);
+        float hazardRadiusSq = hazardRadius * hazardRadius;
+        float hazardHeightTolerance = max(config.playerHeight * SPIKE_KILL_HEIGHT_FACTOR, SPIKE_KILL_MIN_HEIGHT);
+
+        float px = object3D.objX;
+        float py = object3D.objY;
+        float pz = object3D.objZ;
+
+        for (int i = 0; i < spikeCount; ++i) {
+            float dx = px - frameStartState.getNearbyDeathSpikeX(i);
+            float dz = pz - frameStartState.getNearbyDeathSpikeZ(i);
+            if (dx * dx + dz * dz > hazardRadiusSq) {
+                continue;
+            }
+            float dy = abs(py - frameStartState.getNearbyDeathSpikeY(i));
+            if (dy <= hazardHeightTolerance) {
+                dead = true;
+                return;
+            }
+        }
     }
 
     public final class PlayerInputAPI {

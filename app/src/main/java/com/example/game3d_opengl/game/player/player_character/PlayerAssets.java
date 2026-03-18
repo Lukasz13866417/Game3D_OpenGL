@@ -39,14 +39,19 @@ public class PlayerAssets {
             playerCreator.scaleY(PLAYER_HEIGHT);
             playerCreator.scaleZ(PLAYER_HEIGHT);
 
-            // Build the mesh (AbstractMesh3D) and wrap it with UnbatchedObject3D for transforms
-            UnbatchedObject3DWithOutline obj = new UnbatchedObject3DWithOutline.Builder()
+            UnbatchedObject3DWithOutline.Builder builder =
+                    new UnbatchedObject3DWithOutline.Builder()
                     .verts(playerCreator.getVerts())
                     .faces(playerCreator.getFaces())
-                    .fillColor(CLR(0,0,0,1))
-                    .edgeColor(CLR(1,1,1,1))
-                    .edgePixels(1.5f)
-                    .build();
+                    .fillColor(CLR(49f/255f, 37f/255f, 34f/255f,1.0f))
+                    .ambient(0.3f)
+                    .diffuse(0.9f)
+                    .specular(0.15f)
+                    .shininess(5f);
+            if (playerCreator.hasNormals()) {
+                builder.normals(playerCreator.getNormals());
+            }
+            UnbatchedObject3DWithOutline obj = builder.build();
             obj.objX = INITIAL_POSITION_X;
             obj.objY = INITIAL_POSITION_Y;
             obj.objZ = INITIAL_POSITION_Z;

@@ -37,6 +37,8 @@ public final class OutputNode extends StateInfoNode<OutputNode.Data> {
         FrameStartPlayerState in = input != null ? input.getData() : null;
         boolean hasFooting = in != null && in.getTileBelow() != null;
         float fallSpeed = in != null ? in.getFallSpeed() : 0f;
+        float impactSpeed = Math.max(0f, fallSpeed);
+        float bounceFactor = Math.max(0f, Math.min(config.bounceSpeedFactor, 0.999f));
         JumpLogicNode.JumpDecision jumpDecision =
                 (jumpLogicData != null && jumpLogicData.decision != null)
                         ? jumpLogicData.decision
@@ -45,9 +47,9 @@ public final class OutputNode extends StateInfoNode<OutputNode.Data> {
             data.oneTimePosOffset = new Vector3D(0,0.2f,0);
             data.move = moveData.move.setY(config.jumpInitialSpeed);
             data.nextFallSpeed = 0;
-        } else if (hasFooting && fallSpeed > config.bounceFallSpeedThreshold) {
+        } else if (hasFooting && impactSpeed > config.bounceFallSpeedThreshold) {
             data.oneTimePosOffset = new Vector3D(0,0,0);
-            data.move = moveData.move.setY(fallSpeed * config.bounceSpeedFactor);
+            data.move = moveData.move.setY(impactSpeed * bounceFactor + config.bounceOneTimeOffset);
             data.nextFallSpeed = 0;
         } else {
             data.move = moveData.move;

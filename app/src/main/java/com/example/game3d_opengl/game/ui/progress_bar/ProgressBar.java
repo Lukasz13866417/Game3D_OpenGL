@@ -89,14 +89,14 @@ public final class ProgressBar implements GPUResourceOwner {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
-        if (fillMesh != null) fillMesh.cleanupGPUResourcesRecursivelyOnContextLoss();
-        if (outlineMesh != null) outlineMesh.cleanupGPUResourcesRecursivelyOnContextLoss();
+    public void cleanupGPUResourcesRecursively() {
+        if (fillMesh != null) fillMesh.cleanupGPUResourcesRecursively();
+        if (outlineMesh != null) outlineMesh.cleanupGPUResourcesRecursively();
     }
 
     private void rebuildMeshes() {
-        if (fillMesh != null) fillMesh.cleanupGPUResourcesRecursivelyOnContextLoss();
-        if (outlineMesh != null) outlineMesh.cleanupGPUResourcesRecursivelyOnContextLoss();
+        if (fillMesh != null) fillMesh.cleanupGPUResourcesRecursively();
+        if (outlineMesh != null) outlineMesh.cleanupGPUResourcesRecursively();
 
         Builder.FillMeshData fillData = buildFillMeshData();
         fillMesh = new ProgressBarFillMesh3D.Builder()

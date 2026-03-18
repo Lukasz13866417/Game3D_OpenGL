@@ -9,6 +9,7 @@ import android.opengl.GLSurfaceView;
 import android.util.Log;
 
 import com.example.game3d_opengl.game.stage.stages.main.GameplayStage;
+import com.example.game3d_opengl.game.stage.stages.main.LoadingStage;
 import com.example.game3d_opengl.game.stage.stages.main.MenuStage;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.stage.stages.test.AddonPlacementTestStage;
@@ -22,6 +23,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
 
     private static final long TARGET_FRAME_NS = 9_000_000L;
     private static final float SLOW_FRAME_THRESHOLD_MS = 12.0f; // log if frame slower than this
+    private static final float MAX_SIMULATION_DT_MS = 33.333f;
 
     private final Context androidContext;
     private int surfaceW = 0, surfaceH = 0;
@@ -33,7 +35,6 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private volatile Stage pendingStage = null;
     private Stage currStage;
     private final MenuStage menuStage;
-    private final GameplayStage gameplayStage;
     private volatile boolean useFrameCap = true;
 
     public void setUseFrameCap(boolean useFrameCap) {
@@ -53,7 +54,11 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         }
 
         public void toGameplay() {
-            switchTo(gameplayStage);
+            switchTo(new GameplayStage(this));
+        }
+
+        public void toLoadingThenGameplay() {
+            switchTo(new LoadingStage(this));
         }
 
         public void toSettings() {
@@ -69,7 +74,6 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     public MyGLRenderer(Context androidContext) {
         this.androidContext = androidContext;
         this.stageManager = new StageManager();
-        this.gameplayStage = new GameplayStage(stageManager);
         this.menuStage = new MenuStage(stageManager);
         this.currStage =  //new TestTerrainStageSimulated(stageManager);
                           //new TestTerrainStage(stageManager);
@@ -77,7 +81,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
                           //new TestGridRowsStage(stageManager);
                           //new TestGridRowsStageWithAddons(stageManager);
                           //new AddonPlacementTestStage(stageManager);
-                          //gameplayStage;
+                          //new GameplayStage(stageManager);
                           menuStage;
                           //new TestWireframeStage(stageManager);
                           //new IconTestStage(stageManager);
@@ -143,6 +147,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         }
         float deltaTime = (elapsed <= 0 ? 0.0f : (elapsed / 1_000_000f)); // ms
         lastFrameTime = referenceNow;
+        float simulationDt = Math.min(deltaTime, MAX_SIMULATION_DT_MS);
 
         // Slow frame logging
         if (deltaTime > SLOW_FRAME_THRESHOLD_MS) {
@@ -153,7 +158,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         if (!currStage.isPaused()) {
-            currStage.updateThenDraw(deltaTime);
+            currStage.updateThenDraw(simulationDt);
         }
 
     }

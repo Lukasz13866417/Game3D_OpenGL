@@ -22,8 +22,10 @@ public class PlayerConfig {
     static final float JUMP_INITIAL_SPEED = 0.015f;
 
     // Bounce constants
-    static final float BOUNCE_FALL_SPEED_THRESHOLD = 0.0025f;
-    static final float BOUNCE_SPEED_FACTOR = 0.6f;
+    static final float BOUNCE_FALL_SPEED_THRESHOLD = 0.0015f;
+    static final float BOUNCE_SPEED_FACTOR = 0.8f;
+
+    static final float BOUNCE_ONE_TIME_OFFSET = 0.003f;
 
     // Movement constants
     static final float INITIAL_DIRECTION_X = 0f;
@@ -35,9 +37,9 @@ public class PlayerConfig {
 
 
     // Asset loading constants
-     static final String PLAYER_MODEL_FILENAME = "tire.obj";
-     static final float MODEL_ROTATION_X = PI / 2;
-     static final float MODEL_ROTATION_Y = PI / 2;
+     static final String PLAYER_MODEL_FILENAME = "tire4.obj";
+     static final float MODEL_ROTATION_X = 0;//PI / 2;
+     static final float MODEL_ROTATION_Y = 0;//PI / 2;
 
     // Error messages
      static final String ERROR_ASSETS_NOT_LOADED
@@ -61,6 +63,7 @@ public class PlayerConfig {
     public final float jumpInitialSpeed;
     public final float bounceFallSpeedThreshold;
     public final float bounceSpeedFactor;
+    public final float bounceOneTimeOffset;
 
     public PlayerConfig() {
         this.playerWidth = PLAYER_WIDTH;
@@ -78,5 +81,6 @@ public class PlayerConfig {
         this.jumpInitialSpeed = JUMP_INITIAL_SPEED;
         this.bounceFallSpeedThreshold = BOUNCE_FALL_SPEED_THRESHOLD;
         this.bounceSpeedFactor = BOUNCE_SPEED_FACTOR;
+        this.bounceOneTimeOffset = BOUNCE_ONE_TIME_OFFSET;
     }
 }
