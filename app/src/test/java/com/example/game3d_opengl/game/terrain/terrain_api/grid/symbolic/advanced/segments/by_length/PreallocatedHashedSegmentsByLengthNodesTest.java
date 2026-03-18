@@ -4,6 +4,8 @@ import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridSegm
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_length.segtree_implementation.PreallocatedHashedSegmentsByLengthNodes;
 import org.junit.Test;
 
+import java.util.Arrays;
+
 import static org.junit.Assert.*;
 
 public class PreallocatedHashedSegmentsByLengthNodesTest {
@@ -77,6 +79,110 @@ public class PreallocatedHashedSegmentsByLengthNodesTest {
         PreallocatedHashedSegmentsByLengthNodes t = new PreallocatedHashedSegmentsByLengthNodes(4, 4, true);
         t.insert(1, 1, 4);
         assertEquals(3, t.countFittingSpaces(2));
+    }
+
+    @Test
+    public void bulk_build_matches_insert_build_for_horizontal_segments() {
+        GridSegment[] segments = new GridSegment[]{
+                new GridSegment(4, 2, 3),
+                new GridSegment(2, 6, 2),
+                new GridSegment(2, 1, 5),
+                new GridSegment(5, 1, 7)
+        };
+
+        PreallocatedHashedSegmentsByLengthNodes inserted =
+                new PreallocatedHashedSegmentsByLengthNodes(5, 7, false);
+        for (GridSegment seg : segments) {
+            inserted.insert(seg.row, seg.col, seg.length);
+        }
+
+        PreallocatedHashedSegmentsByLengthNodes bulkBuilt =
+                PreallocatedHashedSegmentsByLengthNodes.fromFreeSegments(5, 7, false, segments);
+
+        for (int size = 1; size <= 7; ++size) {
+            assertEquals(inserted.countFittingSpaces(size), bulkBuilt.countFittingSpaces(size));
+            int total = inserted.countFittingSpaces(size);
+            for (int k = 1; k <= total; ++k) {
+                assertEquals(inserted.getKthFittingSpace(size, k), bulkBuilt.getKthFittingSpace(size, k));
+            }
+        }
+
+        inserted.destroy();
+        bulkBuilt.destroy();
+    }
+
+    @Test
+    public void bulk_build_matches_insert_build_for_vertical_segments() {
+        GridSegment[] segments = new GridSegment[]{
+                new GridSegment(6, 2, 3),
+                new GridSegment(1, 1, 4),
+                new GridSegment(3, 3, 6),
+                new GridSegment(2, 4, 2)
+        };
+
+        PreallocatedHashedSegmentsByLengthNodes inserted =
+                new PreallocatedHashedSegmentsByLengthNodes(8, 4, true);
+        for (GridSegment seg : segments) {
+            inserted.insert(seg.row, seg.col, seg.length);
+        }
+
+        PreallocatedHashedSegmentsByLengthNodes bulkBuilt =
+                PreallocatedHashedSegmentsByLengthNodes.fromFreeSegments(8, 4, true, segments);
+
+        for (int size = 1; size <= 8; ++size) {
+            assertEquals(inserted.countFittingSpaces(size), bulkBuilt.countFittingSpaces(size));
+            int total = inserted.countFittingSpaces(size);
+            for (int k = 1; k <= total; ++k) {
+                assertEquals(inserted.getKthFittingSpace(size, k), bulkBuilt.getKthFittingSpace(size, k));
+            }
+        }
+
+        inserted.destroy();
+        bulkBuilt.destroy();
+    }
+
+    @Test
+    public void bulk_build_handles_parent_style_rebased_segments() {
+        GridSegment[] childAInParent = new GridSegment[]{
+                new GridSegment(2, 1, 4),
+                new GridSegment(3, 5, 2)
+        };
+        GridSegment[] childBInParent = new GridSegment[]{
+                new GridSegment(7, 2, 3),
+                new GridSegment(8, 1, 5)
+        };
+        GridSegment[] parentOnly = new GridSegment[]{
+                new GridSegment(1, 1, 5),
+                new GridSegment(6, 1, 5)
+        };
+
+        GridSegment[] all = new GridSegment[childAInParent.length + childBInParent.length + parentOnly.length];
+        System.arraycopy(childAInParent, 0, all, 0, childAInParent.length);
+        System.arraycopy(childBInParent, 0, all, childAInParent.length, childBInParent.length);
+        System.arraycopy(parentOnly, 0, all, childAInParent.length + childBInParent.length, parentOnly.length);
+
+        GridSegment[] shuffled = all.clone();
+        Arrays.sort(shuffled, (a, b) -> Integer.compare(b.length, a.length));
+
+        PreallocatedHashedSegmentsByLengthNodes inserted =
+                new PreallocatedHashedSegmentsByLengthNodes(8, 5, false);
+        for (GridSegment seg : all) {
+            inserted.insert(seg.row, seg.col, seg.length);
+        }
+
+        PreallocatedHashedSegmentsByLengthNodes bulkBuilt =
+                PreallocatedHashedSegmentsByLengthNodes.fromFreeSegments(8, 5, false, shuffled);
+
+        for (int size = 1; size <= 5; ++size) {
+            assertEquals(inserted.countFittingSpaces(size), bulkBuilt.countFittingSpaces(size));
+            int total = inserted.countFittingSpaces(size);
+            for (int k = 1; k <= total; ++k) {
+                assertEquals(inserted.getKthFittingSpace(size, k), bulkBuilt.getKthFittingSpace(size, k));
+            }
+        }
+
+        inserted.destroy();
+        bulkBuilt.destroy();
     }
 }
 

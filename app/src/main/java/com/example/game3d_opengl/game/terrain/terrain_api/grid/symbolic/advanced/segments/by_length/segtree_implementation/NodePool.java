@@ -1,6 +1,6 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_length.segtree_implementation;
 
-class NodePool {
+public class NodePool {
     private Node[] nodes;
     private final PreallocatedResizableArrayStack freeIndices;
 

@@ -14,6 +14,22 @@ public abstract class BaseTerrainStructure<GridBrushType extends Terrain.BaseGri
 
     protected abstract GridBrushType selectBrush(Terrain terrain);
 
+    /**
+     * Optional hook for structures that need to reserve a full row range in their parent grid.
+     * Returned rows are 1-indexed and local to this structure.
+     */
+    protected int[] getParentBlockedRowsRange(int nRows, int nCols) {
+        return null;
+    }
+
+    /**
+     * Child structures can disable propagation when they reserve a dedicated area
+     * in the parent via {@link #getParentBlockedRowsRange(int, int)}.
+     */
+    protected boolean shouldPropagateReservationsToParent() {
+        return true;
+    }
+
     public final void generateAddons(Terrain terrain, int nRows, int nCols){
         generateAddons(selectBrush(terrain), nRows, nCols);
     }

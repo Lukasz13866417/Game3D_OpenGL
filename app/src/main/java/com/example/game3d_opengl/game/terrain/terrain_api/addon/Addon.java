@@ -17,6 +17,12 @@ public abstract class Addon implements TerrainElement, PlayerInteractable {
         this.ready = false;
     }
 
+    /**
+     * Places this addon onto a terrain footprint defined by four corners.
+     *
+     * <p>The footprint may represent either a single grid cell or a larger
+     * multi-cell region (for example, a horizontal segment region).
+     */
     public void place(Vector3D fieldNearLeft,
                       Vector3D fieldNearRight,
                       Vector3D fieldFarLeft,

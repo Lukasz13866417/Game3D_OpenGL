@@ -13,12 +13,19 @@ public class BasicGridCreator implements BaseGridCreator {
     private final int nRows, nCols;
     private final GridCreatorWrapper parent;
     private final int parentRowOffset;
+    private final boolean propagateToParent;
 
     public BasicGridCreator(int nRows, int nCols, GridCreatorWrapper parentGrid, int parentRowOffset) {
+        this(nRows, nCols, parentGrid, parentRowOffset, true);
+    }
+
+    public BasicGridCreator(int nRows, int nCols, GridCreatorWrapper parentGrid,
+                            int parentRowOffset, boolean propagateToParent) {
         this.nRows = nRows;
         this.nCols = nCols;
         this.parent = parentGrid;
         this.parentRowOffset = parentRowOffset;
+        this.propagateToParent = propagateToParent;
     }
 
     @Override
@@ -27,8 +34,8 @@ public class BasicGridCreator implements BaseGridCreator {
         assert row >= 1;
         assert col <= nCols;
         assert col >= 1;
-        if (parent != null && parent.content != null) {
-            parent.content.reserveVertical(row + parentRowOffset, col, length);
+        if (propagateToParent && parent != null) {
+            parent.reserveVertical(row + parentRowOffset, col, length);
         }
         return new GridSegment(row, col, length);
     }
@@ -39,8 +46,8 @@ public class BasicGridCreator implements BaseGridCreator {
         assert row >= 1;
         assert col <= nCols;
         assert col >= 1;
-        if (parent != null && parent.content != null) {
-            parent.content.reserveHorizontal(row + parentRowOffset, col, length);
+        if (propagateToParent && parent != null) {
+            parent.reserveHorizontal(row + parentRowOffset, col, length);
         }
         return new GridSegment(row, col, length);
     }
@@ -59,11 +66,13 @@ public class BasicGridCreator implements BaseGridCreator {
     public void printMetaData() {
         System.out.println("GRID METADATA (Basic): ");
         System.out.println("rows: " + nRows + " cols: " + nCols);
-        if (parent != null && parent.content != null) {
-            System.out.println("Parent: " + parent.content.getClass().getSimpleName());
-            parent.content.printMetaData();
+        BaseGridCreator parentContent = parent == null ? null : parent.getContent();
+        if (parentContent != null) {
+            System.out.println("Parent: " + parentContent.getClass().getSimpleName());
+            parentContent.printMetaData();
         } else {
             System.out.println("Parent: null");
         }
     }
+
 }

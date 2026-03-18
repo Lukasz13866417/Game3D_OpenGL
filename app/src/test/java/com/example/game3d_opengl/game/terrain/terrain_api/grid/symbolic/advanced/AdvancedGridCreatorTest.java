@@ -1,472 +1,548 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.BaseGridCreator;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridSegment;
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_end_pos.EndPosTreeKind;
+
 import org.junit.Test;
 
-import java.util.ArrayList;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Random;
 import java.util.Set;
 
-import static org.junit.Assert.*;
-
 public class AdvancedGridCreatorTest {
+    private static final Object PRINT_CAPTURE_LOCK = new Object();
 
-    // ================================================================
-    //  Helper: brute-force pair counting on a boolean[] free array
-    // ================================================================
-
-    private static long bruteForcePortalPairCount(boolean[] free, int d) {
-        int N = free.length;
-        int[] prefix = new int[N];
-        prefix[0] = free[0] ? 1 : 0;
-        for (int i = 1; i < N; i++) {
-            prefix[i] = prefix[i - 1] + (free[i] ? 1 : 0);
-        }
-        long count = 0;
-        for (int y = 0; y < N; y++) {
-            if (!free[y]) continue;
-            for (int x = 0; x < y; x++) {
-                if (!free[x]) continue;
-                int between = prefix[y - 1] - prefix[x];
-                if (between >= d) count++;
+    private static String[] capturePrintedGridLines(BaseGridCreator creator) {
+        synchronized (PRINT_CAPTURE_LOCK) {
+            PrintStream originalOut = System.out;
+            ByteArrayOutputStream capturedBytes = new ByteArrayOutputStream();
+            PrintStream capture = new PrintStream(capturedBytes);
+            try {
+                System.setOut(capture);
+                creator.printGrid();
+            } finally {
+                System.setOut(originalOut);
+                capture.close();
             }
+
+            String text = new String(capturedBytes.toByteArray(), StandardCharsets.UTF_8)
+                    .replace("\r\n", "\n");
+            while (text.endsWith("\n")) {
+                text = text.substring(0, text.length() - 1);
+            }
+            return text.split("\n");
         }
-        return count;
     }
 
-    private static int code(int row, int col, int nCols) {
-        return (row - 1) * nCols + (col - 1);
+    private static void assertPrintedGrid(
+            BaseGridCreator creator, int expectedRows, int expectedCols, String... expectedGridRows
+    ) {
+        String[] lines = capturePrintedGridLines(creator);
+        assertEquals(expectedGridRows.length + 2, lines.length);
+        assertTrue(lines[0].startsWith("Horizontal hashCode(): "));
+        assertTrue(lines[1].startsWith("Rows: " + expectedRows + " | Cols: " + expectedCols + " "));
+        assertTrue(lines[1].endsWith(",false"));
+        for (int i = 0; i < expectedGridRows.length; ++i) {
+            assertEquals(expectedGridRows[i], lines[i + 2]);
+        }
     }
 
-    private static void markReserved(boolean[] free, int row, int col, int nCols) {
-        free[code(row, col, nCols)] = false;
+    private static void destroyIfMaterialized(GridCreatorWrapper wrapper) {
+        BaseGridCreator content = wrapper.getContent();
+        if (content != null) {
+            content.destroy();
+        }
+        wrapper.releaseRetainedAdvancedCreator();
     }
 
-    // ================================================================
-    //  Basic portal pair operations
-    // ================================================================
 
     @Test
-    public void countPortalPairs_fresh_grid() {
-        AdvancedGridCreator g = new AdvancedGridCreator(5, 5);
-        // F=25, d=0 => 25*24/2 = 300
-        assertEquals(300, g.countPortalPairs(0));
-        // d=3 => gap=25-3-1=21 => 21*22/2 = 231
-        assertEquals(231, g.countPortalPairs(3));
-        g.destroy();
-    }
-
-    @Test
-    public void reserveRandomPortalPair_returns_valid_pair() {
-        AdvancedGridCreator g = new AdvancedGridCreator(6, 6);
-        int d = 3;
-        long before = g.countPortalPairs(d);
-        assertTrue(before > 0);
-
-        GridSegment[] pair = g.reserveRandomPortalPair(d);
-        GridSegment entrance = pair[0];
-        GridSegment exit = pair[1];
-
-        // Both are single cells
-        assertEquals(1, entrance.length);
-        assertEquals(1, exit.length);
-
-        // Exit has a larger row-major code than entrance
-        int entranceCode = code(entrance.row, entrance.col, 6);
-        int exitCode = code(exit.row, exit.col, 6);
-        assertTrue("exit code must be > entrance code", exitCode > entranceCode);
-
-        // Bounds check
-        assertTrue(entrance.row >= 1 && entrance.row <= 6);
-        assertTrue(entrance.col >= 1 && entrance.col <= 6);
-        assertTrue(exit.row >= 1 && exit.row <= 6);
-        assertTrue(exit.col >= 1 && exit.col <= 6);
-
-        // Count must have decreased (we removed 2 free cells)
-        long after = g.countPortalPairs(d);
-        assertTrue("pair count should decrease after reserving", after < before);
-
-        g.destroy();
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void reserveRandomPortalPair_throws_when_no_pairs() {
-        // 1x2 grid, d=1 => gap=2-1-1=0 => no pairs
-        AdvancedGridCreator g = new AdvancedGridCreator(1, 2);
+    public void reserveVertical_blocks_same_cells_for_horizontal_reservations() {
+        AdvancedGridCreator creator = new AdvancedGridCreator(4, 4);
         try {
-            g.reserveRandomPortalPair(1);
+            creator.reserveVertical(1, 2, 3);
+            GridSegment onlyFit = creator.reserveRandomFittingHorizontal(4);
+            assertEquals(new GridSegment(4, 1, 4), onlyFit);
         } finally {
-            g.destroy();
+            creator.destroy();
         }
     }
 
-    // ================================================================
-    //  Portal pairs after vertical/horizontal reserves
-    // ================================================================
-
     @Test
-    public void countPortalPairs_decreases_after_reserveVertical() {
-        AdvancedGridCreator g = new AdvancedGridCreator(5, 5);
-        int d = 2;
-        long count1 = g.countPortalPairs(d);
-
-        g.reserveVertical(1, 1, 3); // reserves (1,1), (2,1), (3,1)
-        long count2 = g.countPortalPairs(d);
-        assertTrue("count should decrease after vertical reserve", count2 < count1);
-
-        g.destroy();
-    }
-
-    @Test
-    public void countPortalPairs_decreases_after_reserveHorizontal() {
-        AdvancedGridCreator g = new AdvancedGridCreator(5, 5);
-        int d = 2;
-        long count1 = g.countPortalPairs(d);
-
-        g.reserveHorizontal(2, 1, 4); // reserves (2,1), (2,2), (2,3), (2,4)
-        long count2 = g.countPortalPairs(d);
-        assertTrue("count should decrease after horizontal reserve", count2 < count1);
-
-        g.destroy();
-    }
-
-    @Test
-    public void countPortalPairs_matches_brute_force_after_reserves() {
-        int nRows = 4, nCols = 5;
-        int N = nRows * nCols;
-        boolean[] free = new boolean[N];
-        for (int i = 0; i < N; i++) free[i] = true;
-
-        AdvancedGridCreator g = new AdvancedGridCreator(nRows, nCols);
-
-        // Reserve a vertical segment
-        g.reserveVertical(1, 2, 3);
-        for (int r = 1; r <= 3; r++) markReserved(free, r, 2, nCols);
-
-        // Reserve a horizontal segment
-        g.reserveHorizontal(4, 1, 4);
-        for (int c = 1; c <= 4; c++) markReserved(free, 4, c, nCols);
-
-        for (int d = 0; d <= 10; d++) {
-            assertEquals("d=" + d, bruteForcePortalPairCount(free, d), g.countPortalPairs(d));
-        }
-
-        g.destroy();
-    }
-
-    // ================================================================
-    //  Portal pair after reserveRandomFitting*
-    // ================================================================
-
-    @Test
-    public void portal_pair_after_random_vertical_reserves() {
-        int nRows = 8, nCols = 6;
-        int N = nRows * nCols;
-        boolean[] free = new boolean[N];
-        for (int i = 0; i < N; i++) free[i] = true;
-
-        AdvancedGridCreator g = new AdvancedGridCreator(nRows, nCols);
-
-        // Reserve some random single cells
-        for (int i = 0; i < 10; i++) {
-            GridSegment seg = g.reserveRandomFittingVertical(1);
-            markReserved(free, seg.row, seg.col, nCols);
-        }
-
-        int d = 3;
-        assertEquals(bruteForcePortalPairCount(free, d), g.countPortalPairs(d));
-
-        // Should still be able to reserve a portal pair
-        if (g.countPortalPairs(d) > 0) {
-            GridSegment[] pair = g.reserveRandomPortalPair(d);
-            markReserved(free, pair[0].row, pair[0].col, nCols);
-            markReserved(free, pair[1].row, pair[1].col, nCols);
-            assertEquals(bruteForcePortalPairCount(free, d), g.countPortalPairs(d));
-        }
-
-        g.destroy();
-    }
-
-    @Test
-    public void portal_pair_after_random_horizontal_reserves() {
-        int nRows = 6, nCols = 8;
-        int N = nRows * nCols;
-        boolean[] free = new boolean[N];
-        for (int i = 0; i < N; i++) free[i] = true;
-
-        AdvancedGridCreator g = new AdvancedGridCreator(nRows, nCols);
-
-        for (int i = 0; i < 5; i++) {
-            GridSegment seg = g.reserveRandomFittingHorizontal(2);
-            for (int c = seg.col; c < seg.col + seg.length; c++) {
-                markReserved(free, seg.row, c, nCols);
+    public void reserveHorizontal_on_taken_cells_throws() {
+        AdvancedGridCreator creator = new AdvancedGridCreator(4, 4);
+        try {
+            creator.reserveVertical(1, 2, 4);
+            try {
+                creator.reserveHorizontal(2, 1, 3);
+                fail("Expected reserveHorizontal to reject overlapping reserved cells.");
+            } catch (IllegalArgumentException expected) {
+                // Expected.
             }
+        } finally {
+            creator.destroy();
         }
-
-        int d = 2;
-        assertEquals(bruteForcePortalPairCount(free, d), g.countPortalPairs(d));
-
-        if (g.countPortalPairs(d) > 0) {
-            GridSegment[] pair = g.reserveRandomPortalPair(d);
-            markReserved(free, pair[0].row, pair[0].col, nCols);
-            markReserved(free, pair[1].row, pair[1].col, nCols);
-            assertEquals(bruteForcePortalPairCount(free, d), g.countPortalPairs(d));
-        }
-
-        g.destroy();
     }
 
     @Test
-    public void portal_pair_after_reserveKRandomFields() {
-        int nRows = 7, nCols = 5;
-        int N = nRows * nCols;
-        boolean[] free = new boolean[N];
-        for (int i = 0; i < N; i++) free[i] = true;
+    public void printGrid_outputs_expected_rows_after_non_random_reservations() {
+        AdvancedGridCreator creator = new AdvancedGridCreator(4, 5);
+        try {
+            creator.reserveVertical(1, 2, 3);
+            creator.reserveHorizontal(4, 3, 2);
 
-        AdvancedGridCreator g = new AdvancedGridCreator(nRows, nCols);
-
-        GridSegment[] fields = g.reserveKRandomFields(8);
-        for (GridSegment seg : fields) {
-            markReserved(free, seg.row, seg.col, nCols);
+            assertPrintedGrid(
+                    creator,
+                    4,
+                    5,
+                    "0 [., #, ., ., .]",
+                    "1 [., #, ., ., .]",
+                    "2 [., #, ., ., .]",
+                    "3 [., ., #, #, .]"
+            );
+        } finally {
+            creator.destroy();
         }
-
-        int d = 4;
-        assertEquals(bruteForcePortalPairCount(free, d), g.countPortalPairs(d));
-
-        if (g.countPortalPairs(d) > 0) {
-            GridSegment[] pair = g.reserveRandomPortalPair(d);
-            markReserved(free, pair[0].row, pair[0].col, nCols);
-            markReserved(free, pair[1].row, pair[1].col, nCols);
-            assertEquals(bruteForcePortalPairCount(free, d), g.countPortalPairs(d));
-        }
-
-        g.destroy();
     }
 
-    // ================================================================
-    //  Portal pair cells are blocked in vertical/horizontal handlers
-    //  (subsequent random reserves never pick the same cells)
-    // ================================================================
-
     @Test
-    public void portal_pair_cells_blocked_for_future_reserves() {
-        int nRows = 6, nCols = 6;
-        AdvancedGridCreator g = new AdvancedGridCreator(nRows, nCols);
+    public void reserveKRandomFields_returns_sorted_unique_single_cells() {
+        AdvancedGridCreator creator = new AdvancedGridCreator(5, 5);
+        try {
+            GridSegment[] reserved = creator.reserveKRandomFields(6);
+            assertEquals(6, reserved.length);
 
-        GridSegment[] pair = g.reserveRandomPortalPair(2);
-        Set<String> portalCells = new HashSet<>();
-        portalCells.add(pair[0].row + "," + pair[0].col);
-        portalCells.add(pair[1].row + "," + pair[1].col);
-
-        // Reserve all remaining cells one by one; none should be a portal cell
-        int remaining = nRows * nCols - 2;
-        for (int i = 0; i < remaining; i++) {
-            GridSegment seg = g.reserveRandomFittingVertical(1);
-            String key = seg.row + "," + seg.col;
-            assertFalse("Portal cell " + key + " was reused", portalCells.contains(key));
-        }
-
-        g.destroy();
-    }
-
-    // ================================================================
-    //  Parent propagation
-    // ================================================================
-
-    @Test
-    public void portal_pair_propagates_to_parent() {
-        int parentRows = 20, parentCols = 5;
-        AdvancedGridCreator parent = new AdvancedGridCreator(parentRows, parentCols);
-        long parentCountBefore = parent.countPortalPairs(0);
-
-        GridCreatorWrapper wrapper = new GridCreatorWrapper();
-        wrapper.content = parent;
-
-        int childRows = 6, childCols = 5, offset = 3;
-        AdvancedGridCreator child = new AdvancedGridCreator(childRows, childCols, wrapper, offset);
-
-        GridSegment[] pair = child.reserveRandomPortalPair(2);
-
-        // Parent's pair count should have decreased (2 cells were propagated)
-        long parentCountAfter = parent.countPortalPairs(0);
-        assertTrue("parent count should decrease after child portal pair",
-                parentCountAfter < parentCountBefore);
-
-        child.destroy();
-        parent.destroy();
-    }
-
-    // ================================================================
-    //  Multiple portal pairs
-    // ================================================================
-
-    @Test
-    public void multiple_portal_pairs_on_same_grid() {
-        int nRows = 10, nCols = 10;
-        int N = nRows * nCols;
-        boolean[] free = new boolean[N];
-        for (int i = 0; i < N; i++) free[i] = true;
-
-        AdvancedGridCreator g = new AdvancedGridCreator(nRows, nCols);
-
-        int d = 5;
-        Set<String> allPortalCells = new HashSet<>();
-
-        for (int p = 0; p < 5; p++) {
-            long count = g.countPortalPairs(d);
-            assertEquals("Pair " + p, bruteForcePortalPairCount(free, d), count);
-            if (count == 0) break;
-
-            GridSegment[] pair = g.reserveRandomPortalPair(d);
-
-            // Verify no cell reuse
-            String k0 = pair[0].row + "," + pair[0].col;
-            String k1 = pair[1].row + "," + pair[1].col;
-            assertFalse("Entrance cell reused: " + k0, allPortalCells.contains(k0));
-            assertFalse("Exit cell reused: " + k1, allPortalCells.contains(k1));
-            assertNotEquals("Entrance and exit must differ", k0, k1);
-            allPortalCells.add(k0);
-            allPortalCells.add(k1);
-
-            // Exit code > entrance code
-            assertTrue(code(pair[1].row, pair[1].col, nCols)
-                    > code(pair[0].row, pair[0].col, nCols));
-
-            markReserved(free, pair[0].row, pair[0].col, nCols);
-            markReserved(free, pair[1].row, pair[1].col, nCols);
-        }
-
-        g.destroy();
-    }
-
-    // ================================================================
-    //  Randomized: mixed operations with brute-force oracle
-    // ================================================================
-
-    @Test
-    public void randomized_mixed_operations_match_brute_force() {
-        Random rng = new Random(314159);
-        for (int trial = 0; trial < 30; trial++) {
-            int nRows = rng.nextInt(5) + 3;  // 3..7
-            int nCols = rng.nextInt(5) + 3;  // 3..7
-            int N = nRows * nCols;
-            int d = rng.nextInt(Math.max(1, N / 3));
-
-            boolean[] free = new boolean[N];
-            for (int i = 0; i < N; i++) free[i] = true;
-            AdvancedGridCreator g = new AdvancedGridCreator(nRows, nCols);
-
-            for (int op = 0; op < 12; op++) {
-                int choice = rng.nextInt(5);
-                switch (choice) {
-                    case 0: { // reserveVertical single cell
-                        try {
-                            GridSegment seg = g.reserveRandomFittingVertical(1);
-                            markReserved(free, seg.row, seg.col, nCols);
-                        } catch (Exception ignored) {
-                            // grid might be exhausted
-                        }
-                        break;
-                    }
-                    case 1: { // reserveHorizontal single cell
-                        try {
-                            GridSegment seg = g.reserveRandomFittingHorizontal(1);
-                            markReserved(free, seg.row, seg.col, nCols);
-                        } catch (Exception ignored) {
-                            // grid might be exhausted
-                        }
-                        break;
-                    }
-                    case 2: { // reserveVertical multi-cell (length 1-3)
-                        try {
-                            int len = rng.nextInt(2) + 1;
-                            GridSegment seg = g.reserveRandomFittingVertical(len);
-                            for (int r = seg.row; r < seg.row + len; r++) {
-                                markReserved(free, r, seg.col, nCols);
-                            }
-                        } catch (Exception ignored) {
-                            // might fail if no space
-                        }
-                        break;
-                    }
-                    case 3: { // reserveHorizontal multi-cell (length 1-3)
-                        try {
-                            int len = rng.nextInt(2) + 1;
-                            GridSegment seg = g.reserveRandomFittingHorizontal(len);
-                            for (int c = seg.col; c < seg.col + len; c++) {
-                                markReserved(free, seg.row, c, nCols);
-                            }
-                        } catch (Exception ignored) {
-                            // might fail if no space
-                        }
-                        break;
-                    }
-                    case 4: { // reserveRandomPortalPair
-                        long pairCount = g.countPortalPairs(d);
-                        assertEquals("Trial " + trial + " op " + op,
-                                bruteForcePortalPairCount(free, d), pairCount);
-                        if (pairCount > 0) {
-                            GridSegment[] pair = g.reserveRandomPortalPair(d);
-                            markReserved(free, pair[0].row, pair[0].col, nCols);
-                            markReserved(free, pair[1].row, pair[1].col, nCols);
-                            // Verify ordering
-                            assertTrue(code(pair[1].row, pair[1].col, nCols)
-                                    > code(pair[0].row, pair[0].col, nCols));
-                        }
-                        break;
-                    }
+            Set<String> seen = new HashSet<>();
+            GridSegment prev = null;
+            for (GridSegment seg : reserved) {
+                assertEquals(1, seg.length);
+                assertTrue(seg.row >= 1 && seg.row <= 5);
+                assertTrue(seg.col >= 1 && seg.col <= 5);
+                assertTrue(seen.add(seg.row + ":" + seg.col));
+                if (prev != null) {
+                    assertTrue(
+                            prev.row < seg.row || (prev.row == seg.row && prev.col <= seg.col)
+                    );
                 }
-
-                // After every operation, verify countPortalPairs is consistent
-                assertEquals("Trial " + trial + " op " + op + " post-check",
-                        bruteForcePortalPairCount(free, d), g.countPortalPairs(d));
+                prev = seg;
             }
-
-            g.destroy();
+        } finally {
+            creator.destroy();
         }
     }
 
     @Test
-    public void randomized_portal_pairs_then_exhaust_grid() {
-        // Reserve some portal pairs, then fill remaining grid with single reserves.
-        // No cell should ever be double-reserved.
-        Random rng = new Random(271828);
-        for (int trial = 0; trial < 20; trial++) {
-            int nRows = rng.nextInt(4) + 3;
-            int nCols = rng.nextInt(4) + 3;
-            int N = nRows * nCols;
-            int d = rng.nextInt(Math.max(1, N / 4));
+    public void exportHorizontalFreeSegments_roundTrip_through_rebuild() {
+        AdvancedGridCreator original = new AdvancedGridCreator(6, 5);
+        AdvancedGridCreator rebuilt = null;
+        try {
+            original.reserveVertical(2, 2, 3);
+            original.reserveHorizontal(6, 1, 2);
+            original.reserveHorizontal(1, 4, 2);
 
-            AdvancedGridCreator g = new AdvancedGridCreator(nRows, nCols);
-            Set<String> reserved = new HashSet<>();
+            rebuilt = AdvancedGridCreator.createFromHorizontalFreeSegments(
+                    original.nRows,
+                    original.nCols,
+                    null,
+                    0,
+                    EndPosTreeKind.POOLED_TREAP,
+                    true,
+                    original.exportHorizontalFreeSegments()
+            );
 
-            // Reserve some portal pairs
-            int portalPairs = 0;
-            while (g.countPortalPairs(d) > 0 && portalPairs < 3) {
-                GridSegment[] pair = g.reserveRandomPortalPair(d);
-                for (GridSegment seg : pair) {
-                    String key = seg.row + "," + seg.col;
-                    assertFalse("Double reserve: " + key + " trial " + trial,
-                            reserved.contains(key));
-                    reserved.add(key);
+            assertArrayEquals(
+                    original.exportHorizontalFreeSegments(),
+                    rebuilt.exportHorizontalFreeSegments()
+            );
+        } finally {
+            original.destroy();
+            if (rebuilt != null) {
+                rebuilt.destroy();
+            }
+        }
+    }
+
+    @Test
+    public void wrapper_materializes_parent_from_child_creator() {
+        GridCreatorWrapper parentWrapper = new GridCreatorWrapper();
+        GridCreatorWrapper childWrapper = new GridCreatorWrapper();
+        try {
+            parentWrapper.configureStructure(
+                    true,
+                    5,
+                    4,
+                    null,
+                    0,
+                    EndPosTreeKind.POOLED_TREAP,
+                    true,
+                    new int[0][2]
+            );
+            childWrapper.configureStructure(
+                    true,
+                    3,
+                    4,
+                    parentWrapper,
+                    1,
+                    EndPosTreeKind.POOLED_TREAP,
+                    true,
+                    new int[0][2]
+            );
+            parentWrapper.addChildWrapper(childWrapper, 1);
+            childWrapper.materializeIfNeeded();
+            ((AdvancedGridCreator) childWrapper.getContent()).reserveHorizontal(2, 2, 2);
+            childWrapper.finishAddonPhase();
+            parentWrapper.materializeIfNeeded();
+
+            AdvancedGridCreator parent = (AdvancedGridCreator) parentWrapper.getContent();
+            assertNotNull(parent);
+
+            try {
+                parent.reserveHorizontal(3, 2, 2);
+                fail("Expected parent summary build to preserve child reservations.");
+            } catch (IllegalArgumentException expected) {
+                // Expected.
+            }
+
+            GridSegment freeTopRow = parent.reserveRandomFittingHorizontal(4);
+            assertEquals(1, freeTopRow.col);
+            assertEquals(4, freeTopRow.length);
+            assertTrue(
+                    freeTopRow.row == 1
+                            || freeTopRow.row == 2
+                            || freeTopRow.row == 4
+                            || freeTopRow.row == 5
+            );
+
+            parentWrapper.finishAddonPhase();
+        } finally {
+            destroyIfMaterialized(parentWrapper);
+            destroyIfMaterialized(childWrapper);
+        }
+    }
+
+    @Test
+    public void wrapper_build_merges_vertical_runs_across_adjacent_children() {
+        GridCreatorWrapper parentWrapper = new GridCreatorWrapper();
+        GridCreatorWrapper firstChild = new GridCreatorWrapper();
+        GridCreatorWrapper secondChild = new GridCreatorWrapper();
+        parentWrapper.configureStructure(
+                true,
+                4,
+                1,
+                null,
+                0,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        firstChild.configureStructure(
+                true,
+                2,
+                1,
+                parentWrapper,
+                0,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        secondChild.configureStructure(
+                true,
+                2,
+                1,
+                parentWrapper,
+                2,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        parentWrapper.addChildWrapper(firstChild, 0);
+        parentWrapper.addChildWrapper(secondChild, 2);
+
+        try {
+            firstChild.materializeIfNeeded();
+            firstChild.finishAddonPhase();
+            secondChild.materializeIfNeeded();
+            secondChild.finishAddonPhase();
+
+            parentWrapper.materializeIfNeeded();
+
+            AdvancedGridCreator parent = (AdvancedGridCreator) parentWrapper.getContent();
+            assertNotNull(parent);
+            assertEquals(new GridSegment(1, 1, 4), parent.reserveRandomFittingVertical(4));
+
+            parentWrapper.finishAddonPhase();
+        } finally {
+            destroyIfMaterialized(parentWrapper);
+            destroyIfMaterialized(firstChild);
+            destroyIfMaterialized(secondChild);
+        }
+    }
+
+    @Test
+    public void createFromChildren_builds_parent_directly_from_child_creators() {
+        AdvancedGridCreator firstChild = new AdvancedGridCreator(2, 4);
+        AdvancedGridCreator secondChild = new AdvancedGridCreator(2, 4);
+        AdvancedGridCreator parent = null;
+        try {
+            firstChild.reserveHorizontal(1, 2, 2);
+            secondChild.reserveVertical(1, 4, 2);
+
+            parent = AdvancedGridCreator.createFromChildren(
+                    5,
+                    4,
+                    null,
+                    0,
+                    EndPosTreeKind.POOLED_TREAP,
+                    true,
+                    new int[][]{{3, 3}},
+                    new AdvancedGridCreator[]{firstChild, secondChild},
+                    new int[]{0, 2},
+                    2
+            );
+
+            assertArrayEquals(
+                    new GridSegment[]{
+                            GridSegment.GS(1, 1, 1),
+                            GridSegment.GS(1, 4, 1),
+                            GridSegment.GS(2, 1, 4),
+                            GridSegment.GS(4, 1, 3),
+                            GridSegment.GS(5, 1, 4)
+                    },
+                    parent.exportHorizontalFreeSegments()
+            );
+
+            assertArrayEquals(
+                    new GridSegment[]{
+                            GridSegment.GS(1, 1, 2),
+                            GridSegment.GS(4, 1, 2),
+                            GridSegment.GS(2, 2, 1),
+                            GridSegment.GS(4, 2, 2),
+                            GridSegment.GS(2, 3, 1),
+                            GridSegment.GS(4, 3, 2),
+                            GridSegment.GS(1, 4, 2),
+                            GridSegment.GS(5, 4, 1)
+                    },
+                    parent.exportVerticalFreeSegments()
+            );
+        } finally {
+            firstChild.destroy();
+            secondChild.destroy();
+            if (parent != null) {
+                parent.destroy();
+            }
+        }
+    }
+
+    @Test
+    public void createFromChildren_builds_parent_directly_from_child_creators_for_all_backends() {
+        for (EndPosTreeKind kind : EndPosTreeKind.values()) {
+            AdvancedGridCreator firstChild = new AdvancedGridCreator(2, 4, kind);
+            AdvancedGridCreator secondChild = new AdvancedGridCreator(2, 4, kind);
+            AdvancedGridCreator parent = null;
+            try {
+                firstChild.reserveHorizontal(1, 2, 2);
+                secondChild.reserveVertical(1, 4, 2);
+
+                parent = AdvancedGridCreator.createFromChildren(
+                        5,
+                        4,
+                        null,
+                        0,
+                        kind,
+                        true,
+                        new int[][]{{3, 3}},
+                        new AdvancedGridCreator[]{firstChild, secondChild},
+                        new int[]{0, 2},
+                        2
+                );
+
+                assertArrayEquals(
+                        kind.name(),
+                        new GridSegment[]{
+                                GridSegment.GS(1, 1, 1),
+                                GridSegment.GS(1, 4, 1),
+                                GridSegment.GS(2, 1, 4),
+                                GridSegment.GS(4, 1, 3),
+                                GridSegment.GS(5, 1, 4)
+                        },
+                        parent.exportHorizontalFreeSegments()
+                );
+
+                assertArrayEquals(
+                        kind.name(),
+                        new GridSegment[]{
+                                GridSegment.GS(1, 1, 2),
+                                GridSegment.GS(4, 1, 2),
+                                GridSegment.GS(2, 2, 1),
+                                GridSegment.GS(4, 2, 2),
+                                GridSegment.GS(2, 3, 1),
+                                GridSegment.GS(4, 3, 2),
+                                GridSegment.GS(1, 4, 2),
+                                GridSegment.GS(5, 4, 1)
+                        },
+                        parent.exportVerticalFreeSegments()
+                );
+            } finally {
+                firstChild.destroy();
+                secondChild.destroy();
+                if (parent != null) {
+                    parent.destroy();
                 }
-                portalPairs++;
             }
+        }
+    }
 
-            // Fill the rest with single vertical reserves
-            while (reserved.size() < N) {
-                GridSegment seg = g.reserveRandomFittingVertical(1);
-                String key = seg.row + "," + seg.col;
-                assertFalse("Double reserve: " + key + " trial " + trial,
-                        reserved.contains(key));
-                reserved.add(key);
-            }
+    @Test
+    public void wrapper_tree_prints_expected_grids_across_multiple_levels() {
+        GridCreatorWrapper root = new GridCreatorWrapper();
+        GridCreatorWrapper childA = new GridCreatorWrapper();
+        GridCreatorWrapper childB = new GridCreatorWrapper();
+        GridCreatorWrapper grandchildA1 = new GridCreatorWrapper();
+        GridCreatorWrapper grandchildA2 = new GridCreatorWrapper();
+        GridCreatorWrapper grandchildB1 = new GridCreatorWrapper();
 
-            assertEquals(N, reserved.size());
-            g.destroy();
+        root.configureStructure(
+                true,
+                9,
+                5,
+                null,
+                0,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        childA.configureStructure(
+                true,
+                4,
+                5,
+                root,
+                1,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        childB.configureStructure(
+                true,
+                3,
+                5,
+                root,
+                6,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        grandchildA1.configureStructure(
+                true,
+                2,
+                5,
+                childA,
+                1,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        grandchildA2.configureStructure(
+                true,
+                1,
+                5,
+                childA,
+                3,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        grandchildB1.configureStructure(
+                true,
+                2,
+                5,
+                childB,
+                0,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        childA.addChildWrapper(grandchildA1, 1);
+        childA.addChildWrapper(grandchildA2, 3);
+        childB.addChildWrapper(grandchildB1, 0);
+        root.addChildWrapper(childA, 1);
+        root.addChildWrapper(childB, 6);
+
+        try {
+            grandchildA1.materializeIfNeeded();
+            grandchildA1.reserveHorizontal(1, 2, 3);
+            grandchildA1.reserveVertical(1, 5, 2);
+            grandchildA1.finishAddonPhase();
+
+            grandchildA2.materializeIfNeeded();
+            grandchildA2.reserveVertical(1, 1, 1);
+            grandchildA2.finishAddonPhase();
+
+            grandchildB1.materializeIfNeeded();
+            grandchildB1.reserveVertical(1, 3, 2);
+            grandchildB1.finishAddonPhase();
+
+            childA.reserveVertical(2, 1, 2);
+            childA.reserveHorizontal(4, 2, 2);
+            childA.materializeIfNeeded();
+            assertPrintedGrid(
+                    childA.getContent(),
+                    4,
+                    5,
+                    "0 [., ., ., ., .]",
+                    "1 [#, #, #, #, #]",
+                    "2 [#, ., ., ., #]",
+                    "3 [#, #, #, ., .]"
+            );
+            childA.finishAddonPhase();
+
+            childB.reserveHorizontal(3, 1, 4);
+            childB.reserveVertical(1, 5, 3);
+            childB.materializeIfNeeded();
+            assertPrintedGrid(
+                    childB.getContent(),
+                    3,
+                    5,
+                    "0 [., ., #, ., #]",
+                    "1 [., ., #, ., #]",
+                    "2 [#, #, #, #, #]"
+            );
+            childB.finishAddonPhase();
+
+            root.reserveVertical(1, 5, 2);
+            root.reserveHorizontal(6, 2, 3);
+            root.materializeIfNeeded();
+            assertPrintedGrid(
+                    root.getContent(),
+                    9,
+                    5,
+                    "0 [., ., ., ., #]",
+                    "1 [., ., ., ., #]",
+                    "2 [#, #, #, #, #]",
+                    "3 [#, ., ., ., #]",
+                    "4 [#, #, #, ., .]",
+                    "5 [., #, #, #, .]",
+                    "6 [., ., #, ., #]",
+                    "7 [., ., #, ., #]",
+                    "8 [#, #, #, #, #]"
+            );
+            root.finishAddonPhase();
+        } finally {
+            destroyIfMaterialized(root);
+            destroyIfMaterialized(childA);
+            destroyIfMaterialized(childB);
+            destroyIfMaterialized(grandchildA1);
+            destroyIfMaterialized(grandchildA2);
+            destroyIfMaterialized(grandchildB1);
         }
     }
 }

@@ -2,8 +2,10 @@ package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL_REGION;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_K_RANDOM_FIELDS;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL_REGION;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_VERTICAL;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_VERTICAL;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_START_STRUCTURE_ADDONS;
@@ -52,10 +54,17 @@ class Util {
             int col = (int) buffer[offset + 3];
             int segLength = (int) buffer[offset + 4];
             System.out.println("^& RESERVE HORIZONTAL " + row + "," + col + "," + segLength);
+        } else if (code == CMD_RESERVE_HORIZONTAL_REGION) {
+            int row = (int) buffer[offset + 2];
+            int col = (int) buffer[offset + 3];
+            int segLength = (int) buffer[offset + 4];
+            System.out.println("^& RESERVE HORIZONTAL REGION " + row + "," + col + "," + segLength);
         } else if (code == CMD_RESERVE_RANDOM_VERTICAL) {
             System.out.println("^& RESERVE RANDOM VERTICAL " + buffer[offset + 2]);
         } else if (code == CMD_RESERVE_RANDOM_HORIZONTAL) {
             System.out.println("^& RESERVE RANDOM HORIZONTAL " + buffer[offset + 2]);
+        } else if (code == CMD_RESERVE_RANDOM_HORIZONTAL_REGION) {
+            System.out.println("^& RESERVE RANDOM HORIZONTAL REGION " + buffer[offset + 2]);
         } else if (code == CMD_RESERVE_K_RANDOM_FIELDS) {
             System.out.println("^& RESERVE " + (int) buffer[offset + 2] + " RANDOM FIELDS");
         } else if (code == CMD_FINISH_STRUCTURE_ADDONS) {

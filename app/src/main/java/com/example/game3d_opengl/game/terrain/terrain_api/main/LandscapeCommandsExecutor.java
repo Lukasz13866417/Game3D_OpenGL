@@ -1,8 +1,7 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
-import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.AdvancedGridCreator;
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_end_pos.EndPosTreeKind;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCreatorWrapper;
-import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.basic.BasicGridCreator;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.execbuffer.CommandExecutor;
 
 public class LandscapeCommandsExecutor implements CommandExecutor {
@@ -67,7 +66,9 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                     what = terrain.childStructuresQueue.dequeue();
                 }
                 terrain.structureStack.push(what);
-                terrain.gridCreatorWrapperStack.push(new GridCreatorWrapper());
+                terrain.gridCreatorWrapperStack.push(
+                        new GridCreatorWrapper(terrain.gridResourcePack.partialSegmentHandlerResourcePack())
+                );
                 if (!isChild) {
                     what.generateTiles(terrain.tileBrush);
                     terrain.commandBuffer.addCommand(CMD_FINISH_STRUCTURE_LANDSCAPE);
@@ -83,20 +84,44 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 GridCreatorWrapper myGridCreatorWrapper = terrain.gridCreatorWrapperStack.pop();
                 GridCreatorWrapper parentGridCreatorWrapper = terrain.gridCreatorWrapperStack.peek();
                 int nRowsAdded = terrain.tileManager.getCurrRowCount() - startRowCount;
+                boolean propagateToParent = thatStructure.shouldPropagateReservationsToParent();
+                int[][] blockedRowsForThisCreator = myGridCreatorWrapper.consumePendingBlockedRowsRanges();
                 System.out.println("<> ROWS ADDED: "+nRowsAdded+" , " +terrain.tileManager.getCurrRowCount() + " , " + startRowCount+ " name: "+thatStructure.name);
-                if (thatStructure instanceof AdvancedTerrainStructure) {
-                    myGridCreatorWrapper.content = new AdvancedGridCreator(
-                            nRowsAdded, terrain.nCols, parentGridCreatorWrapper,
-                            ourRowOffsetFromParent
-                    );
-                } else {
-                    myGridCreatorWrapper.content = new BasicGridCreator(
-                            nRowsAdded, terrain.nCols, parentGridCreatorWrapper,
-                            ourRowOffsetFromParent
-                    );
+                boolean isAdvanced = thatStructure instanceof AdvancedTerrainStructure;
+                myGridCreatorWrapper.configureStructure(
+                        isAdvanced,
+                        nRowsAdded,
+                        terrain.nCols,
+                        parentGridCreatorWrapper,
+                        ourRowOffsetFromParent,
+                        EndPosTreeKind.POOLED_TREAP,
+                        propagateToParent,
+                        blockedRowsForThisCreator
+                );
+                if (parentGridCreatorWrapper != null) {
+                    parentGridCreatorWrapper.addChildWrapper(myGridCreatorWrapper, ourRowOffsetFromParent);
+                }
+                if (propagateToParent && parentGridCreatorWrapper != null) {
+                    for (int[] range : blockedRowsForThisCreator) {
+                        parentGridCreatorWrapper.addPendingBlockedRowsRange(
+                                range[0] + ourRowOffsetFromParent,
+                                range[1] + ourRowOffsetFromParent
+                        );
+                    }
+                }
+                int[] blockedRows = thatStructure.getParentBlockedRowsRange(nRowsAdded, terrain.nCols);
+                if (blockedRows != null && blockedRows.length == 2 && parentGridCreatorWrapper != null) {
+                    int localStart = blockedRows[0];
+                    int localEnd = blockedRows[1];
+                    if (localStart <= localEnd) {
+                        int absStart = ourRowOffsetFromParent + localStart;
+                        int absEnd = ourRowOffsetFromParent + localEnd;
+                        parentGridCreatorWrapper.addPendingBlockedRowsRange(absStart, absEnd);
+                    }
                 }
                 terrain.gridCreatorWrapperQueue.enqueue(myGridCreatorWrapper);
                 terrain.rowOffsetQueue.enqueue(startRowCount);
+                terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_START_STRUCTURE_ADDONS);
                 thatStructure.generateAddons(terrain, nRowsAdded, terrain.nCols);
                 terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS);
                 break;
