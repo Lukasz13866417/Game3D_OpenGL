@@ -114,15 +114,11 @@ public class TestTileManagerStage extends Stage {
 
     }
     @Override
-    public void onClose() {
+    protected void onDeactivated(DeactivationReason reason) {
 
     }
     @Override
-    public void onSwitch() {
-
-    }
-    @Override
-    public void onReturn() {
+    protected void onActivated(ActivationReason reason) {
 
     }
     @Override

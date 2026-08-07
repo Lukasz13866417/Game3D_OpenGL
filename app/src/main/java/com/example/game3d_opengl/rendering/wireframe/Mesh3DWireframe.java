@@ -2,7 +2,7 @@ package com.example.game3d_opengl.rendering.wireframe;
 
 import android.opengl.GLES20;
 
-import com.example.game3d_opengl.rendering.Camera;
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
 import com.example.game3d_opengl.rendering.mesh.BaseMeshDrawArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -10,15 +10,20 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 import java.util.ArrayList;
 
-public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeShaderPair> {
+public class Mesh3DWireframe extends AbstractMesh3D<
+        BaseMeshDrawArgs,
+        WireframeShaderPair<VertexLayout.EdgeABLayout>,
+        VertexLayout.EdgeABLayout> {
 
     private final FColor edgeColor;
     final float pixelWidth;
+    final float capPixels;
 
     public Mesh3DWireframe(Builder builder) {
         super(builder);
         this.edgeColor = builder.edgeColor;
         this.pixelWidth = builder.pixelWidth;
+        this.capPixels = builder.capPixels;
         this.fs = new WireframeShaderArgs.FS();
         this.vs = new WireframeShaderArgs.VS();
     }
@@ -29,17 +34,27 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
     // Fragment shader args are easy
     private final WireframeShaderArgs.FS fs;
 
+    public boolean canUpdateGeometry(Vector3D[] verts, int[][] faces) {
+        float[] vertexData = buildExpandedVertexData(verts, faces);
+        return canUpdateVertexData(vertexData.length);
+    }
+
+    public void updateGeometry(Vector3D[] verts, int[][] faces) {
+        updateVertexData(buildExpandedVertexData(verts, faces));
+    }
+
 
     @Override
-    protected void setVariableArgsValues(BaseMeshDrawArgs args, WireframeShaderPair s) {
+    protected void setVariableArgsValues(
+            BaseMeshDrawArgs args,
+            WireframeShaderPair<VertexLayout.EdgeABLayout> s) {
         // vertex shader uniform args
         vs.color = edgeColor;
         vs.mvp = args.vp;
         vs.halfPx = pixelWidth;
-        vs.capPx = pixelWidth;
+        vs.capPx = capPixels;
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, VIEWPORT_TMP, 0);
-        vs.viewportW = Math.max(1, VIEWPORT_TMP[2]);
-        vs.viewportH = Math.max(1, VIEWPORT_TMP[3]);
+        applyViewport(VIEWPORT_TMP, vs);
         vs.uDepthBiasNDC = -5e-3f; // TODO change to builder arg.
 
         // fragment shader is easy here
@@ -47,11 +62,24 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
         s.setArgs(vs, fs);
     }
 
-    public static class Builder extends BaseBuilder<Mesh3DWireframe, Builder, WireframeShaderPair> {
+    static void applyViewport(int[] viewport, WireframeShaderArgs.VS target) {
+        target.viewportX = viewport[0];
+        target.viewportY = viewport[1];
+        target.viewportW = Math.max(1, viewport[2]);
+        target.viewportH = Math.max(1, viewport[3]);
+    }
+
+    public static class Builder extends BaseBuilder<
+            Mesh3DWireframe,
+            Builder,
+            BaseMeshDrawArgs,
+            WireframeShaderPair<VertexLayout.EdgeABLayout>,
+            VertexLayout.EdgeABLayout> {
         private FColor edgeColor;
 
         private final float UNSET_PIXEL_WIDTH = -1f;
         private float pixelWidth = UNSET_PIXEL_WIDTH; // desired thickness in pixels
+        private float capPixels = Float.NaN;
 
         public Builder edgeColor(FColor c) {
             this.edgeColor = c;
@@ -63,48 +91,33 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
             return this;
         }
 
+        public Builder capPixels(float px) {
+            this.capPixels = px;
+            return this;
+        }
+
         @Override
         public void checkValid() {
             shader(WireframeShaderPair.getSharedShader());
             super.checkValid();
             assert edgeColor != null;
             assert pixelWidth != UNSET_PIXEL_WIDTH;
+            if (Float.isNaN(capPixels)) {
+                capPixels = pixelWidth;
+            }
         }
 
         @Override
         protected float[] setVertexData() {
             // 1) Extract edges from original user faces (dedup optional)
-            ArrayList<int[]> edges = new ArrayList<>();
-            for (int[] face : faces) {
-                int n = face.length;
-                for (int k = 0; k < n; ++k) {
-                    int i = face[k];
-                    int j = face[(k + 1) % n];
-                    if (i == j) continue;
-                    int a = Math.min(i, j), b = Math.max(i, j);
-                    edges.add(new int[]{a, b});
-                }
-            }
-
-            final int vertsPerEdge = 4;
-            final int floatsPerVert = 8; // aPosA(3) + aPosB(3) + aEnd(1) + aSide(1)
-            float[] out = new float[edges.size() * vertsPerEdge * floatsPerVert];
+            ArrayList<int[]> edges = extractEdges(faces);
+            float[] out = buildExpandedVertexData(verts, edges);
 
             // 2) Build vertex stream and NEW faces that reference this stream
             int[][] newFaces = new int[edges.size()][];
-            int vFloat = 0;
             int vBase  = 0; // counts vertices in the *expanded* VBO (increments by 4 per edge)
 
             for (int e = 0; e < edges.size(); ++e) {
-                int ia = edges.get(e)[0], ib = edges.get(e)[1];
-                Vector3D A = verts[ia], B = verts[ib];
-
-                // Emit the 4 vertices for this edge (A-, A+, B-, B+)
-                vFloat = putEdgeVert(out, vFloat, A, B, 0f, -1f); // base+0
-                vFloat = putEdgeVert(out, vFloat, A, B, 0f, +1f); // base+1
-                vFloat = putEdgeVert(out, vFloat, A, B, 1f, -1f); // base+2
-                vFloat = putEdgeVert(out, vFloat, A, B, 1f, +1f); // base+3
-
                 // Order vertices so the diagonal spans across the line width (A- -> B+),
                 // avoiding a split along the line direction.
                 newFaces[e] = new int[]{ vBase + 0, vBase + 1, vBase + 3, vBase + 2 };
@@ -118,17 +131,11 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
             return out;
         }
 
-        private static int putEdgeVert(float[] dst, int off,
-                                       Vector3D A, Vector3D B,
-                                       float end, float side) {
-            // aPosA
-            dst[off++] = (float)A.x; dst[off++] = (float)A.y; dst[off++] = (float)A.z;
-            // aPosB
-            dst[off++] = (float)B.x; dst[off++] = (float)B.y; dst[off++] = (float)B.z;
-            // aEnd, aSide
-            dst[off++] = end; dst[off++] = side;
-            return off;
+        @Override
+        protected VertexLayout.EdgeABLayout createLayout() {
+            return VertexLayout.EdgeABLayout.INSTANCE;
         }
+
         @Override
         public Builder self() {
             return this;
@@ -138,8 +145,57 @@ public class Mesh3DWireframe extends AbstractMesh3D<BaseMeshDrawArgs, WireframeS
         public Mesh3DWireframe create() {
             return new Mesh3DWireframe(this);
         }
+    }
 
+    private static float[] buildExpandedVertexData(
+            Vector3D[] verts, int[][] faces) {
+        return buildExpandedVertexData(verts, extractEdges(faces));
+    }
+
+    private static float[] buildExpandedVertexData(
+            Vector3D[] verts, ArrayList<int[]> edges) {
+        final int vertsPerEdge = 4;
+        final int floatsPerVert = 8;
+        float[] out = new float[edges.size() * vertsPerEdge * floatsPerVert];
+        int vFloat = 0;
+        for (int[] edge : edges) {
+            Vector3D a = verts[edge[0]];
+            Vector3D b = verts[edge[1]];
+            vFloat = putEdgeVert(out, vFloat, a, b, 0f, -1f);
+            vFloat = putEdgeVert(out, vFloat, a, b, 0f, +1f);
+            vFloat = putEdgeVert(out, vFloat, a, b, 1f, -1f);
+            vFloat = putEdgeVert(out, vFloat, a, b, 1f, +1f);
+        }
+        return out;
+    }
+
+    private static ArrayList<int[]> extractEdges(int[][] faces) {
+        ArrayList<int[]> edges = new ArrayList<>();
+        for (int[] face : faces) {
+            int n = face.length;
+            for (int k = 0; k < n; ++k) {
+                int i = face[k];
+                int j = face[(k + 1) % n];
+                if (i == j) {
+                    continue;
+                }
+                edges.add(new int[]{Math.min(i, j), Math.max(i, j)});
+            }
+        }
+        return edges;
+    }
+
+    private static int putEdgeVert(float[] dst, int off,
+                                   Vector3D a, Vector3D b,
+                                   float end, float side) {
+        dst[off++] = (float) a.x;
+        dst[off++] = (float) a.y;
+        dst[off++] = (float) a.z;
+        dst[off++] = (float) b.x;
+        dst[off++] = (float) b.y;
+        dst[off++] = (float) b.z;
+        dst[off++] = end;
+        dst[off++] = side;
+        return off;
     }
 }
-
-

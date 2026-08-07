@@ -133,18 +133,25 @@ public final class TextRenderer implements GPUResourceOwner {
         markDirty();
     }
 
+    public BitmapFont.TextMetrics measureText(String text, float scale) {
+        return font.measureText(text, scale);
+    }
+
     public void markDirty() {
         dirty = true;
     }
 
     public void draw() {
         if (labels.isEmpty()) return;
-        if (dirty) rebuildVertexBuffer();
+        boolean bufferChanged = dirty;
+        if (bufferChanged) rebuildVertexBuffer();
         if (vertexCount == 0) return;
 
         font.ensureTexture();
-        ensureVbo();
-        uploadBuffer();
+        boolean vboCreated = ensureVbo();
+        if (bufferChanged || vboCreated) {
+            uploadBuffer();
+        }
 
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);
         GLES20.glEnable(GLES20.GL_BLEND);
@@ -283,11 +290,12 @@ public final class TextRenderer implements GPUResourceOwner {
         vertexBuffer = bb.asFloatBuffer();
     }
 
-    private void ensureVbo() {
-        if (vboId != 0) return;
+    private boolean ensureVbo() {
+        if (vboId != 0) return false;
         int[] ids = new int[1];
         GLES20.glGenBuffers(1, ids, 0);
         vboId = ids[0];
+        return true;
     }
 
     private void uploadBuffer() {

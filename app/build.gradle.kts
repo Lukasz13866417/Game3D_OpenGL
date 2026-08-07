@@ -7,11 +7,14 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.game3d_opengl"
+        // A separate ID lets performance builds coexist with an installed APK that was
+        // signed by a different debug key: -PgameApplicationId=com.example.game3d_opengl.perf
+        applicationId = providers.gradleProperty("gameApplicationId")
+            .getOrElse("com.example.game3d_opengl")
         minSdk = 28
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.01"
 
         testInstrumentationRunner = "androidx.benchmark.junit4.AndroidBenchmarkRunner"
         // Fast smoke-run defaults for on-device benchmark iteration time.
@@ -34,7 +37,10 @@ android {
     }
 
     sourceSets {
-        getByName("main").java.srcDirs("src/main/java")
+        getByName("main") {
+            java.srcDirs("src/main/java")
+            assets.srcDirs("src/main/assets", "../wheel-mesh-lab/exports")
+        }
         getByName("test").java.srcDirs("src/test/java")
         getByName("androidTest").java.srcDirs("src/androidTest/java")
     }
@@ -44,6 +50,7 @@ android {
 
 dependencies {
 
+    implementation(project(":game-core"))
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.benchmark.common)

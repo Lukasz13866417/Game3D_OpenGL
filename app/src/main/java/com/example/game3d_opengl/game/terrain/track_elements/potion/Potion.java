@@ -4,18 +4,19 @@ import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
 import static com.example.game3d_opengl.game.util.GameMath.getNormal;
 
 import android.content.res.AssetManager;
+import android.opengl.Matrix;
 
 import com.example.game3d_opengl.game.player.player_character.Player;
-import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.ModelCreator;
-import com.example.game3d_opengl.rendering.infill.Mesh3DInfill;
+import com.example.game3d_opengl.rendering.util3d.PreparedModelData;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 
 import java.io.IOException;
 
-public class Potion extends Addon {
+public class Potion extends Addon
+        implements PotionBatchInstance {
 
     public static final float POTION_MODEL_WIDTH = 0.2f,
                                POTION_MODEL_HEIGHT = 0.62f,
@@ -24,19 +25,22 @@ public class Potion extends Addon {
     public static FColor POTION_FILL_COLOR = CLR(0.8f,0,0.8f,1);
     public static FColor POTION_EDGE_COLOR = CLR(1,1,1,1);
     
-    // Shared mesh for all potions
-    private static Mesh3DInfill sharedFill;
-    private static boolean assetsLoaded = false;
-    
-    // Instance-specific transform wrapper
-    private final UnbatchedObject3DWithOutline object3D;
-    
-    public static void LOAD_POTION_ASSETS(AssetManager assetManager){
-        if (assetsLoaded){
-            // Prevent loading multiple times. Always fail fast in this project
-            throw new IllegalStateException("Attempt to load twice");
-            // TODO slight improvement:  do the same in each LOAD_xxx_ASSETS.
-        };
+    private static PotionBatchRenderer defaultBatchRenderer;
+    private static PreparedModelData preparedPotionModel;
+
+    private PotionBatchRenderer batchRenderer;
+    private float objX;
+    private float objY;
+    private float objZ;
+    private float objYaw;
+
+    public static synchronized void preparePotionAssetsFromDisk(AssetManager assetManager) {
+        if (defaultBatchRenderer != null || preparedPotionModel != null) {
+            return;
+        }
+        if (assetManager == null) {
+            throw new IllegalArgumentException("AssetManager cannot be null");
+        }
         
         ModelCreator modelCreator = new ModelCreator(assetManager);
         try {
@@ -45,61 +49,91 @@ public class Potion extends Addon {
             modelCreator.scaleX(POTION_MODEL_WIDTH);
             modelCreator.scaleY(POTION_MODEL_HEIGHT);
             modelCreator.scaleZ(POTION_MODEL_WIDTH);
-            
-            // Build shared meshes once
-            sharedFill = new Mesh3DInfill.Builder()
-                    .verts(modelCreator.getVerts())
-                    .faces(modelCreator.getFaces())
-                    .fillColor(POTION_FILL_COLOR)
-                    .ambient(0.5f)
-                    .diffuse(0.7f)
-                    .specular(2.0f)
-                    .shininess(64f)
-                    .buildObject();
-
-            assetsLoaded = true;
+            preparedPotionModel = new PreparedModelData(
+                    modelCreator.getVerts(),
+                    modelCreator.getFaces(),
+                    modelCreator.hasNormals() ? modelCreator.getNormals() : null
+            );
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
+    public static synchronized boolean hasPreparedOrLoadedAssets() {
+        return defaultBatchRenderer != null || preparedPotionModel != null;
+    }
+
+    public static synchronized PotionBatchRenderer buildBatchRenderer(AssetManager assetManager) {
+        if (preparedPotionModel == null) {
+            preparePotionAssetsFromDisk(assetManager);
+        }
+        PotionBatchRenderer renderer = new PotionBatchRenderer(preparedPotionModel);
+        preparedPotionModel = null;
+        return renderer;
+    }
+
+    public static synchronized void installDefaultBatchRenderer(PotionBatchRenderer renderer) {
+        defaultBatchRenderer = renderer;
+    }
 
     public static Potion createPotion(){
-        assert sharedFill != null;
-        UnbatchedObject3DWithOutline obj3d =
-                                          UnbatchedObject3DWithOutline.wrap(sharedFill, null);
-        return new Potion(obj3d);
+        return new Potion();
     }
     
-    private Potion(UnbatchedObject3DWithOutline object3DWithOutline){
-        super();
-        this.object3D = object3DWithOutline;
+    private Potion(){
+        this(defaultBatchRenderer);
+    }
 
+    public Potion(PotionBatchRenderer batchRenderer) {
+        super();
+        this.batchRenderer = batchRenderer;
     }
     
     @Override
-    protected void onPlace(Vector3D fieldNearLeft, Vector3D fieldNearRight,
-                           Vector3D fieldFarLeft, Vector3D fieldFarRight) {
-        Vector3D fieldMid = fieldFarLeft.add(fieldFarRight)
-                .add(fieldNearRight).add(fieldNearLeft).div(4);
-        Vector3D out = getNormal(fieldNearLeft,fieldFarLeft,fieldFarRight).mult(-1);
-        Vector3D myMid = fieldMid.add(out.withLen(0.1f)).addY(POTION_MODEL_HEIGHT/2);
-        
-        if (object3D != null) {
-            object3D.objX = myMid.x;
-            object3D.objY = myMid.y;
-            object3D.objZ = myMid.z;
+    protected void onPlace(float nearLeftX, float nearLeftY, float nearLeftZ,
+                           float nearRightX, float nearRightY, float nearRightZ,
+                           float farLeftX, float farLeftY, float farLeftZ,
+                           float farRightX, float farRightY, float farRightZ) {
+        float fieldMidX = 0.25f * (farLeftX + farRightX + nearRightX + nearLeftX);
+        float fieldMidY = 0.25f * (farLeftY + farRightY + nearRightY + nearLeftY);
+        float fieldMidZ = 0.25f * (farLeftZ + farRightZ + nearRightZ + nearLeftZ);
+
+        float edge1X = farLeftX - nearLeftX;
+        float edge1Y = farLeftY - nearLeftY;
+        float edge1Z = farLeftZ - nearLeftZ;
+        float edge2X = farRightX - nearLeftX;
+        float edge2Y = farRightY - nearLeftY;
+        float edge2Z = farRightZ - nearLeftZ;
+        float normalX = edge1Y * edge2Z - edge1Z * edge2Y;
+        float normalY = edge1Z * edge2X - edge1X * edge2Z;
+        float normalZ = edge1X * edge2Y - edge1Y * edge2X;
+        float normalLen = (float) Math.sqrt(
+                normalX * normalX + normalY * normalY + normalZ * normalZ
+        );
+        if (normalLen > 1e-8f) {
+            float scale = -0.1f / normalLen;
+            objX = fieldMidX + normalX * scale;
+            objY = fieldMidY + normalY * scale + POTION_MODEL_HEIGHT / 2f;
+            objZ = fieldMidZ + normalZ * scale;
+            return;
         }
+
+        objX = fieldMidX;
+        objY = fieldMidY + POTION_MODEL_HEIGHT / 2f;
+        objZ = fieldMidZ;
     }
 
     @Override
     public void draw(float[] vpMatrix) {
-        object3D.draw(vpMatrix);
+        PotionBatchRenderer renderer = resolveBatchRenderer();
+        if (renderer != null) {
+            renderer.drawSingle(vpMatrix, this);
+        }
     }
 
     @Override
     public void updateBeforeDraw(float dtMillis) {
-        if (object3D != null) object3D.objYaw += dtMillis * 0.16f;
+        objYaw += dtMillis * 0.16f;
     }
 
     @Override
@@ -108,25 +142,53 @@ public class Potion extends Addon {
 
     @Override
     public void rebasePosition(Vector3D delta) {
-        if (delta == null || object3D == null) return;
-        object3D.objX += delta.x;
-        object3D.objY += delta.y;
-        object3D.objZ += delta.z;
+        if (delta == null) return;
+        objX += delta.x;
+        objY += delta.y;
+        objZ += delta.z;
     }
 
     @Override
     public void cleanupGPUResourcesRecursively() {
-        sharedFill.cleanupGPUResourcesRecursively();
+        // Renderer ownership lives outside the addon instance.
     }
 
     @Override
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
-        sharedFill.reloadGPUResourcesRecursivelyOnContextLoss();
+        // Renderer ownership lives outside the addon instance.
     }
 
 
     @Override
     public void accept(Player player) {
         player.interactWith(this);
+    }
+
+    public boolean usesBatchRenderer(PotionBatchRenderer renderer) {
+        if (renderer == null) {
+            return false;
+        }
+        if (batchRenderer == null) {
+            batchRenderer = defaultBatchRenderer;
+        }
+        return batchRenderer == renderer;
+    }
+
+    void writeModelMatrix(float[] outModel) {
+        Matrix.setIdentityM(outModel, 0);
+        Matrix.translateM(outModel, 0, objX, objY, objZ);
+        Matrix.rotateM(outModel, 0, objYaw, 0f, 1f, 0f);
+    }
+
+    @Override
+    public void writePotionModelMatrix(float[] outModel) {
+        writeModelMatrix(outModel);
+    }
+
+    private PotionBatchRenderer resolveBatchRenderer() {
+        if (batchRenderer == null) {
+            batchRenderer = defaultBatchRenderer;
+        }
+        return batchRenderer;
     }
 }

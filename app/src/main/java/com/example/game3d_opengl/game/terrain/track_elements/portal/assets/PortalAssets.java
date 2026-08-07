@@ -4,8 +4,7 @@ public final class PortalAssets {
     private PortalAssets() {}
 
     public static PortalAsset createPortalAsset() {
-        return new SpikedTorusPortalAsset();
-        // return new TriambicIcosahedronPortalAsset();
+        return new BeaconPortalAsset();
     }
 }
 

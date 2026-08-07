@@ -6,13 +6,17 @@ import android.opengl.Matrix;
 
 import com.example.game3d_opengl.game.terrain.track_elements.portal.PortalLightingEnvironment;
 import com.example.game3d_opengl.rendering.RenderConfig;
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
 import com.example.game3d_opengl.rendering.mesh.BaseMeshDrawArgs;
-import com.example.game3d_opengl.rendering.shader.ShaderPair;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
-public class Mesh3DInfill extends AbstractMesh3D<BaseMeshDrawArgs, ShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS>> {
+public class Mesh3DInfill extends AbstractMesh3D<
+        BaseMeshDrawArgs,
+        MeshShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS, VertexLayout.PositionNormalLayout>,
+        VertexLayout.PositionNormalLayout> {
 
     public Mesh3DInfill(Builder builder){
         super(builder);
@@ -23,17 +27,39 @@ public class Mesh3DInfill extends AbstractMesh3D<BaseMeshDrawArgs, ShaderPair<In
         this.shininess = builder.shininess;
     }
 
-    private final FColor fillColor;
+    private static final FColor WHITE = CLR(1f, 1f, 1f, 1f);
+
+    private FColor fillColor;
     private final float ambient, diffuse, specular, shininess;
 
     private final float[] tmpMvp = new float[16];
     private final float[] identityMatrix = new float[16];
+    private final InfillShaderArgs.VS vs = new InfillShaderArgs.VS();
+    private final InfillShaderArgs.FS fs = new InfillShaderArgs.FS();
+
+    public void setFillColor(FColor fillColor) {
+        if (fillColor != null) {
+            this.fillColor = fillColor;
+        }
+    }
 
     @Override
-    protected void setVariableArgsValues(BaseMeshDrawArgs args, ShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS> s) {
-        InfillShaderArgs.VS vs = new InfillShaderArgs.VS();
-        InfillShaderArgs.FS fs = new InfillShaderArgs.FS();
-        fs.color = fillColor != null ? fillColor : CLR(1,1,1,1);
+    protected void setVariableArgsValues(
+            BaseMeshDrawArgs args,
+            MeshShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS, VertexLayout.PositionNormalLayout> s) {
+        fs.color = fillColor != null ? fillColor : WHITE;
+        fs.lightX = 0f;
+        fs.lightY = 0f;
+        fs.lightZ = 0f;
+        fs.cameraX = 0f;
+        fs.cameraY = 0f;
+        fs.cameraZ = 0f;
+        fs.isDepthPass = 0;
+        fs.opacityMultiplier = args != null ? args.opacityMultiplier : 1f;
+        vs.spinAngleStartRadians =
+                args != null ? args.spinAngleStartRadians : 0f;
+        vs.spinAngleStepRadians =
+                args != null ? args.spinAngleStepRadians : 0f;
 
         if (args.model != null) {
             Matrix.multiplyMM(tmpMvp, 0, args.vp, 0, args.model, 0);
@@ -49,7 +75,7 @@ public class Mesh3DInfill extends AbstractMesh3D<BaseMeshDrawArgs, ShaderPair<In
             if (cameraPos != null) {
                 fs.cameraX = cameraPos.x; fs.cameraY = cameraPos.y; fs.cameraZ = cameraPos.z;
             }
-            fs.lightColor = lightColor != null ? lightColor : CLR(1f, 1f, 1f, 1f);
+            fs.lightColor = lightColor != null ? lightColor : WHITE;
             fs.ambient = ambient;
             fs.diffuse = diffuse;
             fs.specular = specular;
@@ -58,7 +84,7 @@ public class Mesh3DInfill extends AbstractMesh3D<BaseMeshDrawArgs, ShaderPair<In
             vs.mvp = args.vp;
             Matrix.setIdentityM(identityMatrix, 0);
             vs.modelMatrix = identityMatrix;
-            fs.lightColor = CLR(1f, 1f, 1f, 1f);
+            fs.lightColor = WHITE;
             fs.ambient = 1f;
             fs.diffuse = 0f;
             fs.specular = 0f;
@@ -68,7 +94,12 @@ public class Mesh3DInfill extends AbstractMesh3D<BaseMeshDrawArgs, ShaderPair<In
         s.setArgs(vs, fs);
     }
 
-    public static class Builder extends BaseBuilder<Mesh3DInfill, Builder, ShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS>> {
+    public static class Builder extends BaseBuilder<
+            Mesh3DInfill,
+            Builder,
+            BaseMeshDrawArgs,
+            MeshShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS, VertexLayout.PositionNormalLayout>,
+            VertexLayout.PositionNormalLayout> {
         private FColor fillColor = CLR(1,1,1,1);
         private Vector3D[] suppliedNormals;
         private float ambient = 0.4f;
@@ -224,6 +255,11 @@ public class Mesh3DInfill extends AbstractMesh3D<BaseMeshDrawArgs, ShaderPair<In
                 }
             }
             return normals;
+        }
+
+        @Override
+        protected VertexLayout.PositionNormalLayout createLayout() {
+            return VertexLayout.PositionNormalLayout.INSTANCE;
         }
 
         @Override

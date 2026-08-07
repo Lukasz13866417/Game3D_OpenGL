@@ -1,0 +1,52 @@
+newmtl violet_core
+Ka 0.035 0.028 0.045
+Kd 0.035 0.028 0.045
+Ks 0 0 0
+Ns 1
+d 1
+
+newmtl violet_glow_primary
+Ka 0.5 0.22 0.82
+Kd 0.5 0.22 0.82
+Ks 0 0 0
+Ns 1
+Ke 0.5 0.22 0.82
+d 1
+
+newmtl violet_glow_secondary
+Ka 0.5 0.22 0.82
+Kd 0.5 0.22 0.82
+Ks 0 0 0
+Ns 1
+Ke 0.5 0.22 0.82
+d 1
+
+newmtl violet_glow_detail
+Ka 0.5 0.22 0.82
+Kd 0.5 0.22 0.82
+Ks 0 0 0
+Ns 1
+Ke 0.5 0.22 0.82
+d 1
+
+newmtl violet_armor
+Ka 0.0336 0.0304 0.04
+Kd 0.105 0.095 0.125
+Ks 0.07 0.07 0.07
+Ns 10
+d 1
+
+newmtl violet_hub
+Ka 0.0425 0.0391 0.0493
+Kd 0.125 0.115 0.145
+Ks 0.16 0.16 0.16
+Ns 24
+d 1
+
+newmtl violet_energy
+Ka 0.5 0.22 0.82
+Kd 0.5 0.22 0.82
+Ks 0 0 0
+Ns 1
+Ke 0.5 0.22 0.82
+d 1

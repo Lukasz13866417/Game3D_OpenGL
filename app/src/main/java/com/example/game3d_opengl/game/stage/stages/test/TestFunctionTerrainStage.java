@@ -57,7 +57,13 @@ public class TestFunctionTerrainStage extends Stage {
                 new LightSource(new FColor(1.0f,0,0))
         );
 
-        terrain.enqueueStructure(new TerrainFunction(20,x -> 0.1f*(float)sqrt(x),0,2));
+        terrain.enqueueStructure(
+                TerrainFunction.builder()
+                        .tilesToMake(20)
+                        .function(x -> 0.1f * (float) sqrt(x))
+                        .xRange(0f, 2f)
+                        .build()
+        );
 
         /*System.out.println("TILE COUNT: "+terrain.getTileCount());
         for (int i = 0; i < terrain.getTileCount(); ++i) {
@@ -81,17 +87,12 @@ public class TestFunctionTerrainStage extends Stage {
     }
 
     @Override
-    public void onClose() {
+    protected void onDeactivated(DeactivationReason reason) {
 
     }
 
     @Override
-    public void onSwitch() {
-
-    }
-
-    @Override
-    public void onReturn() {
+    protected void onActivated(ActivationReason reason) {
 
     }
 

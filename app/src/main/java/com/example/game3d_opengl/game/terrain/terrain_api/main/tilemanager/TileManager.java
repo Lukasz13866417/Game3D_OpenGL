@@ -3,7 +3,7 @@ package com.example.game3d_opengl.game.terrain.terrain_api.main.tilemanager;
 import static com.example.game3d_opengl.game.util.GameMath.EPSILON;
 import static com.example.game3d_opengl.game.util.GameMath.NINF;
 import static com.example.game3d_opengl.game.util.GameMath.PI;
-import static com.example.game3d_opengl.game.util.GameMath.rotateAroundAxis;
+import static com.example.game3d_opengl.game.util.GameMath.rotateAroundAxisTo;
 import static com.example.game3d_opengl.game.util.GameMath.roundToDecimals;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import static java.lang.Math.abs;
@@ -12,11 +12,13 @@ import static java.lang.Math.round;
 
 import com.example.game3d_opengl.game.pooling.PooledSlotLease;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.TileProfile;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.TerrainGridField;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.FixedMaxSizeDeque;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.OverflowingPreallocatedRowInfoBuffer;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.OverflowingPreallocatedSegmentHistoryBuffer;
 import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.TerrainLandscapeRenderer;
+import com.example.game3d_opengl.game.util.GameMath.MutableVec3;
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -52,6 +54,11 @@ public class TileManager implements GPUResourceOwner {
     private float dHorizontalAng = 0f, currHorizontalAng = 0f, currVerticalAng = 0f;
     private float pendingLift = 0f;
     private long nextId = 0L;
+    private int removedTileCount = 0;
+    private final MutableVec3 scratchRotatedLeft = new MutableVec3();
+    private final MutableVec3 scratchRotatedRight = new MutableVec3();
+    private final MutableVec3 scratchForwardDir = new MutableVec3();
+    private final MutableVec3 scratchTiltedDir = new MutableVec3();
 
     /**
      * "Upcoming" alphas applied to vertices pushed to {@link TerrainLandscapeRenderer}.
@@ -59,6 +66,8 @@ public class TileManager implements GPUResourceOwner {
      * accidentally apply these upcoming alphas to the *previous* tile.
      */
     private float alphaL = 1, alphaR = 1;
+    private TileProfile upcomingTileProfile = TileProfile.NORMAL;
+    private float upcomingBrightnessMultiplier = TileProfile.NORMAL.getBrightnessMultiplier();
 
     // ============================================================================
     // PUBLIC CONSTRUCTOR
@@ -140,32 +149,74 @@ public class TileManager implements GPUResourceOwner {
 
         Vector3D l1 = lastTile.farLeft;
         Vector3D r1 = lastTile.farRight;
+        float l1x = l1.x;
+        float l1y = l1.y;
+        float l1z = l1.z;
+        float r1x = r1.x;
+        float r1y = r1.y;
+        float r1z = r1.z;
+        float midX = 0.5f * (l1x + r1x);
+        float midY = 0.5f * (l1y + r1y);
+        float midZ = 0.5f * (l1z + r1z);
 
-        Vector3D axis = V3(0, -1, 0);
-
-        Vector3D mid = l1.add(r1).div(2);
-
-        Vector3D newL1 = rotateAroundAxis(mid,axis,l1,dHorizontalAng);
-        Vector3D newR1 = rotateAroundAxis(mid,axis,r1,dHorizontalAng);
+        rotateAroundAxisTo(
+                scratchRotatedLeft,
+                midX, midY, midZ,
+                0f, -1f, 0f,
+                l1x, l1y, l1z,
+                dHorizontalAng
+        );
+        rotateAroundAxisTo(
+                scratchRotatedRight,
+                midX, midY, midZ,
+                0f, -1f, 0f,
+                r1x, r1y, r1z,
+                dHorizontalAng
+        );
 
         dHorizontalAng = 0.0f;
 
-        Vector3D dir = rotateAroundAxis(
-                V3(0,0,0),
-                V3(0,-1,0),
-                newR1.sub(newL1),
-                -PI/2
-        ).withLen(segLength);
-
-        dir = rotateAroundAxis(
-                V3(0,0,0),
-                newR1.sub(newL1),
-                dir,
+        float edgeX = scratchRotatedRight.x - scratchRotatedLeft.x;
+        float edgeY = scratchRotatedRight.y - scratchRotatedLeft.y;
+        float edgeZ = scratchRotatedRight.z - scratchRotatedLeft.z;
+        rotateAroundAxisTo(
+                scratchForwardDir,
+                0f, 0f, 0f,
+                0f, -1f, 0f,
+                edgeX, edgeY, edgeZ,
+                -PI / 2f
+        );
+        float horizontalDirLen = (float) Math.sqrt(
+                scratchForwardDir.x * scratchForwardDir.x
+                        + scratchForwardDir.y * scratchForwardDir.y
+                        + scratchForwardDir.z * scratchForwardDir.z
+        );
+        float forwardScale = horizontalDirLen > EPSILON ? segLength / horizontalDirLen : 0f;
+        scratchForwardDir.x *= forwardScale;
+        scratchForwardDir.y *= forwardScale;
+        scratchForwardDir.z *= forwardScale;
+        rotateAroundAxisTo(
+                scratchTiltedDir,
+                0f, 0f, 0f,
+                edgeX, edgeY, edgeZ,
+                scratchForwardDir.x, scratchForwardDir.y, scratchForwardDir.z,
                 currVerticalAng
         );
 
-        Vector3D l2 = newL1.add(dir);
-        Vector3D r2 = newR1.add(dir);
+        float newL1x = scratchRotatedLeft.x;
+        float newL1y = scratchRotatedLeft.y;
+        float newL1z = scratchRotatedLeft.z;
+        float newR1x = scratchRotatedRight.x;
+        float newR1y = scratchRotatedRight.y;
+        float newR1z = scratchRotatedRight.z;
+        float l2x = newL1x + scratchTiltedDir.x;
+        float l2y = newL1y + scratchTiltedDir.y;
+        float l2z = newL1z + scratchTiltedDir.z;
+        float r2x = newR1x + scratchTiltedDir.x;
+        float r2y = newR1y + scratchTiltedDir.y;
+        float r2z = newR1z + scratchTiltedDir.z;
+        Vector3D rewrittenFarLeft = V3(newL1x, newL1y, newL1z);
+        Vector3D rewrittenFarRight = V3(newR1x, newR1y, newR1z);
 
 
         // Update the last tile's far edge by replacing it with [newL1,newR1].
@@ -177,27 +228,31 @@ public class TileManager implements GPUResourceOwner {
         boolean wasLastLiftedUp = lastHistory.isFirstLiftedUp;
         final float lastAlphaL = lastHistory.alphaL;
         final float lastAlphaR = lastHistory.alphaR;
+        final float lastBrightnessMultiplier = lastHistory.brightnessMultiplier;
         Tile oldLast = removeLastTile();
+        TileProfile lastProfile = oldLast.getProfile();
 
         isReAdded = true;
         if(tiles.isEmpty()){ // re-adding guardian - oldLast.isEmptySegment() -> true
             // so oldLast.isFirstLiftedUp() -> false, and isFirstLiftedUp doesn't matter
-            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, newR1,
+            addTile(oldLast.nearLeft, oldLast.nearRight, rewrittenFarLeft, rewrittenFarRight,
                     oldLast.isEmptySegment(), false, false,
-                    lastAlphaL, lastAlphaR);
+                    lastAlphaL, lastAlphaR, lastProfile, lastBrightnessMultiplier);
         }else{
-            addTile(oldLast.nearLeft, oldLast.nearRight, newL1, newR1,
+            addTile(oldLast.nearLeft, oldLast.nearRight, rewrittenFarLeft, rewrittenFarRight,
                     oldLast.isEmptySegment(),
                     tiles.getLast().isEmptySegment(),
                     wasLastLiftedUp,
-                    lastAlphaL, lastAlphaR);
+                    lastAlphaL, lastAlphaR, lastProfile, lastBrightnessMultiplier);
         }
         isReAdded = false;
 
-        Vector3D nL = newL1.addY(pendingLift);
-        Vector3D nR = newR1.addY(pendingLift);
-        Vector3D fL = l2.addY(pendingLift);
-        Vector3D fR = r2.addY(pendingLift);
+        float lift = pendingLift;
+        boolean hasLift = abs(lift) > EPSILON;
+        Vector3D nL = hasLift ? V3(newL1x, newL1y + lift, newL1z) : rewrittenFarLeft;
+        Vector3D nR = hasLift ? V3(newR1x, newR1y + lift, newR1z) : rewrittenFarRight;
+        Vector3D fL = V3(l2x, l2y + lift, l2z);
+        Vector3D fR = V3(r2x, r2y + lift, r2z);
 
         /*assert(testParallel(
                 (fL.sub(nL)),
@@ -213,9 +268,9 @@ public class TileManager implements GPUResourceOwner {
                 fR,
                 isEmpty,
                 oldLast.isEmptySegment(),
-                (abs(pendingLift) > EPSILON),
+                hasLift,
                 // use current upcoming alphas for the NEW tile
-                alphaL, alphaR);
+                alphaL, alphaR, upcomingTileProfile, upcomingBrightnessMultiplier);
 
         pendingLift = 0;
     }
@@ -245,13 +300,13 @@ public class TileManager implements GPUResourceOwner {
     public void removeOldTiles(long oldestAcceptable) {
         // If first tile is far from player, this it has been visited a long time ago
         // In that case, it can be removed because we are sure it wont be displayed anymore.
-        System.out.println("%%%"+oldestAcceptable+ " "+tiles.getFirst().getID());
         while (tiles.size() > 1
                 && (tiles.getFirst().isEmptySegment() || tiles.getFirst().getID() < oldestAcceptable)) {
             if(!tiles.getFirst().isEmptySegment()) {
                 landscapeRenderer.popFront();
             }
             tiles.popFirst();
+            removedTileCount++;
         }
     }
 
@@ -289,8 +344,57 @@ public class TileManager implements GPUResourceOwner {
         return tiles.size();
     }
 
+    public int getFirstVisibleTileAbsoluteIndex() {
+        return tiles.isEmpty() ? -1 : removedTileCount;
+    }
+
+    public int getAbsoluteTileIndexForVisibleIndex(int visibleTileIndex) {
+        if (visibleTileIndex < 0 || visibleTileIndex >= tiles.size()) {
+            throw new IndexOutOfBoundsException(
+                    "Visible tile index " + visibleTileIndex + " out of bounds for size " + tiles.size()
+            );
+        }
+        return removedTileCount + visibleTileIndex;
+    }
+
+    public int getLastGeneratedTileIndex() {
+        return tiles.isEmpty() ? -1 : removedTileCount + tiles.size() - 1;
+    }
+
     public Tile getTile(int i) {
         return tiles.get(i);
+    }
+
+    public int findLastTileIndexAtOrBefore(long tileId) {
+        int low = 0;
+        int high = tiles.size() - 1;
+        int best = -1;
+        while (low <= high) {
+            int mid = (low + high) >>> 1;
+            long midId = tiles.get(mid).getID();
+            if (midId <= tileId) {
+                best = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return best;
+    }
+
+    public int getAbsoluteTileIndexAtOrBefore(long tileId) {
+        if (tiles.isEmpty()) {
+            return -1;
+        }
+        int visibleIdx = tileId >= 0 ? findLastTileIndexAtOrBefore(tileId) : -1;
+        if (visibleIdx < 0) {
+            return getFirstVisibleTileAbsoluteIndex();
+        }
+        return getAbsoluteTileIndexForVisibleIndex(visibleIdx);
+    }
+
+    public float getSegmentLength() {
+        return segLength;
     }
 
     public long getTileIdForRow(int row) {
@@ -311,18 +415,15 @@ public class TileManager implements GPUResourceOwner {
      * farRight = (row, col) bottom
      */
     public TerrainGridField getField(int row, int col) {
-        GridRowInfo info = rowInfoBuffer.get(row - 1);
-        Vector3D p0 = getGridPoint(info, col - 1, true);
-        Vector3D p1 = getGridPoint(info, col, true);
-        Vector3D p2 = getGridPoint(info, col, false);
-        Vector3D p3 = getGridPoint(info, col - 1, false);
+        float[] corners = new float[12];
+        writeFieldCorners(row, col, corners);
 
         // nearLeft=p0, nearRight=p1, farLeft=p3, farRight=p2.
         return new TerrainGridField(
-                p0, /* nearLeft */
-                p1, /* nearRight */
-                p3, /* farLeft */
-                p2  /* farRight */
+                V3(corners[0], corners[1], corners[2]),
+                V3(corners[3], corners[4], corners[5]),
+                V3(corners[6], corners[7], corners[8]),
+                V3(corners[9], corners[10], corners[11])
         );
     }
 
@@ -339,19 +440,53 @@ public class TileManager implements GPUResourceOwner {
         assert length >= 1;
         assert startCol + length - 1 <= nCols;
 
-        TerrainGridField left = getField(row, startCol);
-        TerrainGridField right = getField(row, startCol + length - 1);
+        float[] corners = new float[12];
+        writeHorizontalRegionFieldCorners(row, startCol, length, corners);
         return new TerrainGridField(
-                left.nearLeft,
-                right.nearRight,
-                left.farLeft,
-                right.farRight
+                V3(corners[0], corners[1], corners[2]),
+                V3(corners[3], corners[4], corners[5]),
+                V3(corners[6], corners[7], corners[8]),
+                V3(corners[9], corners[10], corners[11])
         );
+    }
+
+    public void writeFieldCorners(int row, int col, float[] outCorners) {
+        if (outCorners == null || outCorners.length < 12) {
+            throw new IllegalArgumentException("outCorners must contain at least 12 floats");
+        }
+        GridRowInfo info = rowInfoBuffer.get(row - 1);
+        writeGridPoint(info, col - 1, true, outCorners, 0);
+        writeGridPoint(info, col, true, outCorners, 3);
+        writeGridPoint(info, col - 1, false, outCorners, 6);
+        writeGridPoint(info, col, false, outCorners, 9);
+    }
+
+    public void writeHorizontalRegionFieldCorners(int row, int startCol, int length, float[] outCorners) {
+        assert row >= 1 && row <= rowInfoBuffer.size();
+        assert startCol >= 1 && startCol <= nCols;
+        assert length >= 1;
+        assert startCol + length - 1 <= nCols;
+        if (outCorners == null || outCorners.length < 12) {
+            throw new IllegalArgumentException("outCorners must contain at least 12 floats");
+        }
+        GridRowInfo info = rowInfoBuffer.get(row - 1);
+        writeGridPoint(info, startCol - 1, true, outCorners, 0);
+        writeGridPoint(info, startCol + length - 1, true, outCorners, 3);
+        writeGridPoint(info, startCol - 1, false, outCorners, 6);
+        writeGridPoint(info, startCol + length - 1, false, outCorners, 9);
     }
 
     public void setUpcomingAlphas(float alphaL, float alphaR){
         this.alphaL = alphaL;
         this.alphaR = alphaR;
+    }
+
+    public void setUpcomingTileProfile(TileProfile profile) {
+        upcomingTileProfile = profile != null ? profile : TileProfile.NORMAL;
+    }
+
+    public void setUpcomingBrightnessMultiplier(float brightnessMultiplier) {
+        upcomingBrightnessMultiplier = brightnessMultiplier;
     }
 
     // ============================================================================
@@ -362,7 +497,19 @@ public class TileManager implements GPUResourceOwner {
      * Helper: builds a new tile and fully integrates it with row/buffer tracking.
      */
     private void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, boolean isEmptySegment, boolean wasPreviousEmpty, boolean isFirstLiftedUp) {
-        addTile(nl, nr, fl, fr, isEmptySegment, wasPreviousEmpty, isFirstLiftedUp, alphaL, alphaR);
+        addTile(
+                nl,
+                nr,
+                fl,
+                fr,
+                isEmptySegment,
+                wasPreviousEmpty,
+                isFirstLiftedUp,
+                alphaL,
+                alphaR,
+                upcomingTileProfile,
+                upcomingBrightnessMultiplier
+        );
     }
 
     /**
@@ -371,20 +518,40 @@ public class TileManager implements GPUResourceOwner {
      */
     private void addTile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr,
                          boolean isEmptySegment, boolean wasPreviousEmpty, boolean isFirstLiftedUp,
-                         float alphaLUsed, float alphaRUsed) {
+                         float alphaLUsed, float alphaRUsed, TileProfile tileProfileUsed,
+                         float brightnessMultiplierUsed) {
 
-        Tile tile = new Tile(nl, nr, fl, fr, nextId++, isEmptySegment);
+        TileProfile safeProfile = tileProfileUsed != null ? tileProfileUsed : TileProfile.NORMAL;
+        Tile tile = new Tile(
+                nl, nr, fl, fr, nextId++, isEmptySegment, safeProfile, brightnessMultiplierUsed
+        );
         assert tiles.isEmpty() || tile.getID() > tiles.getLast().getID();
         tiles.pushBack(tile);
         if(!isEmptySegment) {
             if (wasPreviousEmpty || isFirstLiftedUp) {
                 landscapeRenderer.newStrip();
-                landscapeRenderer.pushBack(nl, nr, alphaLUsed, alphaRUsed);
+                landscapeRenderer.pushBack(
+                        nl,
+                        nr,
+                        alphaLUsed,
+                        alphaRUsed,
+                        brightnessMultiplierUsed,
+                        brightnessMultiplierUsed
+                );
             }
-            landscapeRenderer.pushBack(fl, fr, alphaLUsed, alphaRUsed);
+            landscapeRenderer.pushBack(
+                    fl,
+                    fr,
+                    alphaLUsed,
+                    alphaRUsed,
+                    brightnessMultiplierUsed,
+                    brightnessMultiplierUsed
+            );
         }
 
-        generateRowsForTile(tile, wasPreviousEmpty, isFirstLiftedUp, alphaLUsed, alphaRUsed);
+        generateRowsForTile(
+                tile, wasPreviousEmpty, isFirstLiftedUp, alphaLUsed, alphaRUsed, brightnessMultiplierUsed
+        );
 
         lastTile = tile;
     }
@@ -418,7 +585,8 @@ public class TileManager implements GPUResourceOwner {
 
 
     private void generateRowsForTile(Tile tile, boolean wasPreviousEmpty, boolean isFirstLiftedUp,
-                                     float alphaLUsed, float alphaRUsed) {
+                                     float alphaLUsed, float alphaRUsed,
+                                     float brightnessMultiplierUsed) {
         // Currently, row ends are spaced by rowSpacing only on the longer side.
         // On the shorter side, they are spaced proportionally more densely.
         // But there might be another approach.
@@ -428,24 +596,36 @@ public class TileManager implements GPUResourceOwner {
         Vector3D nr = tile.nearRight;
         Vector3D fl = tile.farLeft;
         Vector3D fr = tile.farRight;
-        Vector3D el = fl.sub(nl);
-        Vector3D er = fr.sub(nr);
-        float elL = (float) Math.sqrt(el.sqlen());
-        float elR = (float) Math.sqrt(er.sqlen());
+        final long tileId = tile.getID();
+        final float nlx = nl.x, nly = nl.y, nlz = nl.z;
+        final float nrx = nr.x, nry = nr.y, nrz = nr.z;
+        final float flx = fl.x, fly = fl.y, flz = fl.z;
+        final float frx = fr.x, fry = fr.y, frz = fr.z;
+
+        final float elx = flx - nlx;
+        final float ely = fly - nly;
+        final float elz = flz - nlz;
+        final float erx = frx - nrx;
+        final float ery = fry - nry;
+        final float erz = frz - nrz;
+        final float elL = (float) Math.sqrt(elx * elx + ely * ely + elz * elz);
+        final float elR = (float) Math.sqrt(erx * erx + ery * ery + erz * erz);
 
         if (tile.isEmptySegment()) {
             segmentHistoryBuffer.add(
                     true,
                     false,
                     0,
-                    nl.x, nl.y, nl.z,
-                    nr.x, nr.y, nr.z,
-                    fl.x, fl.y, fl.z,
-                    fr.x, fr.y, fr.z,
-                    fl.x, fl.y, fl.z,
-                    fr.x, fr.y, fr.z,
+                    nlx, nly, nlz,
+                    nrx, nry, nrz,
+                    flx, fly, flz,
+                    frx, fry, frz,
+                    flx, fly, flz,
+                    frx, fry, frz,
                     0,
-                    alphaLUsed, alphaRUsed
+                    alphaLUsed, alphaRUsed,
+                    tile.getProfile(),
+                    brightnessMultiplierUsed
             );
             return;
         }
@@ -469,50 +649,87 @@ public class TileManager implements GPUResourceOwner {
             longerLen = elR;
         }
 
-        Vector3D lastNL = V3(lastSegmentInfo.lastLx, lastSegmentInfo.lastLy, lastSegmentInfo.lastLz);
-        Vector3D lastNR = V3(lastSegmentInfo.lastRx, lastSegmentInfo.lastRy, lastSegmentInfo.lastRz);
+        float lastNLx = lastSegmentInfo.lastLx;
+        float lastNLy = lastSegmentInfo.lastLy;
+        float lastNLz = lastSegmentInfo.lastLz;
+        float lastNRx = lastSegmentInfo.lastRx;
+        float lastNRy = lastSegmentInfo.lastRy;
+        float lastNRz = lastSegmentInfo.lastRz;
         if(wasPreviousEmpty || isFirstLiftedUp){
-            lastNL = nl;
-            lastNR = nr;
+            lastNLx = nlx;
+            lastNLy = nly;
+            lastNLz = nlz;
+            lastNRx = nrx;
+            lastNRy = nry;
+            lastNRz = nrz;
         }
-        assert lastNL != null;
         for(; distLonger < longerLen; distLonger += rowSpacing){
-            Vector3D currNL, currNR;
+            float currNLx, currNLy, currNLz;
+            float currNRx, currNRy, currNRz;
             if(isLeftLonger){
-                currNL = nl.add(el.withLen(distLonger));
-                currNR = nr.add(er.withLen(distShorter));
+                float leftScale = distLonger / elL;
+                float rightScale = distShorter / elR;
+                currNLx = nlx + elx * leftScale;
+                currNLy = nly + ely * leftScale;
+                currNLz = nlz + elz * leftScale;
+                currNRx = nrx + erx * rightScale;
+                currNRy = nry + ery * rightScale;
+                currNRz = nrz + erz * rightScale;
             }else{
-                currNL = nl.add(el.withLen(distShorter));
-                currNR = nr.add(er.withLen(distLonger));
+                float leftScale = distShorter / elL;
+                float rightScale = distLonger / elR;
+                currNLx = nlx + elx * leftScale;
+                currNLy = nly + ely * leftScale;
+                currNLz = nlz + elz * leftScale;
+                currNRx = nrx + erx * rightScale;
+                currNRy = nry + ery * rightScale;
+                currNRz = nrz + erz * rightScale;
             }
             distShorter += spacingShorter;
             rowInfoBuffer.add(
-                    tile.getID(),
-                    lastNL.x, lastNL.y, lastNL.z,
-                    lastNR.x, lastNR.y, lastNR.z,
-                    currNL.x, currNL.y, currNL.z,
-                    currNR.x, currNR.y, currNR.z
+                    tileId,
+                    lastNLx, lastNLy, lastNLz,
+                    lastNRx, lastNRy, lastNRz,
+                    currNLx, currNLy, currNLz,
+                    currNRx, currNRy, currNRz
             );
-            lastNL = currNL;
-            lastNR = currNR;
+            lastNLx = currNLx;
+            lastNLy = currNLy;
+            lastNLz = currNLz;
+            lastNRx = currNRx;
+            lastNRy = currNRy;
+            lastNRz = currNRz;
             ++cntRows;
         }
 
-        float ourLeftover = (float)(Math.sqrt(isLeftLonger ? fl.sub(lastNL).sqlen() : fr.sub(lastNR).sqlen()));
+        float ourLeftover;
+        if (isLeftLonger) {
+            float dx = flx - lastNLx;
+            float dy = fly - lastNLy;
+            float dz = flz - lastNLz;
+            ourLeftover = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        } else {
+            float dx = frx - lastNRx;
+            float dy = fry - lastNRy;
+            float dz = frz - lastNRz;
+            ourLeftover = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        }
         assert ourLeftover >= 0;
 
         segmentHistoryBuffer.add(
                 false,
                 isFirstLiftedUp,
                 cntRows,
-                nl.x, nl.y, nl.z,
-                nr.x, nr.y, nr.z,
-                fl.x, fl.y, fl.z,
-                fr.x, fr.y, fr.z,
-                lastNL.x, lastNL.y, lastNL.z,
-                lastNR.x, lastNR.y, lastNR.z,
+                nlx, nly, nlz,
+                nrx, nry, nrz,
+                flx, fly, flz,
+                frx, fry, frz,
+                lastNLx, lastNLy, lastNLz,
+                lastNRx, lastNRy, lastNRz,
                 ourLeftover,
-                alphaLUsed, alphaRUsed);
+                alphaLUsed, alphaRUsed,
+                tile.getProfile(),
+                brightnessMultiplierUsed);
     }
 
     public void printTiles(){
@@ -625,6 +842,34 @@ public class TileManager implements GPUResourceOwner {
         );
     }
 
+    private void writeGridPoint(GridRowInfo rowInfo, int c, boolean isTop, float[] out, int offset) {
+        float t = (float) c / nCols;
+        float lx;
+        float ly;
+        float lz;
+        float rx;
+        float ry;
+        float rz;
+        if (isTop) {
+            lx = rowInfo.LSx;
+            ly = rowInfo.LSy;
+            lz = rowInfo.LSz;
+            rx = rowInfo.RSx;
+            ry = rowInfo.RSy;
+            rz = rowInfo.RSz;
+        } else {
+            lx = rowInfo.LS_lastx;
+            ly = rowInfo.LS_lasty;
+            lz = rowInfo.LS_lastz;
+            rx = rowInfo.RS_lastx;
+            ry = rowInfo.RS_lasty;
+            rz = rowInfo.RS_lastz;
+        }
+        out[offset] = lx + (rx - lx) * t;
+        out[offset + 1] = ly + (ry - ly) * t;
+        out[offset + 2] = lz + (rz - lz) * t;
+    }
+
     public void updateBeforeDraw(float dt){
     }
 
@@ -696,6 +941,8 @@ public class TileManager implements GPUResourceOwner {
         public int rowsAddedCnt = 0;
         /** Alphas used for this tile's ribbon vertices (left/right). */
         public float alphaL = 1f, alphaR = 1f;
+        public TileProfile tileProfile = TileProfile.NORMAL;
+        public float brightnessMultiplier = TileProfile.NORMAL.getBrightnessMultiplier();
         public float nLx = 0f, nLy = 0f, nLz = 0f;
         public float nRx = 0f, nRy = 0f, nRz = 0f;
         public float fLx = 0f, fLy = 0f, fLz = 0f;
@@ -719,7 +966,9 @@ public class TileManager implements GPUResourceOwner {
                         float lastLx, float lastLy, float lastLz,
                         float lastRx, float lastRy, float lastRz,
                         float leftover,
-                        float alphaL, float alphaR) {
+                        float alphaL, float alphaR,
+                        TileProfile tileProfile,
+                        float brightnessMultiplier) {
             this.isEmpty = isEmpty;
             this.isFirstLiftedUp = isFirstLiftedUp;
             this.rowsAddedCnt = rowsAddedCnt;
@@ -744,6 +993,8 @@ public class TileManager implements GPUResourceOwner {
             this.leftover = leftover;
             this.alphaL = alphaL;
             this.alphaR = alphaR;
+            this.tileProfile = tileProfile != null ? tileProfile : TileProfile.NORMAL;
+            this.brightnessMultiplier = brightnessMultiplier;
         }
     }
 

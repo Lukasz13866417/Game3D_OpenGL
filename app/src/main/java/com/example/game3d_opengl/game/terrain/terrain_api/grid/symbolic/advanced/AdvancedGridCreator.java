@@ -3,6 +3,8 @@ package com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advance
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.BaseGridCreator;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridSegment;
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.RetainedGridSummary;
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.GridBuildScratch;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.GridSegmentSink;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.PartialSegmentHandlerResourcePack;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_end_pos.EndPosTreeKind;
@@ -11,7 +13,7 @@ import com.example.game3d_opengl.game.terrain.terrain_api.main.GridResourcePack;
 
 import java.util.Arrays;
 
-public class AdvancedGridCreator implements BaseGridCreator {
+public class AdvancedGridCreator implements BaseGridCreator, RetainedGridSummary {
 
     public final int nRows, nCols;
     private final PartialSegmentHandler vertical, horizontal;
@@ -136,7 +138,7 @@ public class AdvancedGridCreator implements BaseGridCreator {
             EndPosTreeKind endPosTreeKind,
             boolean propagateToParent,
             int[][] blockedRowsRanges,
-            AdvancedGridCreator[] childCreators,
+            RetainedGridSummary[] childCreators,
             int[] childRowOffsets,
             int childCount
     ) {
@@ -164,7 +166,7 @@ public class AdvancedGridCreator implements BaseGridCreator {
             boolean propagateToParent,
             int[][] blockedRowsRanges,
             PartialSegmentHandlerResourcePack partialSegmentHandlerResourcePack,
-            AdvancedGridCreator[] childCreators,
+            RetainedGridSummary[] childCreators,
             int[] childRowOffsets,
             int childCount
     ) {
@@ -196,6 +198,29 @@ public class AdvancedGridCreator implements BaseGridCreator {
                         childRowOffsets,
                         childCount
                 )
+        );
+    }
+
+    public static AdvancedGridCreator createFromPreparedHandlers(
+            int nRows,
+            int nCols,
+            GridCreatorWrapper parentGrid,
+            int parentRowOffset,
+            boolean propagateToParent,
+            PartialSegmentHandler horizontalHandler,
+            PartialSegmentHandler verticalHandler
+    ) {
+        if (horizontalHandler == null || verticalHandler == null) {
+            throw new IllegalArgumentException("Prepared handlers must both be non-null.");
+        }
+        return new AdvancedGridCreator(
+                nRows,
+                nCols,
+                parentGrid,
+                parentRowOffset,
+                propagateToParent,
+                horizontalHandler,
+                verticalHandler
         );
     }
 
@@ -288,6 +313,16 @@ public class AdvancedGridCreator implements BaseGridCreator {
         return propagateToParent;
     }
 
+    @Override
+    public int getRowCount() {
+        return nRows;
+    }
+
+    @Override
+    public int getColCount() {
+        return nCols;
+    }
+
     public GridSegment[] exportHorizontalFreeSegments() {
         return horizontal.exportFreeSegments();
     }
@@ -302,6 +337,14 @@ public class AdvancedGridCreator implements BaseGridCreator {
 
     public void forEachVerticalFreeSegment(GridSegmentSink sink) {
         vertical.forEachFreeSegment(sink);
+    }
+
+    public void appendMaximalFreeSegments(boolean verticalSegments, GridBuildScratch out) {
+        if (verticalSegments) {
+            vertical.appendMaximalFreeSegments(out);
+        } else {
+            horizontal.appendMaximalFreeSegments(out);
+        }
     }
 
     /**
@@ -364,14 +407,14 @@ public class AdvancedGridCreator implements BaseGridCreator {
         return Arrays.copyOf(verticalSegments, count);
     }
 
-    private static AdvancedGridCreator[] extractChildCreators(GridCreatorWrapper[] childWrappers, int childCount) {
+    private static RetainedGridSummary[] extractChildCreators(GridCreatorWrapper[] childWrappers, int childCount) {
         if (childCount <= 0) {
-            return new AdvancedGridCreator[0];
+            return new RetainedGridSummary[0];
         }
-        AdvancedGridCreator[] childCreators = new AdvancedGridCreator[childCount];
+        RetainedGridSummary[] childCreators = new RetainedGridSummary[childCount];
         for (int i = 0; i < childCount; ++i) {
             childCreators[i] = childWrappers != null && i < childWrappers.length && childWrappers[i] != null
-                    ? childWrappers[i].getRetainedAdvancedCreator()
+                    ? childWrappers[i].getRetainedSummary()
                     : null;
         }
         return childCreators;

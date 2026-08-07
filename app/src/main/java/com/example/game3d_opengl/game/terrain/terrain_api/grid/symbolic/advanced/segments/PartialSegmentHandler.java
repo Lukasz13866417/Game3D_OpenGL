@@ -2,11 +2,12 @@ package com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advance
 
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridSegment;
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.RetainedGridSummary;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.AdvancedGridCreator;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_end_pos.EndPosTreeKind;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_end_pos.SegmentsByEndPosition;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_length.SegmentsByLength;
-import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_length.segtree_implementation.PreallocatedHashedSegmentsByLengthNodes;
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_length.treap.PooledTreapSegmentsByLength;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.GridResourcePack;
 import com.example.game3d_opengl.game.util.GameRandom;
 
@@ -78,10 +79,10 @@ public class PartialSegmentHandler {
         this.nRows = nRows;
         this.nCols = nCols;
         this.segmentsByLength = initialFreeSegments != null
-                ? PreallocatedHashedSegmentsByLengthNodes.fromFreeSegments(
+                ? PooledTreapSegmentsByLength.fromFreeSegments(
                         nRows, nCols, vertical, resourcePack, initialFreeSegments
                 )
-                : new PreallocatedHashedSegmentsByLengthNodes(nRows, nCols, vertical, resourcePack);
+                : new PooledTreapSegmentsByLength(nRows, nCols, vertical, resourcePack);
         this.segmentsByEndPosition = initialFreeSegments != null
                 ? SegmentsByEndPosition.fromFreeSegments(
                         nRows, nCols, vertical, endPosTreeKind, resourcePack, initialFreeSegments
@@ -122,39 +123,13 @@ public class PartialSegmentHandler {
         return new PartialSegmentHandler(nRows, nCols, vertical, endPosTreeKind, resourcePack, null, freeSegments);
     }
 
-    public static PartialSegmentHandler fromScratch(
-            int nRows,
-            int nCols,
-            boolean vertical,
-            EndPosTreeKind endPosTreeKind,
-            PartialSegmentHandlerResourcePack resourcePack,
-            GridBuildScratch scratch
-    ) {
-        SegmentsByEndPosition byEndPosition = SegmentsByEndPosition.fromScratch(
-                nRows,
-                nCols,
-                vertical,
-                endPosTreeKind,
-                resourcePack,
-                scratch
-        );
-        SegmentsByLength byLength = PreallocatedHashedSegmentsByLengthNodes.fromScratch(
-                nRows,
-                nCols,
-                vertical,
-                resourcePack,
-                scratch
-        );
-        return new PartialSegmentHandler(nRows, nCols, byLength, byEndPosition);
-    }
-
     public static PartialSegmentHandler fromChildren(
             int nRows,
             int nCols,
             boolean vertical,
             EndPosTreeKind endPosTreeKind,
             int[][] blockedRowsRanges,
-            AdvancedGridCreator[] childCreators,
+            RetainedGridSummary[] childCreators,
             int[] childRowOffsets,
             int childCount
     ) {
@@ -178,7 +153,7 @@ public class PartialSegmentHandler {
             EndPosTreeKind endPosTreeKind,
             PartialSegmentHandlerResourcePack resourcePack,
             int[][] blockedRowsRanges,
-            AdvancedGridCreator[] childCreators,
+            RetainedGridSummary[] childCreators,
             int[] childRowOffsets,
             int childCount
     ) {
@@ -208,10 +183,72 @@ public class PartialSegmentHandler {
                         childCount
                 );
             }
-            return fromScratch(nRows, nCols, vertical, endPosTreeKind, resourcePack, scratch);
+            SegmentsByEndPosition byEndPosition = SegmentsByEndPosition.fromEndSortedScratch(
+                    nRows,
+                    nCols,
+                    vertical,
+                    endPosTreeKind,
+                    resourcePack,
+                    scratch
+            );
+            scratch.sortByLengthThenPosition();
+            SegmentsByLength byLength = PooledTreapSegmentsByLength.fromLengthSortedScratch(
+                    nRows,
+                    nCols,
+                    vertical,
+                    resourcePack,
+                    scratch
+            );
+            return new PartialSegmentHandler(nRows, nCols, byLength, byEndPosition);
         } finally {
             scratch.clear();
         }
+    }
+
+    public static PartialSegmentHandler buildHorizontalFromChildren(
+            int nRows,
+            int nCols,
+            EndPosTreeKind endPosTreeKind,
+            PartialSegmentHandlerResourcePack resourcePack,
+            int[][] blockedRowsRanges,
+            RetainedGridSummary[] childCreators,
+            int[] childRowOffsets,
+            int childCount
+    ) {
+        return fromChildren(
+                nRows,
+                nCols,
+                false,
+                endPosTreeKind,
+                resourcePack,
+                blockedRowsRanges,
+                childCreators,
+                childRowOffsets,
+                childCount
+        );
+    }
+
+    public static PartialSegmentHandler buildVerticalFromChildren(
+            int nRows,
+            int nCols,
+            EndPosTreeKind endPosTreeKind,
+            PartialSegmentHandlerResourcePack resourcePack,
+            int[][] blockedRowsRanges,
+            RetainedGridSummary[] childCreators,
+            int[] childRowOffsets,
+            int childCount
+    ) {
+        return fromChildren(
+                nRows,
+                nCols,
+                true,
+                endPosTreeKind,
+                resourcePack,
+                blockedRowsRanges,
+                childCreators,
+                childRowOffsets,
+                childCount
+        );
     }
 
     public static PartialSegmentHandler fromChildWrappers(
@@ -319,26 +356,24 @@ public class PartialSegmentHandler {
             int nRows,
             int nCols,
             boolean[] blockedRows,
-            AdvancedGridCreator[] childCreators,
+            RetainedGridSummary[] childCreators,
             int[] childRowOffsets,
             int childCount
     ) {
-        boolean[] coveredRows = new boolean[nRows + 1];
-
+        int nextParentRow = 1;
         for (int i = 0; i < childCount; ++i) {
-            AdvancedGridCreator child = getChild(childCreators, i);
+            RetainedGridSummary child = getChild(childCreators, i);
             if (child == null) {
                 continue;
             }
             int rowOffset = childRowOffsets[i];
             validateChildPlacement(nRows, nCols, child, rowOffset);
-            for (int childRow = 1; childRow <= child.nRows; ++childRow) {
-                int parentRow = rowOffset + childRow;
-                if (coveredRows[parentRow]) {
-                    throw new IllegalStateException("Overlapping propagated child rows in PartialSegmentHandler.");
-                }
-                coveredRows[parentRow] = true;
+            int childStartRow = rowOffset + 1;
+            int childEndRow = rowOffset + child.getRowCount();
+            if (childStartRow < nextParentRow) {
+                throw new IllegalStateException("Overlapping or out-of-order propagated child rows.");
             }
+            appendPlainHorizontalRows(scratch, nextParentRow, childStartRow - 1, nCols, blockedRows);
             child.forEachHorizontalFreeSegment((row, col, length) -> {
                 int parentRow = rowOffset + row;
                 if (blockedRows[parentRow]) {
@@ -346,14 +381,9 @@ public class PartialSegmentHandler {
                 }
                 scratch.add(parentRow, col, length);
             });
+            nextParentRow = childEndRow + 1;
         }
-
-        for (int row = 1; row <= nRows; ++row) {
-            if (blockedRows[row] || coveredRows[row]) {
-                continue;
-            }
-            scratch.add(row, 1, nCols);
-        }
+        appendPlainHorizontalRows(scratch, nextParentRow, nRows, nCols, blockedRows);
     }
 
     private static void fillVerticalFreeSegmentsFromChildren(
@@ -362,83 +392,99 @@ public class PartialSegmentHandler {
             int nCols,
             boolean[] blockedRows,
             int[][] blockedRowsRanges,
-            AdvancedGridCreator[] childCreators,
+            RetainedGridSummary[] childCreators,
             int[] childRowOffsets,
             int childCount
     ) {
-        boolean[] coveredRows = new boolean[nRows + 1];
-
-        for (int i = 0; i < childCount; ++i) {
-            AdvancedGridCreator child = getChild(childCreators, i);
-            if (child == null) {
-                continue;
-            }
-            int rowOffset = childRowOffsets[i];
-            validateChildPlacement(nRows, nCols, child, rowOffset);
-            for (int childRow = 1; childRow <= child.nRows; ++childRow) {
-                int parentRow = rowOffset + childRow;
-                if (coveredRows[parentRow]) {
-                    throw new IllegalStateException("Overlapping propagated child rows in PartialSegmentHandler.");
+        for (int col = 1; col <= nCols; ++col) {
+            VerticalRunWriter writer = new VerticalRunWriter(scratch, col);
+            int nextParentRow = 1;
+            for (int i = 0; i < childCount; ++i) {
+                RetainedGridSummary child = getChild(childCreators, i);
+                if (child == null) {
+                    continue;
                 }
-                coveredRows[parentRow] = true;
-            }
-            child.forEachVerticalFreeSegment((row, col, length) -> {
-                int startRow = rowOffset + row;
-                int endRow = startRow + length - 1;
-                addClippedVerticalSegments(scratch, col, startRow, endRow, nRows, blockedRowsRanges);
-            });
-        }
-
-        int runStart = -1;
-        for (int row = 1; row <= nRows + 1; ++row) {
-            boolean plainFree = row <= nRows && !blockedRows[row] && !coveredRows[row];
-            if (plainFree && runStart == -1) {
-                runStart = row;
-                continue;
-            }
-            if (!plainFree && runStart != -1) {
-                int len = row - runStart;
-                for (int col = 1; col <= nCols; ++col) {
-                    scratch.add(runStart, col, len);
+                int rowOffset = childRowOffsets[i];
+                validateChildPlacement(nRows, nCols, child, rowOffset);
+                int childStartRow = rowOffset + 1;
+                int childEndRow = rowOffset + child.getRowCount();
+                if (childStartRow < nextParentRow) {
+                    throw new IllegalStateException("Overlapping or out-of-order propagated child rows.");
                 }
-                runStart = -1;
+
+                appendClippedVerticalRange(
+                        writer,
+                        nextParentRow,
+                        childStartRow - 1,
+                        nRows,
+                        blockedRowsRanges
+                );
+
+                final int expectedCol = col;
+                child.forEachVerticalFreeSegment((row, childCol, length) -> {
+                    if (childCol != expectedCol) {
+                        return;
+                    }
+                    int startRow = rowOffset + row;
+                    int endRow = startRow + length - 1;
+                    appendClippedVerticalRange(writer, startRow, endRow, nRows, blockedRowsRanges);
+                });
+
+                nextParentRow = childEndRow + 1;
             }
+            appendClippedVerticalRange(writer, nextParentRow, nRows, nRows, blockedRowsRanges);
+            writer.flush();
         }
-        scratch.mergeVerticalIntervalsInPlace();
     }
 
-    private static AdvancedGridCreator[] extractChildCreators(GridCreatorWrapper[] childWrappers, int childCount) {
-        if (childCount <= 0) {
-            return new AdvancedGridCreator[0];
+    private static void appendPlainHorizontalRows(
+            GridBuildScratch scratch,
+            int fromRow,
+            int toRow,
+            int nCols,
+            boolean[] blockedRows
+    ) {
+        if (fromRow > toRow) {
+            return;
         }
-        AdvancedGridCreator[] childCreators = new AdvancedGridCreator[childCount];
+        for (int row = fromRow; row <= toRow; ++row) {
+            if (!isRowBlocked(blockedRows, row)) {
+                scratch.add(row, 1, nCols);
+            }
+        }
+    }
+
+    private static RetainedGridSummary[] extractChildCreators(GridCreatorWrapper[] childWrappers, int childCount) {
+        if (childCount <= 0) {
+            return new RetainedGridSummary[0];
+        }
+        RetainedGridSummary[] childCreators = new RetainedGridSummary[childCount];
         for (int i = 0; i < childCount; ++i) {
             childCreators[i] = childWrappers != null && i < childWrappers.length && childWrappers[i] != null
-                    ? childWrappers[i].getRetainedAdvancedCreator()
+                    ? childWrappers[i].getRetainedSummary()
                     : null;
         }
         return childCreators;
     }
 
-    private static AdvancedGridCreator getChild(AdvancedGridCreator[] childCreators, int index) {
+    private static RetainedGridSummary getChild(RetainedGridSummary[] childCreators, int index) {
         if (childCreators == null || index < 0 || index >= childCreators.length) {
             return null;
         }
         return childCreators[index];
     }
 
-    private static void validateChildPlacement(int nRows, int nCols, AdvancedGridCreator child, int rowOffset) {
-        if (child.nCols != nCols) {
+    private static void validateChildPlacement(int nRows, int nCols, RetainedGridSummary child, int rowOffset) {
+        if (child.getColCount() != nCols) {
             throw new IllegalArgumentException("Child column count does not match parent column count.");
         }
-        if (rowOffset < 0 || rowOffset + child.nRows > nRows) {
+        if (rowOffset < 0 || rowOffset + child.getRowCount() > nRows) {
             throw new IllegalArgumentException("Child rows do not fit inside parent row range.");
         }
     }
 
-    private static void addClippedVerticalSegments(
-            GridBuildScratch out,
-            int col,
+    private static void appendClippedVerticalRange(
+            VerticalRunWriter out,
             int startRow,
             int endRow,
             int nRows,
@@ -465,7 +511,7 @@ public class PartialSegmentHandler {
                     break;
                 }
                 if (curr < blockedStart) {
-                    out.add(curr, col, blockedStart - curr);
+                    out.append(curr, blockedStart - 1);
                 }
                 curr = Math.max(curr, blockedEnd + 1);
                 if (curr > clippedEnd) {
@@ -474,7 +520,7 @@ public class PartialSegmentHandler {
             }
         }
 
-        out.add(curr, col, clippedEnd - curr + 1);
+        out.append(curr, clippedEnd);
     }
 
     public void reserve(int row, int col, int length) {
@@ -512,6 +558,13 @@ public class PartialSegmentHandler {
         segmentsByEndPosition.forEachSorted(sink);
     }
 
+    public void appendMaximalFreeSegments(GridBuildScratch out) {
+        if (out == null) {
+            return;
+        }
+        segmentsByEndPosition.forEachSorted(out::add);
+    }
+
     public void destroy(){
         while(!segmentsByEndPosition.isEmpty()){
             GridSegment curr = segmentsByEndPosition.pollFirst();
@@ -523,6 +576,42 @@ public class PartialSegmentHandler {
         segmentsByLength.destroy();
     }
 
+    private static final class VerticalRunWriter {
+        private final GridBuildScratch out;
+        private final int col;
+        private int runStart = -1;
+        private int runEnd = -1;
 
+        private VerticalRunWriter(GridBuildScratch out, int col) {
+            this.out = out;
+            this.col = col;
+        }
 
+        private void append(int startRow, int endRow) {
+            if (startRow > endRow) {
+                return;
+            }
+            if (runStart == -1) {
+                runStart = startRow;
+                runEnd = endRow;
+                return;
+            }
+            if (startRow <= runEnd + 1) {
+                runEnd = Math.max(runEnd, endRow);
+                return;
+            }
+            flush();
+            runStart = startRow;
+            runEnd = endRow;
+        }
+
+        private void flush() {
+            if (runStart == -1) {
+                return;
+            }
+            out.add(runStart, col, runEnd - runStart + 1);
+            runStart = -1;
+            runEnd = -1;
+        }
+    }
 }

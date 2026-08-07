@@ -13,7 +13,11 @@ public final class Portal extends Addon {
     private float width;
     private float height;
     private boolean placed = false;
-    private final PortalVisual visual;
+    private final PortalAsset asset;
+    private PortalVisual visual;
+    private final ExitPortal pairedExit;
+    private Vector3D lookDirection = new Vector3D(0f, 0f, 1f);
+    private Vector3D up = new Vector3D(0f, 1f, 0f);
 
     public static Portal createPortal(ExitPortal exitPortal) {
         float diameter = exitPortal != null
@@ -22,28 +26,32 @@ public final class Portal extends Addon {
         PortalAsset asset = exitPortal != null
                 ? exitPortal.getAsset()
                 : PortalAssets.createPortalAsset();
-        return new Portal(diameter, diameter, asset);
+        return new Portal(diameter, diameter, asset, exitPortal);
     }
 
-    private Portal(float width, float height, PortalAsset asset) {
+    private Portal(float width, float height, PortalAsset asset, ExitPortal pairedExit) {
         this.width = width;
         this.height = height;
         this.entranceCenter = new Vector3D(0f, 0f, 0f);
-        this.visual = new PortalVisual(asset);
+        this.asset = asset;
+        this.pairedExit = pairedExit;
         setDimensions(width, height);
-        visual.setCenter(this.entranceCenter);
     }
 
     private void setDimensions(float width, float height) {
         this.width = Math.max(PortalConfig.MIN_REGION_WIDTH, width);
         this.height = Math.max(PortalConfig.MIN_REGION_WIDTH, height);
         float outerRadius = 0.5f * Math.min(this.width, this.height);
-        visual.setBaseOuterRadius(outerRadius);
+        if (visual != null) {
+            visual.setBaseOuterRadius(outerRadius);
+        }
     }
 
     @Override
     public void updateBeforeDraw(float dt) {
-        visual.update(dt);
+        if (visual != null) {
+            visual.update(dt);
+        }
     }
 
     @Override
@@ -55,6 +63,7 @@ public final class Portal extends Addon {
         if (!placed) {
             return;
         }
+        ensureVisual();
         visual.setCenter(entranceCenter);
         visual.draw(vp);
     }
@@ -62,7 +71,9 @@ public final class Portal extends Addon {
     public void setEntrance(Vector3D center) {
         if (center != null) {
             entranceCenter = center;
-            visual.setCenter(entranceCenter);
+            if (visual != null) {
+                visual.setCenter(entranceCenter);
+            }
         }
         placed = true;
     }
@@ -77,6 +88,30 @@ public final class Portal extends Addon {
         return placed;
     }
 
+    public Vector3D getEntranceCenter() {
+        return entranceCenter;
+    }
+
+    public Vector3D getLookDirection() {
+        return lookDirection;
+    }
+
+    public Vector3D getUp() {
+        return up;
+    }
+
+    public float getWidth() {
+        return width;
+    }
+
+    public float getHeight() {
+        return height;
+    }
+
+    public ExitPortal getPairedExit() {
+        return pairedExit;
+    }
+
     @Override
     public void accept(Player player) {
         if (player != null) {
@@ -89,24 +124,74 @@ public final class Portal extends Addon {
                            Vector3D fieldNearRight,
                            Vector3D fieldFarLeft,
                            Vector3D fieldFarRight) {
-        Vector3D center = fieldFarLeft.add(fieldFarRight).add(fieldNearLeft).add(fieldNearRight).div(4);
-        Vector3D lookDir = PortalPlacementUtils.computeHorizontalLookDirection(
-                fieldNearLeft, fieldNearRight, fieldFarLeft, fieldFarRight
+        onPlace(
+                fieldNearLeft.x, fieldNearLeft.y, fieldNearLeft.z,
+                fieldNearRight.x, fieldNearRight.y, fieldNearRight.z,
+                fieldFarLeft.x, fieldFarLeft.y, fieldFarLeft.z,
+                fieldFarRight.x, fieldFarRight.y, fieldFarRight.z
         );
-        Vector3D terrainNormal = getNormal(fieldNearLeft, fieldFarLeft, fieldFarRight).normalized();
-        if (terrainNormal.sqlen() < 1e-6f) {
-            terrainNormal = new Vector3D(0f, 1f, 0f);
+    }
+
+    @Override
+    protected void onPlace(float nearLeftX, float nearLeftY, float nearLeftZ,
+                           float nearRightX, float nearRightY, float nearRightZ,
+                           float farLeftX, float farLeftY, float farLeftZ,
+                           float farRightX, float farRightY, float farRightZ) {
+        float centerX = 0.25f * (farLeftX + farRightX + nearLeftX + nearRightX);
+        float centerY = 0.25f * (farLeftY + farRightY + nearLeftY + nearRightY);
+        float centerZ = 0.25f * (farLeftZ + farRightZ + nearLeftZ + nearRightZ);
+
+        float[] lookDir = new float[3];
+        PortalPlacementUtils.computeHorizontalLookDirection(
+                nearLeftX, nearLeftY, nearLeftZ,
+                nearRightX, nearRightY, nearRightZ,
+                farLeftX, farLeftY, farLeftZ,
+                farRightX, farRightY, farRightZ,
+                lookDir
+        );
+
+        float edge1X = farLeftX - nearLeftX;
+        float edge1Y = farLeftY - nearLeftY;
+        float edge1Z = farLeftZ - nearLeftZ;
+        float edge2X = farRightX - nearLeftX;
+        float edge2Y = farRightY - nearLeftY;
+        float edge2Z = farRightZ - nearLeftZ;
+        float normalX = edge1Y * edge2Z - edge1Z * edge2Y;
+        float normalY = edge1Z * edge2X - edge1X * edge2Z;
+        float normalZ = edge1X * edge2Y - edge1Y * edge2X;
+        float normalLen = (float) Math.sqrt(
+                normalX * normalX + normalY * normalY + normalZ * normalZ
+        );
+        if (normalLen < 1e-6f) {
+            normalX = 0f;
+            normalY = 1f;
+            normalZ = 0f;
+        } else {
+            float invLen = 1f / normalLen;
+            normalX *= invLen;
+            normalY *= invLen;
+            normalZ *= invLen;
         }
-        if (terrainNormal.y < 0f) {
-            terrainNormal = terrainNormal.mult(-1f);
+        if (normalY < 0f) {
+            normalX = -normalX;
+            normalY = -normalY;
+            normalZ = -normalZ;
         }
-        visual.setLookDirection(lookDir);
+
+        lookDirection = new Vector3D(lookDir[0], lookDir[1], lookDir[2]);
+        if (visual != null) {
+            visual.setLookDirection(lookDirection);
+        }
         setDimensions(
                 PortalConfig.DEFAULT_WIDTH_WORLD,
                 PortalConfig.DEFAULT_WIDTH_WORLD
         );
-        Vector3D liftedCenter = center.add(
-                terrainNormal.withLen(visual.getMaxExpectedOuterRadius() + PortalConfig.BASE_CLEARANCE)
+        float lift = 0.5f * Math.min(width, height)
+                + PortalConfig.BASE_CLEARANCE;
+        Vector3D liftedCenter = new Vector3D(
+                centerX + normalX * lift,
+                centerY + normalY * lift,
+                centerZ + normalZ * lift
         );
         setEntrance(liftedCenter);
         placed = true;
@@ -114,11 +199,25 @@ public final class Portal extends Addon {
 
     @Override
     public void cleanupGPUResourcesRecursively() {
-        visual.cleanupGPUResourcesRecursively();
+        if (visual != null) {
+            visual.cleanupGPUResourcesRecursively();
+        }
     }
 
     @Override
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
-        visual.reloadGPUResourcesRecursivelyOnContextLoss();
+        if (visual != null) {
+            visual.reloadGPUResourcesRecursivelyOnContextLoss();
+        }
+    }
+
+    private void ensureVisual() {
+        if (visual != null) {
+            return;
+        }
+        visual = new PortalVisual(asset);
+        visual.setBaseOuterRadius(0.5f * Math.min(width, height));
+        visual.setCenter(entranceCenter);
+        visual.setLookDirection(lookDirection);
     }
 }

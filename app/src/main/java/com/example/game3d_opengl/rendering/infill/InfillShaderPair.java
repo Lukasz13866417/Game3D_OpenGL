@@ -3,14 +3,18 @@ package com.example.game3d_opengl.rendering.infill;
 import android.content.res.AssetManager;
 import android.opengl.GLES20;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
-public final class InfillShaderPair extends ShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS> {
+public final class InfillShaderPair<
+        L extends VertexLayout.HasPosition & VertexLayout.HasNormals>
+        extends MeshShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS, L> {
 
 
-    private static InfillShaderPair sharedShader = null;
+    private static InfillShaderPair<VertexLayout.PositionNormalLayout> sharedShader = null;
 
-    public static InfillShaderPair getSharedShader(){
+    public static InfillShaderPair<VertexLayout.PositionNormalLayout> getSharedShader(){
         if (sharedShader == null){
             throw new IllegalStateException(
                     "Shader instance is null. Needs calling LOAD_SHADER_CODE first"
@@ -21,6 +25,7 @@ public final class InfillShaderPair extends ShaderPair<InfillShaderArgs.VS, Infi
 
 
     private int uMVP, uModel, uColor, aPos, aNormal;
+    private int uSpinAngleStart, uSpinAngleStep, uOpacityMultiplier;
     private int uLightPos, uLightColor, uCameraPos, uAmbient, uDiffuse, uSpecular, uShininess;
 
 
@@ -30,20 +35,32 @@ public final class InfillShaderPair extends ShaderPair<InfillShaderArgs.VS, Infi
 
 
     public static void LOAD_SHADER_CODE(AssetManager assetManager){
+        if (sharedShader != null) {
+            return;
+        }
         String vs =
+                "#version 300 es\n" +
                 "uniform mat4 uMVPMatrix;\n" +
                 "uniform mat4 uModelMatrix;\n" +
-                "attribute vec3 vPosition;\n" +
-                "attribute vec3 aNormal;\n" +
-                "varying vec3 vWorldPos;\n" +
-                "varying vec3 vWorldNormal;\n" +
+                "uniform float uSpinAngleStart;\n" +
+                "uniform float uSpinAngleStep;\n" +
+                "in vec3 vPosition;\n" +
+                "in vec3 aNormal;\n" +
+                "out vec3 vWorldPos;\n" +
+                "out vec3 vWorldNormal;\n" +
                 "void main(){\n" +
-                "  vec4 wp = uModelMatrix * vec4(vPosition, 1.0);\n" +
+                "  float spinAngle = uSpinAngleStart + float(gl_InstanceID) * uSpinAngleStep;\n" +
+                "  float spinCos = cos(spinAngle);\n" +
+                "  float spinSin = sin(spinAngle);\n" +
+                "  vec3 localPosition = vec3(vPosition.x, spinCos * vPosition.y - spinSin * vPosition.z, spinSin * vPosition.y + spinCos * vPosition.z);\n" +
+                "  vec3 localNormal = vec3(aNormal.x, spinCos * aNormal.y - spinSin * aNormal.z, spinSin * aNormal.y + spinCos * aNormal.z);\n" +
+                "  vec4 wp = uModelMatrix * vec4(localPosition, 1.0);\n" +
                 "  vWorldPos = wp.xyz;\n" +
-                "  vWorldNormal = mat3(uModelMatrix) * aNormal;\n" +
-                "  gl_Position = uMVPMatrix * vec4(vPosition, 1.0);\n" +
+                "  vWorldNormal = mat3(uModelMatrix) * localNormal;\n" +
+                "  gl_Position = uMVPMatrix * vec4(localPosition, 1.0);\n" +
                 "}";
         String fs =
+                "#version 300 es\n" +
                 "precision mediump float;\n" +
                 "uniform vec4 vColor;\n" +
                 "uniform vec3 uLightPos;\n" +
@@ -53,8 +70,10 @@ public final class InfillShaderPair extends ShaderPair<InfillShaderArgs.VS, Infi
                 "uniform float uDiffuse;\n" +
                 "uniform float uSpecular;\n" +
                 "uniform float uShininess;\n" +
-                "varying vec3 vWorldPos;\n" +
-                "varying vec3 vWorldNormal;\n" +
+                "uniform float uOpacityMultiplier;\n" +
+                "in vec3 vWorldPos;\n" +
+                "in vec3 vWorldNormal;\n" +
+                "out vec4 fragColor;\n" +
                 "void main(){\n" +
                 "  vec3 N = normalize(vWorldNormal);\n" +
                 "  vec3 L = normalize(uLightPos - vWorldPos);\n" +
@@ -64,19 +83,16 @@ public final class InfillShaderPair extends ShaderPair<InfillShaderArgs.VS, Infi
                 "  float NdotH = max(dot(N, H), 0.0);\n" +
                 "  float spec = pow(NdotH, uShininess);\n" +
                 "  vec3 color = vColor.rgb * (uAmbient + uDiffuse * NdotL) + uLightColor * uSpecular * spec;\n" +
-                "  gl_FragColor = vec4(color, vColor.a);\n" +
+                "  fragColor = vec4(color, vColor.a * uOpacityMultiplier);\n" +
                 "}";
         sharedShader = new Builder().fromSource(vs,fs).build();
     }
 
-    private static final int STRIDE = 6 * 4; // 6 floats: pos(3) + normal(3)
-
     @Override
-    public void enableAndPointVertexAttribs() {
-        GLES20.glEnableVertexAttribArray(aPos);
-        GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, STRIDE, 0);
-        GLES20.glEnableVertexAttribArray(aNormal);
-        GLES20.glVertexAttribPointer(aNormal, 3, GLES20.GL_FLOAT, false, STRIDE, 3 * 4);
+    protected void enableAndPointVertexAttribs(L layout) {
+        int stride = layout.strideBytes();
+        layout.position().enableAndPoint(aPos, stride);
+        layout.normals().enableAndPoint(aNormal, stride);
     }
 
     @Override
@@ -98,6 +114,9 @@ public final class InfillShaderPair extends ShaderPair<InfillShaderArgs.VS, Infi
         this.uDiffuse = GLES20.glGetUniformLocation(p, "uDiffuse");
         this.uSpecular = GLES20.glGetUniformLocation(p, "uSpecular");
         this.uShininess = GLES20.glGetUniformLocation(p, "uShininess");
+        this.uSpinAngleStart = GLES20.glGetUniformLocation(p, "uSpinAngleStart");
+        this.uSpinAngleStep = GLES20.glGetUniformLocation(p, "uSpinAngleStep");
+        this.uOpacityMultiplier = GLES20.glGetUniformLocation(p, "uOpacityMultiplier");
         this.aPos = GLES20.glGetAttribLocation(p, "vPosition");
         this.aNormal = GLES20.glGetAttribLocation(p, "aNormal");
     }
@@ -122,17 +141,22 @@ public final class InfillShaderPair extends ShaderPair<InfillShaderArgs.VS, Infi
         GLES20.glUniform1f(uDiffuse, fragmentArgs.diffuse);
         GLES20.glUniform1f(uSpecular, fragmentArgs.specular);
         GLES20.glUniform1f(uShininess, Math.max(1f, fragmentArgs.shininess));
+        GLES20.glUniform1f(uSpinAngleStart, vertexArgs.spinAngleStartRadians);
+        GLES20.glUniform1f(uSpinAngleStep, vertexArgs.spinAngleStepRadians);
+        GLES20.glUniform1f(uOpacityMultiplier, fragmentArgs.opacityMultiplier);
     }
 
 
     // Nested types
-    public static final class Builder extends ShaderPair.BaseBuilder<InfillShaderPair, Builder> {
+    public static final class Builder
+            extends ShaderPair.BaseBuilder<InfillShaderPair<VertexLayout.PositionNormalLayout>, Builder> {
         @Override
         protected Builder self() { return this; }
 
         @Override
-        protected InfillShaderPair create(int programHandle, String vs, String fs) {
-            return new InfillShaderPair(programHandle, vs, fs);
+        protected InfillShaderPair<VertexLayout.PositionNormalLayout> create(
+                int programHandle, String vs, String fs) {
+            return new InfillShaderPair<>(programHandle, vs, fs);
         }
     }
 

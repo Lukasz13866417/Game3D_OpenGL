@@ -1,8 +1,10 @@
 package com.example.game3d_opengl.game.player.player_logic;
 
 import com.example.game3d_opengl.game.logic_abstraction.StateInfoNode;
-import com.example.game3d_opengl.game.player.player_character.PlayerConfig;
 
+/**
+ * Supplies temporary legacy player effects to the old movement graph.
+ */
 public final class EffectsNode extends StateInfoNode<EffectsNode.Data> {
     public static final class Data {
         public boolean infiniteJumps;
@@ -10,12 +12,10 @@ public final class EffectsNode extends StateInfoNode<EffectsNode.Data> {
     }
 
     private final InputNode input;
-    private final PlayerConfig config;
     private Data data = new Data();
 
-    public EffectsNode(InputNode input, PlayerConfig config) {
+    public EffectsNode(InputNode input) {
         this.input = input;
-        this.config = config;
     }
 
     @Override

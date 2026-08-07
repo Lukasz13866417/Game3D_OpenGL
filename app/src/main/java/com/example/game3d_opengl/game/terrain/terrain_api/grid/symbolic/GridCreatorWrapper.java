@@ -2,6 +2,7 @@ package com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic;
 
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.PartialSegmentHandlerResourcePack;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.AdvancedGridCreator;
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.PartialSegmentHandler;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_end_pos.EndPosTreeKind;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.basic.BasicGridCreator;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.GridResourcePack;
@@ -23,6 +24,7 @@ public class GridCreatorWrapper {
     private boolean propagateToParent = true;
     private EndPosTreeKind endPosTreeKind = EndPosTreeKind.POOLED_TREAP;
     private int[][] blockedRowRanges = new int[0][2];
+    private String debugName = "unnamed_structure";
 
     private int[] pendingOps = new int[32]; // [type,row,col,length] repeated
     private int pendingCount = 0;
@@ -31,7 +33,18 @@ public class GridCreatorWrapper {
     private GridCreatorWrapper[] childWrappers = new GridCreatorWrapper[4];
     private int[] childRowOffsets = new int[4];
     private int childCount = 0;
-    private AdvancedGridCreator retainedAdvancedCreator = null;
+    private RetainedGridSummary retainedSummary = null;
+    private AdvancedMaterializationState advancedMaterializationState = null;
+
+    private static final class AdvancedMaterializationState {
+        final RetainedGridSummary[] childCreators;
+        PartialSegmentHandler horizontalHandler;
+        PartialSegmentHandler verticalHandler;
+
+        AdvancedMaterializationState(RetainedGridSummary[] childCreators) {
+            this.childCreators = childCreators;
+        }
+    }
 
     public GridCreatorWrapper() {
         this(GridResourcePack.defaultInstance().partialSegmentHandlerResourcePack());
@@ -71,6 +84,31 @@ public class GridCreatorWrapper {
         this.blockedRowRanges = blockedRowRanges != null ? blockedRowRanges : new int[0][2];
     }
 
+    public void setDebugName(String debugName) {
+        if (debugName == null || debugName.trim().isEmpty()) {
+            return;
+        }
+        this.debugName = debugName;
+    }
+
+    public String getDebugName() {
+        return debugName;
+    }
+
+    public String describeForDebug() {
+        return debugName
+                + " [rows=" + nRows
+                + ", cols=" + nCols
+                + ", parentOffset=" + parentRowOffset
+                + ", advanced=" + isAdvanced
+                + ", propagate=" + propagateToParent
+                + "]";
+    }
+
+    public boolean isAdvancedStructure() {
+        return isAdvanced;
+    }
+
     public void materializeIfNeeded() {
         if (content != null) {
             return;
@@ -79,34 +117,23 @@ public class GridCreatorWrapper {
             throw new IllegalStateException("Grid creator wrapper has not been configured yet.");
         }
         if (isAdvanced) {
-            content = AdvancedGridCreator.createFromChildren(
-                    nRows,
-                    nCols,
-                    parentWrapper,
-                    parentRowOffset,
-                    endPosTreeKind,
-                    propagateToParent,
-                    blockedRowRanges,
-                    partialSegmentHandlerResourcePack,
-                    extractRetainedChildCreators(),
-                    childRowOffsets,
-                    childCount
-            );
-            releaseRetainedChildren();
+            beginAdvancedMaterialization();
+            buildAdvancedHorizontalIfNeeded();
+            buildAdvancedVerticalIfNeeded();
+            finalizeAdvancedMaterialization();
         } else {
-            content = new BasicGridCreator(nRows, nCols, parentWrapper, parentRowOffset, propagateToParent);
+            materializeBasicIfNeeded();
         }
-        flushPendingIfPossible();
     }
 
     public void finishAddonPhase() {
-        if (content instanceof AdvancedGridCreator) {
-            AdvancedGridCreator creator = (AdvancedGridCreator) content;
-            if (creator.shouldPropagateToParent() && creator.getParentWrapper() != null) {
-                retainedAdvancedCreator = creator;
-                content = null;
-                return;
-            }
+        advancedMaterializationState = null;
+        if (content instanceof RetainedGridSummary
+                && propagateToParent
+                && parentWrapper != null) {
+            retainedSummary = (RetainedGridSummary) content;
+            content = null;
+            return;
         }
         if (content != null) {
             content.destroy();
@@ -138,6 +165,113 @@ public class GridCreatorWrapper {
         childWrappers[childCount] = childWrapper;
         childRowOffsets[childCount] = rowOffset;
         childCount++;
+    }
+
+    public void beginAdvancedMaterialization() {
+        if (content != null || !isAdvanced) {
+            return;
+        }
+        if (!isConfigured) {
+            throw new IllegalStateException("Grid creator wrapper has not been configured yet.");
+        }
+        if (advancedMaterializationState == null) {
+            advancedMaterializationState =
+                    new AdvancedMaterializationState(extractRetainedChildCreators());
+        }
+    }
+
+    public void buildAdvancedHorizontalIfNeeded() {
+        beginAdvancedMaterialization();
+        if (content != null) {
+            return;
+        }
+        if (advancedMaterializationState == null) {
+            throw new IllegalStateException("Advanced materialization was not started.");
+        }
+        if (advancedMaterializationState.horizontalHandler != null) {
+            return;
+        }
+        advancedMaterializationState.horizontalHandler = PartialSegmentHandler.buildHorizontalFromChildren(
+                nRows,
+                nCols,
+                endPosTreeKind,
+                partialSegmentHandlerResourcePack,
+                blockedRowRanges,
+                advancedMaterializationState.childCreators,
+                childRowOffsets,
+                childCount
+        );
+    }
+
+    public void buildAdvancedVerticalIfNeeded() {
+        beginAdvancedMaterialization();
+        if (content != null) {
+            return;
+        }
+        if (advancedMaterializationState == null) {
+            throw new IllegalStateException("Advanced materialization was not started.");
+        }
+        if (advancedMaterializationState.verticalHandler != null) {
+            return;
+        }
+        advancedMaterializationState.verticalHandler = PartialSegmentHandler.buildVerticalFromChildren(
+                nRows,
+                nCols,
+                endPosTreeKind,
+                partialSegmentHandlerResourcePack,
+                blockedRowRanges,
+                advancedMaterializationState.childCreators,
+                childRowOffsets,
+                childCount
+        );
+    }
+
+    public void finalizeAdvancedMaterialization() {
+        beginAdvancedMaterialization();
+        if (content != null) {
+            return;
+        }
+        if (advancedMaterializationState == null
+                || advancedMaterializationState.horizontalHandler == null
+                || advancedMaterializationState.verticalHandler == null) {
+            throw new IllegalStateException("Advanced materialization is incomplete.");
+        }
+        content = AdvancedGridCreator.createFromPreparedHandlers(
+                nRows,
+                nCols,
+                parentWrapper,
+                parentRowOffset,
+                propagateToParent,
+                advancedMaterializationState.horizontalHandler,
+                advancedMaterializationState.verticalHandler
+        );
+        advancedMaterializationState = null;
+        releaseRetainedChildren();
+        flushPendingIfPossible();
+    }
+
+    public void materializeBasicIfNeeded() {
+        if (content != null) {
+            return;
+        }
+        if (!isConfigured) {
+            throw new IllegalStateException("Grid creator wrapper has not been configured yet.");
+        }
+        if (isAdvanced) {
+            throw new IllegalStateException("Use advanced materialization methods for advanced wrappers.");
+        }
+        content = new BasicGridCreator(
+                nRows,
+                nCols,
+                parentWrapper,
+                parentRowOffset,
+                propagateToParent,
+                blockedRowRanges,
+                takeRetainedChildCreators(),
+                childRowOffsets,
+                childCount
+        );
+        flushPendingIfPossible();
     }
 
     public GridSegment reserveVertical(int row, int col, int length) {
@@ -263,30 +397,54 @@ public class GridCreatorWrapper {
         pendingCount = 0;
     }
 
+    public RetainedGridSummary getRetainedSummary() {
+        return retainedSummary;
+    }
+
+    public RetainedGridSummary takeRetainedSummary() {
+        RetainedGridSummary out = retainedSummary;
+        retainedSummary = null;
+        return out;
+    }
+
     public AdvancedGridCreator getRetainedAdvancedCreator() {
-        return retainedAdvancedCreator;
+        return retainedSummary instanceof AdvancedGridCreator
+                ? (AdvancedGridCreator) retainedSummary
+                : null;
+    }
+
+    public void releaseRetainedSummary() {
+        if (retainedSummary == null) {
+            return;
+        }
+        retainedSummary.destroy();
+        retainedSummary = null;
     }
 
     public void releaseRetainedAdvancedCreator() {
-        if (retainedAdvancedCreator == null) {
-            return;
-        }
-        retainedAdvancedCreator.destroy();
-        retainedAdvancedCreator = null;
+        releaseRetainedSummary();
     }
 
     private void releaseRetainedChildren() {
         for (int i = 0; i < childCount; ++i) {
             if (childWrappers[i] != null) {
-                childWrappers[i].releaseRetainedAdvancedCreator();
+                childWrappers[i].releaseRetainedSummary();
             }
         }
     }
 
-    private AdvancedGridCreator[] extractRetainedChildCreators() {
-        AdvancedGridCreator[] childCreators = new AdvancedGridCreator[childCount];
+    private RetainedGridSummary[] extractRetainedChildCreators() {
+        RetainedGridSummary[] childCreators = new RetainedGridSummary[childCount];
         for (int i = 0; i < childCount; ++i) {
-            childCreators[i] = childWrappers[i] == null ? null : childWrappers[i].getRetainedAdvancedCreator();
+            childCreators[i] = childWrappers[i] == null ? null : childWrappers[i].getRetainedSummary();
+        }
+        return childCreators;
+    }
+
+    private RetainedGridSummary[] takeRetainedChildCreators() {
+        RetainedGridSummary[] childCreators = new RetainedGridSummary[childCount];
+        for (int i = 0; i < childCount; ++i) {
+            childCreators[i] = childWrappers[i] == null ? null : childWrappers[i].takeRetainedSummary();
         }
         return childCreators;
     }

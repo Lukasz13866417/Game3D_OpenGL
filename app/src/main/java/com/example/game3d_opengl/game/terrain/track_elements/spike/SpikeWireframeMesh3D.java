@@ -2,6 +2,7 @@ package com.example.game3d_opengl.game.terrain.track_elements.spike;
 
 import android.opengl.GLES20;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -12,7 +13,10 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  *   aWeightsA(4), aTA(1), aWeightsB(4), aTB(1), aEnd(1), aSide(1)
  * Stride: 12 floats per vertex.
  */
-public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDrawArgs, SpikeWireframeShaderPair> {
+public final class SpikeWireframeMesh3D extends AbstractMesh3D<
+        SpikeWireframeDrawArgs,
+        SpikeWireframeShaderPair<VertexLayout.SpikeCanonicalWireframeLayout>,
+        VertexLayout.SpikeCanonicalWireframeLayout> {
     private static final int[] VIEWPORT_TMP = new int[4];
 
     private final FColor edgeColor;
@@ -49,7 +53,9 @@ public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDra
     }
 
     @Override
-    protected void setVariableArgsValues(SpikeWireframeDrawArgs args, SpikeWireframeShaderPair shader) {
+    protected void setVariableArgsValues(
+            SpikeWireframeDrawArgs args,
+            SpikeWireframeShaderPair<VertexLayout.SpikeCanonicalWireframeLayout> shader) {
         vs.mvp = args.vp;
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, VIEWPORT_TMP, 0);
         vs.viewportW = Math.max(1, VIEWPORT_TMP[2]);
@@ -64,7 +70,12 @@ public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDra
         shader.setArgs(vs, fs);
     }
 
-    public static final class Builder extends AbstractMesh3D.BaseBuilder<SpikeWireframeMesh3D, Builder, SpikeWireframeShaderPair> {
+    public static final class Builder extends AbstractMesh3D.BaseBuilder<
+            SpikeWireframeMesh3D,
+            Builder,
+            SpikeWireframeDrawArgs,
+            SpikeWireframeShaderPair<VertexLayout.SpikeCanonicalWireframeLayout>,
+            VertexLayout.SpikeCanonicalWireframeLayout> {
         private FColor edgeColor = FColor.CLR(1,1,1,1);
         private float pixelWidth = 1.5f;
         private float uDepthBiasNDC = -2e-4f;
@@ -89,7 +100,7 @@ public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDra
 
         @Override
         public void checkValid() {
-            shader(SpikeWireframeShaderPair.sharedShader);
+            shader(SpikeWireframeShaderPair.getSharedShader());
             super.checkValid();
         }
 
@@ -151,6 +162,11 @@ public final class SpikeWireframeMesh3D extends AbstractMesh3D<SpikeWireframeDra
             // aSide (1)
             dst[o++] = side;
             return o;
+        }
+
+        @Override
+        protected VertexLayout.SpikeCanonicalWireframeLayout createLayout() {
+            return VertexLayout.SpikeCanonicalWireframeLayout.INSTANCE;
         }
     }
 }

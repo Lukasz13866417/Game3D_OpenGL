@@ -2,12 +2,15 @@ package com.example.game3d_opengl.game.terrain.track_elements.portal.rendering;
 
 import android.opengl.GLES20;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 public final class PortalSphereShaderPair
-        extends ShaderPair<PortalSphereShaderArgs.VS, PortalSphereShaderArgs.FS> {
+        <L extends VertexLayout.HasPosition & VertexLayout.HasNormals & VertexLayout.HasFaceGroups>
+        extends MeshShaderPair<PortalSphereShaderArgs.VS, PortalSphereShaderArgs.FS, L> {
 
-    private static PortalSphereShaderPair sharedShader = null;
+    private static PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout> sharedShader = null;
 
     private int uVP, uCenter, uRadius, uRotation;
     private int uColorA, uColorB;
@@ -19,25 +22,26 @@ public final class PortalSphereShaderPair
         super(programHandle, vs, fs);
     }
 
-    public static PortalSphereShaderPair getSharedShader() {
+    public static PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout> getSharedShader() {
         if (sharedShader == null) {
             sharedShader = createDefault();
         }
         return sharedShader;
     }
 
-    private static PortalSphereShaderPair createDefault() {
+    private static PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout> createDefault() {
         String vs =
+                "#version 300 es\n" +
                 "uniform mat4 uVPMatrix;\n" +
                 "uniform vec3 uCenter;\n" +
                 "uniform float uRadius;\n" +
                 "uniform mat3 uRotation;\n" +
-                "attribute vec3 aPosition;\n" +
-                "attribute vec3 aNormal;\n" +
-                "attribute float aFaceGroup;\n" +
-                "varying vec3 vWorldPos;\n" +
-                "varying vec3 vWorldNormal;\n" +
-                "varying float vFaceGroup;\n" +
+                "in vec3 aPosition;\n" +
+                "in vec3 aNormal;\n" +
+                "in float aFaceGroup;\n" +
+                "out vec3 vWorldPos;\n" +
+                "out vec3 vWorldNormal;\n" +
+                "out float vFaceGroup;\n" +
                 "void main(){\n" +
                 "  vec3 rotated = uRotation * aPosition;\n" +
                 "  vWorldPos = uCenter + rotated * uRadius;\n" +
@@ -46,6 +50,7 @@ public final class PortalSphereShaderPair
                 "  gl_Position = uVPMatrix * vec4(vWorldPos, 1.0);\n" +
                 "}";
         String fs =
+                "#version 300 es\n" +
                 "precision highp float;\n" +
                 "uniform vec4 uColorA;\n" +
                 "uniform vec4 uColorB;\n" +
@@ -56,11 +61,14 @@ public final class PortalSphereShaderPair
                 "uniform float uDiffuse;\n" +
                 "uniform float uSpecular;\n" +
                 "uniform float uShininess;\n" +
-                "varying vec3 vWorldPos;\n" +
-                "varying vec3 vWorldNormal;\n" +
-                "varying float vFaceGroup;\n" +
+                "in vec3 vWorldPos;\n" +
+                "in vec3 vWorldNormal;\n" +
+                "in float vFaceGroup;\n" +
+                "out vec4 fragColor;\n" +
                 "void main(){\n" +
-                "  vec3 base = mix(uColorA.rgb, uColorB.rgb, step(0.5, vFaceGroup));\n" +
+                "  float groupMix = step(0.5, vFaceGroup);\n" +
+                "  vec3 base = mix(uColorA.rgb, uColorB.rgb, groupMix);\n" +
+                "  float alpha = mix(uColorA.a, uColorB.a, groupMix);\n" +
                 "  vec3 N = normalize(vWorldNormal);\n" +
                 "  vec3 L = normalize(uLightPos - vWorldPos);\n" +
                 "  vec3 V = normalize(uCameraPos - vWorldPos);\n" +
@@ -69,20 +77,17 @@ public final class PortalSphereShaderPair
                 "  float NdotH = max(dot(N, H), 0.0);\n" +
                 "  float spec = pow(NdotH, uShininess);\n" +
                 "  vec3 color = base * (uAmbient + uDiffuse * NdotL) + uLightColor * uSpecular * spec;\n" +
-                "  gl_FragColor = vec4(color, 1.0);\n" +
+                "  fragColor = vec4(color, alpha);\n" +
                 "}";
         return new Builder().fromSource(vs, fs).build();
     }
 
     @Override
-    public void enableAndPointVertexAttribs() {
-        final int stride = 7 * 4; // 7 floats: pos(3) + normal(3) + faceGroup(1)
-        GLES20.glEnableVertexAttribArray(aPosition);
-        GLES20.glVertexAttribPointer(aPosition, 3, GLES20.GL_FLOAT, false, stride, 0);
-        GLES20.glEnableVertexAttribArray(aNormal);
-        GLES20.glVertexAttribPointer(aNormal, 3, GLES20.GL_FLOAT, false, stride, 3 * 4);
-        GLES20.glEnableVertexAttribArray(aFaceGroup);
-        GLES20.glVertexAttribPointer(aFaceGroup, 1, GLES20.GL_FLOAT, false, stride, 6 * 4);
+    protected void enableAndPointVertexAttribs(L layout) {
+        final int stride = layout.strideBytes();
+        layout.position().enableAndPoint(aPosition, stride);
+        layout.normals().enableAndPoint(aNormal, stride);
+        layout.faceGroups().enableAndPoint(aFaceGroup, stride);
     }
 
     @Override
@@ -133,13 +138,16 @@ public final class PortalSphereShaderPair
     }
 
     public static final class Builder
-            extends ShaderPair.BaseBuilder<PortalSphereShaderPair, Builder> {
+            extends ShaderPair.BaseBuilder<
+                    PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout>,
+                    Builder> {
         @Override
         protected Builder self() { return this; }
 
         @Override
-        protected PortalSphereShaderPair create(int programHandle, String vs, String fs) {
-            return new PortalSphereShaderPair(programHandle, vs, fs);
+        protected PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout> create(
+                int programHandle, String vs, String fs) {
+            return new PortalSphereShaderPair<>(programHandle, vs, fs);
         }
     }
 }

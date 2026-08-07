@@ -12,6 +12,10 @@ public class BasicTerrainStairs extends BasicTerrainStructure {
     private final float dAngHor, jump, tilesPerStair, cntStairs;
     private final int emptyBetween;
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
     public BasicTerrainStairs(int tilesPerStair, int cntStairs, float dAngHor, float jump) {
         this(tilesPerStair, cntStairs, 0, dAngHor, jump);
     }
@@ -89,6 +93,55 @@ public class BasicTerrainStairs extends BasicTerrainStructure {
         for (int j = 0; j < len; ++j) { a[j] = DeathSpike.createDeathSpike(); b[j] = DeathSpike.createDeathSpike(); }
         brush.reserveVertical(1, left, len, a);
         brush.reserveVertical(1, right, len, b);
+    }
+
+    public static final class Builder {
+        private Integer tilesPerStair;
+        private Integer cntStairs;
+        private int emptyBetween = 0;
+        private Float dAngHor;
+        private Float jump;
+
+        public Builder tilesPerStair(int tilesPerStair) {
+            this.tilesPerStair = tilesPerStair;
+            return this;
+        }
+
+        public Builder stairCount(int cntStairs) {
+            this.cntStairs = cntStairs;
+            return this;
+        }
+
+        public Builder emptyBetween(int emptyBetween) {
+            this.emptyBetween = emptyBetween;
+            return this;
+        }
+
+        public Builder horizontalAngleDelta(float dAngHor) {
+            this.dAngHor = dAngHor;
+            return this;
+        }
+
+        public Builder jump(float jump) {
+            this.jump = jump;
+            return this;
+        }
+
+        public BasicTerrainStairs build() {
+            if (tilesPerStair == null) {
+                throw new IllegalStateException("tilesPerStair not set");
+            }
+            if (cntStairs == null) {
+                throw new IllegalStateException("stairCount not set");
+            }
+            if (dAngHor == null) {
+                throw new IllegalStateException("horizontalAngleDelta not set");
+            }
+            if (jump == null) {
+                throw new IllegalStateException("jump not set");
+            }
+            return new BasicTerrainStairs(tilesPerStair, cntStairs, emptyBetween, dAngHor, jump);
+        }
     }
 }
 

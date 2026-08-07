@@ -1,5 +1,7 @@
 package com.example.game3d_opengl.game.stage.stage_api;
 
+import com.example.game3d_opengl.game.util.AndroidGameClock;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -13,10 +15,13 @@ public final class TouchEventQueue {
     public static final int TYPE_DOWN = 0;
     public static final int TYPE_UP = 1;
     public static final int TYPE_MOVE = 2;
+    public static final int TYPE_CANCEL = 3;
 
     /** Preallocated event slot. Fields are only valid between enqueue and dequeue. */
     public static final class Event {
         public int type;
+        public long timeNanos;
+        public long sequence;
         public float x1, y1;
         public float x2, y2; // only used for TYPE_MOVE
     }
@@ -28,6 +33,8 @@ public final class TouchEventQueue {
     private final AtomicInteger writePos = new AtomicInteger(0);
     // Written by consumer, read by producer
     private final AtomicInteger readPos = new AtomicInteger(0);
+    private final java.util.concurrent.atomic.AtomicLong nextSequence =
+            new java.util.concurrent.atomic.AtomicLong(0L);
 
     // Scratch event returned by dequeue (avoids allocation on consumer side)
     private final Event dequeueResult = new Event();
@@ -45,6 +52,10 @@ public final class TouchEventQueue {
      * Enqueue a touch-down or touch-up event. Called from the UI thread.
      */
     public void enqueueDownOrUp(int type, float x, float y) {
+        enqueueDownOrUp(type, x, y, AndroidGameClock.nowNanos());
+    }
+
+    public void enqueueDownOrUp(int type, float x, float y, long timeNanos) {
         int w = writePos.get();
         int r = readPos.get();
         int next = (w + 1) % capacity;
@@ -54,6 +65,8 @@ public final class TouchEventQueue {
         }
         Event e = ring[w];
         e.type = type;
+        e.timeNanos = timeNanos;
+        e.sequence = nextSequence.getAndIncrement();
         e.x1 = x;
         e.y1 = y;
         e.x2 = 0f;
@@ -65,6 +78,10 @@ public final class TouchEventQueue {
      * Enqueue a touch-move event. Called from the UI thread.
      */
     public void enqueueMove(float x1, float y1, float x2, float y2) {
+        enqueueMove(x1, y1, x2, y2, AndroidGameClock.nowNanos());
+    }
+
+    public void enqueueMove(float x1, float y1, float x2, float y2, long timeNanos) {
         int w = writePos.get();
         int r = readPos.get();
         int next = (w + 1) % capacity;
@@ -73,6 +90,8 @@ public final class TouchEventQueue {
         }
         Event e = ring[w];
         e.type = TYPE_MOVE;
+        e.timeNanos = timeNanos;
+        e.sequence = nextSequence.getAndIncrement();
         e.x1 = x1;
         e.y1 = y1;
         e.x2 = x2;
@@ -91,6 +110,8 @@ public final class TouchEventQueue {
         if (r == w) return null;
         Event src = ring[r];
         dequeueResult.type = src.type;
+        dequeueResult.timeNanos = src.timeNanos;
+        dequeueResult.sequence = src.sequence;
         dequeueResult.x1 = src.x1;
         dequeueResult.y1 = src.y1;
         dequeueResult.x2 = src.x2;
@@ -104,5 +125,10 @@ public final class TouchEventQueue {
      */
     public boolean isEmpty() {
         return readPos.get() == writePos.get();
+    }
+
+    public void clear() {
+        int w = writePos.get();
+        readPos.set(w);
     }
 }

@@ -35,8 +35,8 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
     private static final FColor DEFAULT_LIGHT_COLOR = new FColor(1f, 1f, 1f, 1f);
 
     // ---- Vertex layout (TerrainRibbonShaderPair) -----------------------------
-    // per-vertex: [pos.xyz, normal.xyz, alpha] -> 7 floats
-    private static final int FLOATS_PER_VERTEX = 7;
+    // per-vertex: [pos.xyz, normal.xyz, alpha, brightness] -> 8 floats
+    private static final int FLOATS_PER_VERTEX = 8;
     private static final int BYTES_PER_FLOAT = 4;
 
     // ---- CPU-side geometry (preallocated ring buffers) -----------------------
@@ -45,7 +45,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         private int head = 0;  // index of first element
         private int size = 0;  // number of elements
         private int seqStart = 0; // sequence id of the head element
-        private final float[] lx, ly, lz, rx, ry, rz, aL, aR;
+        private final float[] lx, ly, lz, rx, ry, rz, aL, aR, bL, bR;
         EdgeRingBuffer(int maxEdges) {
             this.capacity = maxEdges;
             this.lx = new float[maxEdges];
@@ -56,6 +56,8 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
             this.rz = new float[maxEdges];
             this.aL = new float[maxEdges];
             this.aR = new float[maxEdges];
+            this.bL = new float[maxEdges];
+            this.bR = new float[maxEdges];
         }
         private int tailIndex() { return Math.floorMod(head + size, capacity); }
         private int lastIndex() { return Math.floorMod(head + size - 1, capacity); }
@@ -64,11 +66,19 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         /**
          * @return true if pushing caused eviction of the oldest element (ring overwrite).
          */
-        boolean pushBack(Vector3D left, Vector3D right, float alphaL, float alphaR) {
+        boolean pushBack(
+                Vector3D left,
+                Vector3D right,
+                float alphaL,
+                float alphaR,
+                float brightnessL,
+                float brightnessR
+        ) {
             int idx = tailIndex();
             lx[idx] = left.x; ly[idx] = left.y; lz[idx] = left.z;
             rx[idx] = right.x; ry[idx] = right.y; rz[idx] = right.z;
             aL[idx] = alphaL; aR[idx] = alphaR;
+            bL[idx] = brightnessL; bR[idx] = brightnessR;
             boolean evicted = false;
             if (size < capacity) {
                 size++;
@@ -98,6 +108,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
             out.lx = lx[idx]; out.ly = ly[idx]; out.lz = lz[idx];
             out.rx = rx[idx]; out.ry = ry[idx]; out.rz = rz[idx];
             out.aL = aL[idx]; out.aR = aR[idx];
+            out.bL = bL[idx]; out.bR = bR[idx];
         }
 
         void addOffset(float dx, float dy, float dz) {
@@ -189,7 +200,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
 
     // scratch struct to avoid object churn in draw()
     private static final class TmpEdge {
-        float lx, ly, lz, rx, ry, rz, aL, aR;
+        float lx, ly, lz, rx, ry, rz, aL, aR, bL, bR;
     }
 
     private final EdgeRingBuffer edgeBuf;
@@ -224,12 +235,26 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
     // ---- Public API ---------------------------------------------------------
 
     /** Append a new (L,R) pair to the back. Evicts front if at capacity and eviction enabled. */
-    public void pushBack(Vector3D newLeft, Vector3D newRight, float alphaL, float alphaR) {
+    public void pushBack(
+            Vector3D newLeft,
+            Vector3D newRight,
+            float alphaL,
+            float alphaR,
+            float brightnessL,
+            float brightnessR
+    ) {
         // Ensure we have a sub-strip open
         if (stripBuf.getSize() == 0 || stripBuf.getCountAt(stripBuf.getSize() - 1) == 0) {
             stripBuf.startNewStrip(edgeBuf.getNextSeq());
         }
-        boolean evicted = edgeBuf.pushBack(newLeft, newRight, alphaL, alphaR);
+        boolean evicted = edgeBuf.pushBack(
+                newLeft,
+                newRight,
+                alphaL,
+                alphaR,
+                brightnessL,
+                brightnessR
+        );
         // If the edge ring evicted the oldest element (overwrite), keep strip metadata in sync.
         if (evicted && stripBuf.getSize() > 0) {
             stripBuf.decFirstCountAndMaybePop();
@@ -349,10 +374,10 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
 
                 // Left vertex
                 vertexBuffer.put(tmpCurr.lx).put(tmpCurr.ly).put(tmpCurr.lz);
-                vertexBuffer.put(nX).put(nY).put(nZ).put(tmpCurr.aL);
+                vertexBuffer.put(nX).put(nY).put(nZ).put(tmpCurr.aL).put(tmpCurr.bL);
                 // Right vertex
                 vertexBuffer.put(tmpCurr.rx).put(tmpCurr.ry).put(tmpCurr.rz);
-                vertexBuffer.put(nX).put(nY).put(nZ).put(tmpCurr.aR);
+                vertexBuffer.put(nX).put(nY).put(nZ).put(tmpCurr.aR).put(tmpCurr.bR);
                 writtenVertices += 2;
             }
 

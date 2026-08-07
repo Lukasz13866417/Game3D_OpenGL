@@ -1,10 +1,14 @@
 package com.example.game3d_opengl.game.terrain.track_elements.portal.rendering;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 public final class PortalSphereMesh3D
-        extends AbstractMesh3D<PortalSphereDrawArgs, PortalSphereShaderPair> {
+        extends AbstractMesh3D<
+                PortalSphereDrawArgs,
+                PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout>,
+                VertexLayout.PositionNormalFaceGroupLayout> {
 
     private final PortalSphereShaderArgs.VS vs = new PortalSphereShaderArgs.VS();
     private final PortalSphereShaderArgs.FS fs = new PortalSphereShaderArgs.FS();
@@ -14,7 +18,9 @@ public final class PortalSphereMesh3D
     }
 
     @Override
-    protected void setVariableArgsValues(PortalSphereDrawArgs args, PortalSphereShaderPair targetShader) {
+    protected void setVariableArgsValues(
+            PortalSphereDrawArgs args,
+            PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout> targetShader) {
         vs.vp = args.vp;
         vs.centerX = args.centerX;
         vs.centerY = args.centerY;
@@ -40,7 +46,12 @@ public final class PortalSphereMesh3D
     }
 
     public static final class Builder
-            extends BaseBuilder<PortalSphereMesh3D, Builder, PortalSphereShaderPair> {
+            extends BaseBuilder<
+                    PortalSphereMesh3D,
+                    Builder,
+                    PortalSphereDrawArgs,
+                    PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout>,
+                    VertexLayout.PositionNormalFaceGroupLayout> {
 
         private float[] normals;
         private float[] faceGroups;
@@ -77,6 +88,11 @@ public final class PortalSphereMesh3D
                 out[o + 6] = faceGroups != null ? faceGroups[i] : 0f;
             }
             return out;
+        }
+
+        @Override
+        protected VertexLayout.PositionNormalFaceGroupLayout createLayout() {
+            return VertexLayout.PositionNormalFaceGroupLayout.INSTANCE;
         }
 
         @Override

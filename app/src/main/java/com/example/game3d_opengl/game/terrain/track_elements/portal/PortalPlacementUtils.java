@@ -5,39 +5,66 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 final class PortalPlacementUtils {
     private PortalPlacementUtils() {}
 
+    static void computeHorizontalLookDirection(
+            float nearLeftX, float nearLeftY, float nearLeftZ,
+            float nearRightX, float nearRightY, float nearRightZ,
+            float farLeftX, float farLeftY, float farLeftZ,
+            float farRightX, float farRightY, float farRightZ,
+            float[] outDirection
+    ) {
+        float edgeHX = nearRightX - nearLeftX;
+        float edgeHZ = nearRightZ - nearLeftZ;
+
+        float nearMidX = 0.5f * (nearLeftX + nearRightX);
+        float nearMidZ = 0.5f * (nearLeftZ + nearRightZ);
+        float farMidX = 0.5f * (farLeftX + farRightX);
+        float farMidZ = 0.5f * (farLeftZ + farRightZ);
+        float toFarHX = farMidX - nearMidX;
+        float toFarHZ = farMidZ - nearMidZ;
+
+        float lookX = -edgeHZ;
+        float lookY = 0f;
+        float lookZ = edgeHX;
+        float lookLenSq = lookX * lookX + lookZ * lookZ;
+        if (lookLenSq < 1e-8f) {
+            lookX = toFarHX;
+            lookZ = toFarHZ;
+            lookLenSq = lookX * lookX + lookZ * lookZ;
+        }
+        if (lookLenSq < 1e-8f) {
+            outDirection[0] = 0f;
+            outDirection[1] = 0f;
+            outDirection[2] = -1f;
+            return;
+        }
+
+        if ((toFarHX * toFarHX + toFarHZ * toFarHZ) > 1e-8f
+                && lookX * toFarHX + lookZ * toFarHZ < 0f) {
+            lookX = -lookX;
+            lookZ = -lookZ;
+        }
+
+        float invLookLen = 1f / (float) Math.sqrt(lookLenSq);
+        outDirection[0] = lookX * invLookLen;
+        outDirection[1] = lookY;
+        outDirection[2] = lookZ * invLookLen;
+    }
+
     static Vector3D computeHorizontalLookDirection(
             Vector3D fieldNearLeft,
             Vector3D fieldNearRight,
             Vector3D fieldFarLeft,
             Vector3D fieldFarRight
     ) {
-        Vector3D nearEdge = fieldNearRight.sub(fieldNearLeft);
-        Vector3D edgeH = new Vector3D(nearEdge.x, 0f, nearEdge.z);
-
-        Vector3D nearMid = fieldNearLeft.add(fieldNearRight).div(2f);
-        Vector3D farMid = fieldFarLeft.add(fieldFarRight).div(2f);
-        Vector3D toFar = farMid.sub(nearMid);
-        Vector3D toFarH = new Vector3D(toFar.x, 0f, toFar.z);
-
-        // One horizontal perpendicular to near edge.
-        Vector3D look = new Vector3D(-edgeH.z, 0f, edgeH.x);
-        if (look.sqlen() < 1e-8f) {
-            look = toFarH;
-        }
-        if (look.sqlen() < 1e-8f) {
-            look = new Vector3D(0f, 0f, -1f);
-        }
-
-        // Pick the sign that points toward the far side of the tile.
-        if (toFarH.sqlen() > 1e-8f && look.dotProduct(toFarH) < 0f) {
-            look = look.mult(-1f);
-        }
-
-        Vector3D n = look.withLen(1f);
-        if (n.sqlen() < 1e-8f) {
-            return new Vector3D(0f, 0f, -1f);
-        }
-        return n;
+        float[] direction = new float[3];
+        computeHorizontalLookDirection(
+                fieldNearLeft.x, fieldNearLeft.y, fieldNearLeft.z,
+                fieldNearRight.x, fieldNearRight.y, fieldNearRight.z,
+                fieldFarLeft.x, fieldFarLeft.y, fieldFarLeft.z,
+                fieldFarRight.x, fieldFarRight.y, fieldFarRight.z,
+                direction
+        );
+        return new Vector3D(direction[0], direction[1], direction[2]);
     }
 }
 

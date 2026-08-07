@@ -2,34 +2,41 @@ package com.example.game3d_opengl.game.terrain.track_elements.portal.rendering;
 
 import android.opengl.GLES20;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
-public final class PortalShaderPair extends ShaderPair<PortalShaderArgs.VS, PortalShaderArgs.FS> {
+public final class PortalShaderPair<
+        L extends VertexLayout.HasPosition & VertexLayout.HasTexCoords>
+        extends MeshShaderPair<PortalShaderArgs.VS, PortalShaderArgs.FS, L> {
 
-    private static PortalShaderPair sharedShader = null;
+    private static PortalShaderPair<VertexLayout.PositionUvLayout> sharedShader = null;
 
     public static void LOAD_SHADER_CODE() {
         if (sharedShader != null) return;
         String vs = ""
+                + "#version 300 es\n"
                 + "uniform mat4 uMVPMatrix;\n"
-                + "attribute vec4 aPosition;\n"
-                + "attribute vec2 aUV;\n"
-                + "varying vec2 vUV;\n"
+                + "in vec4 aPosition;\n"
+                + "in vec2 aUV;\n"
+                + "out vec2 vUV;\n"
                 + "void main(){\n"
                 + "  vUV = aUV;\n"
                 + "  gl_Position = uMVPMatrix * aPosition;\n"
                 + "}\n";
         String fs = ""
+                + "#version 300 es\n"
                 + "precision mediump float;\n"
                 + "uniform sampler2D uTexture;\n"
-                + "varying vec2 vUV;\n"
+                + "in vec2 vUV;\n"
+                + "out vec4 fragColor;\n"
                 + "void main(){\n"
-                + "  gl_FragColor = texture2D(uTexture, vUV);\n"
+                + "  fragColor = texture(uTexture, vUV);\n"
                 + "}\n";
         sharedShader = new Builder().fromSource(vs, fs).build();
     }
 
-    public static PortalShaderPair getSharedShader() {
+    public static PortalShaderPair<VertexLayout.PositionUvLayout> getSharedShader() {
         if (sharedShader == null) {
             throw new IllegalStateException("PortalShaderPair not loaded. Call LOAD_SHADER_CODE first.");
         }
@@ -55,12 +62,10 @@ public final class PortalShaderPair extends ShaderPair<PortalShaderArgs.VS, Port
     }
 
     @Override
-    public void enableAndPointVertexAttribs() {
-        int stride = 5 * 4;
-        GLES20.glEnableVertexAttribArray(aPos);
-        GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, stride, 0);
-        GLES20.glEnableVertexAttribArray(aUV);
-        GLES20.glVertexAttribPointer(aUV, 2, GLES20.GL_FLOAT, false, stride, 3 * 4);
+    protected void enableAndPointVertexAttribs(L layout) {
+        int stride = layout.strideBytes();
+        layout.position().enableAndPoint(aPos, stride);
+        layout.texCoords().enableAndPoint(aUV, stride);
     }
 
     @Override
@@ -78,13 +83,15 @@ public final class PortalShaderPair extends ShaderPair<PortalShaderArgs.VS, Port
         GLES20.glUniform1i(uTexture, unit);
     }
 
-    public static final class Builder extends ShaderPair.BaseBuilder<PortalShaderPair, Builder> {
+    public static final class Builder
+            extends ShaderPair.BaseBuilder<PortalShaderPair<VertexLayout.PositionUvLayout>, Builder> {
         @Override
         protected Builder self() { return this; }
 
         @Override
-        protected PortalShaderPair create(int programHandle, String vs, String fs) {
-            return new PortalShaderPair(programHandle, vs, fs);
+        protected PortalShaderPair<VertexLayout.PositionUvLayout> create(
+                int programHandle, String vs, String fs) {
+            return new PortalShaderPair<>(programHandle, vs, fs);
         }
     }
 }

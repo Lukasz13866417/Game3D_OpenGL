@@ -3,12 +3,14 @@ package com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advance
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.BaseGridCreator;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridSegment;
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.GridBuildScratch;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_end_pos.EndPosTreeKind;
 
 import org.junit.Test;
@@ -55,6 +57,14 @@ public class AdvancedGridCreatorTest {
         for (int i = 0; i < expectedGridRows.length; ++i) {
             assertEquals(expectedGridRows[i], lines[i + 2]);
         }
+    }
+
+    private static GridSegment[] scratchToSegments(GridBuildScratch scratch) {
+        GridSegment[] out = new GridSegment[scratch.size()];
+        for (int i = 0; i < scratch.size(); ++i) {
+            out[i] = GridSegment.GS(scratch.rowAt(i), scratch.colAt(i), scratch.lengthAt(i));
+        }
+        return out;
     }
 
     private static void destroyIfMaterialized(GridCreatorWrapper wrapper) {
@@ -173,31 +183,48 @@ public class AdvancedGridCreatorTest {
     }
 
     @Test
+    public void appendMaximalFreeSegments_writes_requested_axis_into_scratch() {
+        AdvancedGridCreator creator = new AdvancedGridCreator(4, 4);
+        GridBuildScratch scratch = new GridBuildScratch();
+        try {
+            creator.reserveVertical(1, 2, 3);
+
+            creator.appendMaximalFreeSegments(false, scratch);
+            assertArrayEquals(
+                    new GridSegment[]{
+                            GridSegment.GS(1, 1, 1),
+                            GridSegment.GS(1, 3, 2),
+                            GridSegment.GS(2, 1, 1),
+                            GridSegment.GS(2, 3, 2),
+                            GridSegment.GS(3, 1, 1),
+                            GridSegment.GS(3, 3, 2),
+                            GridSegment.GS(4, 1, 4)
+                    },
+                    scratchToSegments(scratch)
+            );
+
+            scratch.clear();
+            creator.appendMaximalFreeSegments(true, scratch);
+            assertArrayEquals(
+                    new GridSegment[]{
+                            GridSegment.GS(1, 1, 4),
+                            GridSegment.GS(4, 2, 1),
+                            GridSegment.GS(1, 3, 4),
+                            GridSegment.GS(1, 4, 4)
+                    },
+                    scratchToSegments(scratch)
+            );
+        } finally {
+            creator.destroy();
+        }
+    }
+
+    @Test
     public void wrapper_materializes_parent_from_child_creator() {
         GridCreatorWrapper parentWrapper = new GridCreatorWrapper();
         GridCreatorWrapper childWrapper = new GridCreatorWrapper();
         try {
-            parentWrapper.configureStructure(
-                    true,
-                    5,
-                    4,
-                    null,
-                    0,
-                    EndPosTreeKind.POOLED_TREAP,
-                    true,
-                    new int[0][2]
-            );
-            childWrapper.configureStructure(
-                    true,
-                    3,
-                    4,
-                    parentWrapper,
-                    1,
-                    EndPosTreeKind.POOLED_TREAP,
-                    true,
-                    new int[0][2]
-            );
-            parentWrapper.addChildWrapper(childWrapper, 1);
+            configureParentChildPair(parentWrapper, childWrapper);
             childWrapper.materializeIfNeeded();
             ((AdvancedGridCreator) childWrapper.getContent()).reserveHorizontal(2, 2, 2);
             childWrapper.finishAddonPhase();
@@ -227,6 +254,52 @@ public class AdvancedGridCreatorTest {
         } finally {
             destroyIfMaterialized(parentWrapper);
             destroyIfMaterialized(childWrapper);
+        }
+    }
+
+    @Test
+    public void staged_wrapper_materialization_matches_eager_parent_build() {
+        GridCreatorWrapper eagerParent = new GridCreatorWrapper();
+        GridCreatorWrapper eagerChild = new GridCreatorWrapper();
+        GridCreatorWrapper stagedParent = new GridCreatorWrapper();
+        GridCreatorWrapper stagedChild = new GridCreatorWrapper();
+        try {
+            configureParentChildPair(eagerParent, eagerChild);
+            configureParentChildPair(stagedParent, stagedChild);
+
+            eagerChild.materializeIfNeeded();
+            ((AdvancedGridCreator) eagerChild.getContent()).reserveHorizontal(2, 2, 2);
+            eagerChild.finishAddonPhase();
+            eagerParent.materializeIfNeeded();
+            AdvancedGridCreator eagerCreator = (AdvancedGridCreator) eagerParent.getContent();
+            assertNotNull(eagerCreator);
+
+            stagedChild.materializeIfNeeded();
+            ((AdvancedGridCreator) stagedChild.getContent()).reserveHorizontal(2, 2, 2);
+            stagedChild.finishAddonPhase();
+            stagedParent.beginAdvancedMaterialization();
+            assertNull(stagedParent.getContent());
+            stagedParent.buildAdvancedHorizontalIfNeeded();
+            assertNull(stagedParent.getContent());
+            stagedParent.buildAdvancedVerticalIfNeeded();
+            assertNull(stagedParent.getContent());
+            stagedParent.finalizeAdvancedMaterialization();
+            AdvancedGridCreator stagedCreator = (AdvancedGridCreator) stagedParent.getContent();
+            assertNotNull(stagedCreator);
+
+            assertArrayEquals(
+                    eagerCreator.exportHorizontalFreeSegments(),
+                    stagedCreator.exportHorizontalFreeSegments()
+            );
+            assertArrayEquals(
+                    eagerCreator.exportVerticalFreeSegments(),
+                    stagedCreator.exportVerticalFreeSegments()
+            );
+        } finally {
+            destroyIfMaterialized(eagerParent);
+            destroyIfMaterialized(eagerChild);
+            destroyIfMaterialized(stagedParent);
+            destroyIfMaterialized(stagedChild);
         }
     }
 
@@ -286,6 +359,30 @@ public class AdvancedGridCreatorTest {
             destroyIfMaterialized(firstChild);
             destroyIfMaterialized(secondChild);
         }
+    }
+
+    private static void configureParentChildPair(GridCreatorWrapper parentWrapper, GridCreatorWrapper childWrapper) {
+        parentWrapper.configureStructure(
+                true,
+                5,
+                4,
+                null,
+                0,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        childWrapper.configureStructure(
+                true,
+                3,
+                4,
+                parentWrapper,
+                1,
+                EndPosTreeKind.POOLED_TREAP,
+                true,
+                new int[0][2]
+        );
+        parentWrapper.addChildWrapper(childWrapper, 1);
     }
 
     @Test

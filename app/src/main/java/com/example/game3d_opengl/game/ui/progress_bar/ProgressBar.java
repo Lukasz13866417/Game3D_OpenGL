@@ -25,7 +25,7 @@ public final class ProgressBar implements GPUResourceOwner {
     private final float dentWidthPx;
     private final float dentDepthPx;
     private final float edgePx;
-    private final FColor fillColor;
+    private FColor fillColor;
     private final FColor outlineColor;
     private float[] milestones;
     private final Rect outlineRectClip;
@@ -33,6 +33,7 @@ public final class ProgressBar implements GPUResourceOwner {
     private ProgressBarFillMesh3D fillMesh;
     private ProgressBarFillDrawArgs fillDrawArgs;
     private Mesh3DWireframe outlineMesh;
+    private MVPDrawArgs outlineDrawArgs;
 
     private ProgressBar(Builder b) {
         this.minVal = b.minVal;
@@ -63,7 +64,7 @@ public final class ProgressBar implements GPUResourceOwner {
         fillDrawArgs.progress = ratio;
         fillMesh.draw(fillDrawArgs);
 
-        outlineMesh.draw(new MVPDrawArgs(buildPlacementMatrix(outlineRectClip, 0f, 1f, 0f, 1f)));
+        outlineMesh.draw(outlineDrawArgs);
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
     }
 
@@ -76,10 +77,29 @@ public final class ProgressBar implements GPUResourceOwner {
     }
 
     public void setMilestones(float[] milestones) {
-        float[] next = milestones != null ? Arrays.copyOf(milestones, milestones.length) : new float[0];
-        if (Arrays.equals(this.milestones, next)) return;
-        this.milestones = next;
+        setMilestones(milestones, milestones != null ? milestones.length : 0);
+    }
+
+    public void setMilestones(float[] source, int count) {
+        int safeCount = source != null
+                ? Math.max(0, Math.min(count, source.length))
+                : 0;
+        if (sameValues(this.milestones, source, safeCount)) return;
+        this.milestones = safeCount > 0
+                ? Arrays.copyOf(source, safeCount)
+                : new float[0];
         rebuildMeshes();
+    }
+
+    /** Changes only the fill uniform; no geometry or GPU buffer is rebuilt. */
+    public void setFillColor(FColor color) {
+        if (color == null) {
+            return;
+        }
+        fillColor = color;
+        if (fillMesh != null) {
+            fillMesh.setColor(color);
+        }
     }
 
     @Override
@@ -95,10 +115,22 @@ public final class ProgressBar implements GPUResourceOwner {
     }
 
     private void rebuildMeshes() {
+        Builder.FillMeshData fillData = buildFillMeshData();
+        Vector3D[] outlineVerts = buildOutlineVerts();
+        int[][] outlineFace = new int[][]{ buildSequentialFace(outlineVerts.length) };
+
+        if (fillMesh != null
+                && outlineMesh != null
+                && fillMesh.canUpdateGeometry(fillData.verts)
+                && outlineMesh.canUpdateGeometry(outlineVerts, outlineFace)) {
+            fillMesh.updateGeometry(fillData.verts);
+            outlineMesh.updateGeometry(outlineVerts, outlineFace);
+            return;
+        }
+
         if (fillMesh != null) fillMesh.cleanupGPUResourcesRecursively();
         if (outlineMesh != null) outlineMesh.cleanupGPUResourcesRecursively();
 
-        Builder.FillMeshData fillData = buildFillMeshData();
         fillMesh = new ProgressBarFillMesh3D.Builder()
                 .verts(fillData.verts)
                 .faces(fillData.faces)
@@ -107,14 +139,28 @@ public final class ProgressBar implements GPUResourceOwner {
         fillDrawArgs = new ProgressBarFillDrawArgs();
         fillDrawArgs.vp = buildPlacementMatrix(outlineRectClip, 0f, 1f, 0f, 1f);
 
-        Vector3D[] outlineVerts = buildOutlineVerts();
-        int[][] outlineFace = new int[][]{ buildSequentialFace(outlineVerts.length) };
         outlineMesh = new Mesh3DWireframe.Builder()
                 .verts(outlineVerts)
                 .faces(outlineFace)
                 .edgeColor(outlineColor)
                 .pixelWidth(edgePx)
+                // Avoid rounded segment-end overlap at notch corners.
+                .capPixels(0f)
                 .buildObject();
+        outlineDrawArgs = new MVPDrawArgs(
+                buildPlacementMatrix(outlineRectClip, 0f, 1f, 0f, 1f));
+    }
+
+    private static boolean sameValues(float[] current, float[] source, int count) {
+        if (current == null || current.length != count) {
+            return false;
+        }
+        for (int i = 0; i < count; i++) {
+            if (Float.compare(current[i], source[i]) != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static float clamp01(float v) {
@@ -269,7 +315,7 @@ public final class ProgressBar implements GPUResourceOwner {
             List<Float> dentCenters = new ArrayList<>();
             for (float m : sorted) {
                 float t = (m - minVal) / (maxVal - minVal);
-                if (t <= 0f || t >= 1f) continue;
+                if (t < 0f || t >= 1f) continue;
                 dentCenters.add(t);
             }
             float[] out = new float[dentCenters.size()];
@@ -413,7 +459,7 @@ public final class ProgressBar implements GPUResourceOwner {
         List<Float> dentCenters = new ArrayList<>();
         for (float m : sorted) {
             float t = (m - minVal) / (maxVal - minVal);
-            if (t <= 0f || t >= 1f) continue;
+            if (t < 0f || t >= 1f) continue;
             dentCenters.add(t);
         }
         float[] out = new float[dentCenters.size()];

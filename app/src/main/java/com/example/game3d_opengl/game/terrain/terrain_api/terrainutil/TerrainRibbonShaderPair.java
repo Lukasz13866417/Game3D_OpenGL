@@ -5,13 +5,17 @@ import android.opengl.GLES20;
 import com.example.game3d_opengl.rendering.infill.InfillShaderArgs;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
+/**
+ * Shades the streamed terrain ribbon with its theme color and nearby gameplay light.
+ */
 public final class TerrainRibbonShaderPair
         extends ShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS> {
 
     public static final TerrainRibbonShaderPair sharedShader
             = TerrainRibbonShaderPair.createDefault();
 
-    private int uMVP, uColor, aPosition, uLightPos, uLightColor, aNormalAlpha;
+    private int uMVP, uColor, aPosition, uPositionOffset;
+    private int uLightPos, uLightColor, aNormalAlpha, aBrightness;
 
     private TerrainRibbonShaderPair(int programHandle, String vs, String fs) {
         super(programHandle, vs, fs);
@@ -19,27 +23,36 @@ public final class TerrainRibbonShaderPair
 
     public static TerrainRibbonShaderPair createDefault() {
         String vs =
-                "uniform mat4 uMVPMatrix;\n" +
-                        "attribute vec3 aPosition;\n" +
-                        "attribute vec4 aNormalAlpha;\n" +
-                        "varying vec3 vWorldPos;\n" +
-                        "varying vec3 vNormal;\n" +
-                        "varying float vAlpha;\n" +
+                "#version 300 es\n" +
+                        "uniform mat4 uMVPMatrix;\n" +
+                        "uniform vec3 uPositionOffset;\n" +
+                        "in vec3 aPosition;\n" +
+                        "in vec4 aNormalAlpha;\n" +
+                        "in float aBrightness;\n" +
+                        "out vec3 vWorldPos;\n" +
+                        "out vec3 vNormal;\n" +
+                        "out float vAlpha;\n" +
+                        "out float vBrightness;\n" +
                         "void main(){\n" +
-                        "  gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n" +
-                        "  vWorldPos = aPosition;\n" +
+                        "  vec3 renderPosition = aPosition + uPositionOffset;\n" +
+                        "  gl_Position = uMVPMatrix * vec4(renderPosition, 1.0);\n" +
+                        "  vWorldPos = renderPosition;\n" +
                         "  vNormal = aNormalAlpha.xyz;\n" +
                         "  vAlpha = aNormalAlpha.w;\n" +
+                        "  vBrightness = aBrightness;\n" +
                         "}";
         String fs =
-                "precision highp float;\n" +
+                "#version 300 es\n" +
+                        "precision highp float;\n" +
                         "uniform vec4 vColor;\n" +
-                        "varying vec3 vWorldPos;\n" +
-                        "varying vec3 vNormal;\n" +
-                        "varying float vAlpha;\n" +
+                        "in vec3 vWorldPos;\n" +
+                        "in vec3 vNormal;\n" +
+                        "in float vAlpha;\n" +
+                        "in float vBrightness;\n" +
                         "uniform vec3 uLightPos;\n" +
                         "uniform vec3 uLightColor;\n" +
                         "uniform int isDepthPass;\n" +
+                        "out vec4 fragColor;\n" +
                         "void main(){\n" +
                         "  if (isDepthPass == 1) {\n" +
                         "    if (vAlpha < 1.0) discard;\n" +
@@ -47,7 +60,7 @@ public final class TerrainRibbonShaderPair
                         "  }\n" +
                         "  const float AMBIENT = 0.08;\n" +
                         "  const float CONTRAST = 1.35;\n" +
-                        "  const float HIGHLIGHT_GAIN = 1.25;\n" +
+                        "  const float HIGHLIGHT_GAIN = 0.82;\n" +
                         "  vec3 toLight = uLightPos - vWorldPos;\n" +
                         "  float distSq = dot(toLight, toLight);\n" +
                         "  float atten = 1.0 / (1.0 + 0.0000001 * distSq);\n" +
@@ -56,35 +69,41 @@ public final class TerrainRibbonShaderPair
                         "  float diff = max(dot(L, N), 0.0);\n" +
                         "  float lit = clamp((diff * atten - 0.5) * CONTRAST + 0.5, 0.0, 1.0);\n" +
                         "  vec3 lighting = uLightColor * (lit * HIGHLIGHT_GAIN) + vec3(AMBIENT);\n" +
-                        "  gl_FragColor = vec4(vColor.rgb * lighting, vColor.a * vAlpha);\n" +
+                        "  fragColor = vec4(vColor.rgb * lighting * vBrightness, vColor.a * vAlpha);\n" +
                         "}";
         return new Builder().fromSource(vs, fs).build();
     }
 
     @Override
     public void enableAndPointVertexAttribs() {
-        // Attribute layout: vec3 aPosition, vec4 aNormalAlpha
-        final int stride = (3 + 4) * 4; // 28 bytes
+        // Attribute layout: vec3 aPosition, vec4 aNormalAlpha, float aBrightness
+        final int stride = (3 + 4 + 1) * 4; // 32 bytes
         GLES20.glEnableVertexAttribArray(aPosition);
         GLES20.glVertexAttribPointer(aPosition, 3, GLES20.GL_FLOAT, false, stride, 0);
         GLES20.glEnableVertexAttribArray(aNormalAlpha);
         GLES20.glVertexAttribPointer(aNormalAlpha, 4, GLES20.GL_FLOAT, false, stride, 12);
+        GLES20.glEnableVertexAttribArray(aBrightness);
+        GLES20.glVertexAttribPointer(aBrightness, 1, GLES20.GL_FLOAT, false, stride, 28);
     }
 
     @Override
     public void disableVertexAttribs() {
         GLES20.glDisableVertexAttribArray(aPosition);
         GLES20.glDisableVertexAttribArray(aNormalAlpha);
+        GLES20.glDisableVertexAttribArray(aBrightness);
     }
 
     @Override
     protected void setupAttribLocations() {
         this.uMVP = GLES20.glGetUniformLocation(getProgramHandle(), "uMVPMatrix");
+        this.uPositionOffset =
+                GLES20.glGetUniformLocation(getProgramHandle(), "uPositionOffset");
         this.uColor = GLES20.glGetUniformLocation(getProgramHandle(), "vColor");
         this.aPosition = GLES20.glGetAttribLocation(getProgramHandle(), "aPosition");
         this.uLightPos = GLES20.glGetUniformLocation(getProgramHandle(), "uLightPos");
         this.uLightColor = GLES20.glGetUniformLocation(getProgramHandle(), "uLightColor");
         this.aNormalAlpha = GLES20.glGetAttribLocation(getProgramHandle(), "aNormalAlpha");
+        this.aBrightness = GLES20.glGetAttribLocation(getProgramHandle(), "aBrightness");
         this.uIsDepthPass = GLES20.glGetUniformLocation(getProgramHandle(), "isDepthPass");
     }
 
@@ -92,6 +111,11 @@ public final class TerrainRibbonShaderPair
     protected void transferUniformArgsToGPU(InfillShaderArgs.VS vertexArgs,
                                             InfillShaderArgs.FS fragmentArgs) {
         GLES20.glUniformMatrix4fv(uMVP, 1, false, vertexArgs.mvp, 0);
+        GLES20.glUniform3f(
+                uPositionOffset,
+                vertexArgs.positionOffsetX,
+                vertexArgs.positionOffsetY,
+                vertexArgs.positionOffsetZ);
         GLES20.glUniform4fv(uColor, 1, fragmentArgs.color.rgba, 0);
         GLES20.glUniform3f(uLightPos, fragmentArgs.lightX, fragmentArgs.lightY, fragmentArgs.lightZ);
         GLES20.glUniform3f(uLightColor, fragmentArgs.lightColor.r(), fragmentArgs.lightColor.g(), fragmentArgs.lightColor.b());
@@ -113,5 +137,4 @@ public final class TerrainRibbonShaderPair
         }
     }
 }
-
 

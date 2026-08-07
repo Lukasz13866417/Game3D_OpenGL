@@ -2,6 +2,8 @@ package com.example.game3d_opengl.game.terrain.track_elements.spike;
 
 import android.opengl.GLES20;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 /**
@@ -10,7 +12,13 @@ import com.example.game3d_opengl.rendering.shader.ShaderPair;
  * quad to achieve constant pixel thickness.
  */
 public final class SpikeWireframeShaderPair
-        extends ShaderPair<SpikeWireframeShaderArgs.VS, SpikeWireframeShaderArgs.FS> {
+        <L extends VertexLayout.HasWeightsA
+                & VertexLayout.HasTA
+                & VertexLayout.HasWeightsB
+                & VertexLayout.HasTB
+                & VertexLayout.HasEdgeEnd
+                & VertexLayout.HasEdgeSide>
+        extends MeshShaderPair<SpikeWireframeShaderArgs.VS, SpikeWireframeShaderArgs.FS, L> {
 
     // Uniforms
     private int uMVP, uViewport, uHalfPx, uCapPx, uDepthBiasNDC, uColor;
@@ -19,13 +27,13 @@ public final class SpikeWireframeShaderPair
     // Attributes
     private int aWeightsA, aTA, aWeightsB, aTB, aEnd, aSide;
 
-    public static SpikeWireframeShaderPair sharedShader = null;
+    public static SpikeWireframeShaderPair<VertexLayout.SpikeCanonicalWireframeLayout> sharedShader = null;
 
     private SpikeWireframeShaderPair(int programHandle, String vs, String fs) {
         super(programHandle, vs, fs);
     }
 
-    public static SpikeWireframeShaderPair getSharedShader(){
+    public static SpikeWireframeShaderPair<VertexLayout.SpikeCanonicalWireframeLayout> getSharedShader(){
         if (sharedShader == null){
             throw new IllegalStateException(
                     "Shader instance is null. Needs calling LOAD_SHADER_CODE first"
@@ -36,6 +44,7 @@ public final class SpikeWireframeShaderPair
 
     public static void LOAD_SHADER_CODE() {
         String vs =
+                "#version 300 es\n" +
                 "uniform mat4 uMVPMatrix;\n" +
                 "uniform vec2 uViewport;\n" +
                 "uniform float uHalfPx;\n" +
@@ -45,15 +54,15 @@ public final class SpikeWireframeShaderPair
                 "uniform vec3 uApex;\n" +
                 "uniform vec3 uNormal;\n" +
                 "uniform float uBaseOffset;\n" +
-                "attribute vec4 aWeightsA;\n" +
-                "attribute float aTA;\n" +
-                "attribute vec4 aWeightsB;\n" +
-                "attribute float aTB;\n" +
-                "attribute float aEnd;\n" +
-                "attribute float aSide;\n" +
+                "in vec4 aWeightsA;\n" +
+                "in float aTA;\n" +
+                "in vec4 aWeightsB;\n" +
+                "in float aTB;\n" +
+                "in float aEnd;\n" +
+                "in float aSide;\n" +
                 "vec2 ndc(vec4 clip){ return clip.xy / clip.w; }\n" +
-                "varying vec2 vA_ndc;\n" +
-                "varying vec2 vB_ndc;\n" +
+                "out vec2 vA_ndc;\n" +
+                "out vec2 vB_ndc;\n" +
                 "void main(){\n" +
                 "  vec3 pBaseA = aWeightsA.x * uNL + aWeightsA.y * uNR + aWeightsA.z * uFR + aWeightsA.w * uFL;\n" +
                 "  vec3 worldA = mix(pBaseA + uNormal * uBaseOffset, uApex, aTA);\n" +
@@ -82,12 +91,14 @@ public final class SpikeWireframeShaderPair
                 "}";
 
         String fs =
+                "#version 300 es\n" +
                 "precision mediump float;\n" +
                 "uniform vec4 uColor;\n" +
                 "uniform vec2 uViewport;\n" +
                 "uniform float uHalfPx;\n" +
-                "varying vec2 vA_ndc;\n" +
-                "varying vec2 vB_ndc;\n" +
+                "in vec2 vA_ndc;\n" +
+                "in vec2 vB_ndc;\n" +
+                "out vec4 fragColor;\n" +
                 "void main(){\n" +
                 "  vec2 A_px = (vA_ndc * 0.5 + 0.5) * uViewport;\n" +
                 "  vec2 B_px = (vB_ndc * 0.5 + 0.5) * uViewport;\n" +
@@ -108,7 +119,7 @@ public final class SpikeWireframeShaderPair
                 "    dist = area / sqrt(len2 + 1e-6);\n" +
                 "  }\n" +
                 "  if (dist > uHalfPx) discard;\n" +
-                "  gl_FragColor = uColor; }";
+                "  fragColor = uColor; }";
 
         sharedShader = new Builder().fromSource(vs, fs).build();
     }
@@ -140,25 +151,14 @@ public final class SpikeWireframeShaderPair
     }
 
     @Override
-    public void enableAndPointVertexAttribs() {
-        final int stride = 12 * 4; // 12 floats per vertex
-        GLES20.glEnableVertexAttribArray(aWeightsA);
-        GLES20.glVertexAttribPointer(aWeightsA, 4, GLES20.GL_FLOAT, false, stride, 0);
-
-        GLES20.glEnableVertexAttribArray(aTA);
-        GLES20.glVertexAttribPointer(aTA, 1, GLES20.GL_FLOAT, false, stride, 4 * 4);
-
-        GLES20.glEnableVertexAttribArray(aWeightsB);
-        GLES20.glVertexAttribPointer(aWeightsB, 4, GLES20.GL_FLOAT, false, stride, 5 * 4);
-
-        GLES20.glEnableVertexAttribArray(aTB);
-        GLES20.glVertexAttribPointer(aTB, 1, GLES20.GL_FLOAT, false, stride, 9 * 4);
-
-        GLES20.glEnableVertexAttribArray(aEnd);
-        GLES20.glVertexAttribPointer(aEnd, 1, GLES20.GL_FLOAT, false, stride, 10 * 4);
-
-        GLES20.glEnableVertexAttribArray(aSide);
-        GLES20.glVertexAttribPointer(aSide, 1, GLES20.GL_FLOAT, false, stride, 11 * 4);
+    protected void enableAndPointVertexAttribs(L layout) {
+        final int stride = layout.strideBytes();
+        layout.weightsA().enableAndPoint(aWeightsA, stride);
+        layout.tA().enableAndPoint(aTA, stride);
+        layout.weightsB().enableAndPoint(aWeightsB, stride);
+        layout.tB().enableAndPoint(aTB, stride);
+        layout.edgeEnd().enableAndPoint(aEnd, stride);
+        layout.edgeSide().enableAndPoint(aSide, stride);
     }
 
     @Override
@@ -189,13 +189,17 @@ public final class SpikeWireframeShaderPair
         GLES20.glUniform1f(uBaseOffset, v.uBaseOffset);
     }
 
-    public static final class Builder extends ShaderPair.BaseBuilder<SpikeWireframeShaderPair, Builder> {
+    public static final class Builder
+            extends ShaderPair.BaseBuilder<
+                    SpikeWireframeShaderPair<VertexLayout.SpikeCanonicalWireframeLayout>,
+                    Builder> {
         @Override
         protected Builder self() { return this; }
 
         @Override
-        protected SpikeWireframeShaderPair create(int programHandle, String vs, String fs) {
-            return new SpikeWireframeShaderPair(programHandle, vs, fs);
+        protected SpikeWireframeShaderPair<VertexLayout.SpikeCanonicalWireframeLayout> create(
+                int programHandle, String vs, String fs) {
+            return new SpikeWireframeShaderPair<>(programHandle, vs, fs);
         }
     }
 }

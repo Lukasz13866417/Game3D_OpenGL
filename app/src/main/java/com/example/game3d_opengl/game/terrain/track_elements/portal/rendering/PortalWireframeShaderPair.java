@@ -2,6 +2,8 @@ package com.example.game3d_opengl.game.terrain.track_elements.portal.rendering;
 
 import android.opengl.GLES20;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 /**
@@ -12,9 +14,13 @@ import com.example.game3d_opengl.rendering.shader.ShaderPair;
  * projects to screen space, and offsets perpendicular to the edge direction.
  */
 public final class PortalWireframeShaderPair
-        extends ShaderPair<PortalWireframeShaderArgs.VS, PortalWireframeShaderArgs.FS> {
+        <L extends VertexLayout.HasPositionA
+                & VertexLayout.HasPositionB
+                & VertexLayout.HasEdgeEnd
+                & VertexLayout.HasEdgeSide>
+        extends MeshShaderPair<PortalWireframeShaderArgs.VS, PortalWireframeShaderArgs.FS, L> {
 
-    private static PortalWireframeShaderPair sharedShader = null;
+    private static PortalWireframeShaderPair<VertexLayout.EdgeABLayout> sharedShader = null;
 
     private int uVP, uCenter, uRadius, uRotation;
     private int uViewport, uHalfPx, uDepthBiasNDC, uColor;
@@ -24,15 +30,16 @@ public final class PortalWireframeShaderPair
         super(programHandle, vs, fs);
     }
 
-    public static PortalWireframeShaderPair getSharedShader() {
+    public static PortalWireframeShaderPair<VertexLayout.EdgeABLayout> getSharedShader() {
         if (sharedShader == null) {
             sharedShader = createDefault();
         }
         return sharedShader;
     }
 
-    private static PortalWireframeShaderPair createDefault() {
+    private static PortalWireframeShaderPair<VertexLayout.EdgeABLayout> createDefault() {
         String vs =
+                "#version 300 es\n" +
                 "uniform mat4 uVPMatrix;\n" +
                 "uniform vec3 uCenter;\n" +
                 "uniform float uRadius;\n" +
@@ -40,10 +47,10 @@ public final class PortalWireframeShaderPair
                 "uniform vec2 uViewport;\n" +
                 "uniform float uHalfPx;\n" +
                 "uniform float uDepthBiasNDC;\n" +
-                "attribute vec3 aPosA;\n" +
-                "attribute vec3 aPosB;\n" +
-                "attribute float aEnd;\n" +
-                "attribute float aSide;\n" +
+                "in vec3 aPosA;\n" +
+                "in vec3 aPosB;\n" +
+                "in float aEnd;\n" +
+                "in float aSide;\n" +
                 "vec3 toWorld(vec3 p){ return uCenter + uRotation * p * uRadius; }\n" +
                 "vec2 ndc(vec4 clip){ return clip.xy / clip.w; }\n" +
                 "void main(){\n" +
@@ -65,25 +72,23 @@ public final class PortalWireframeShaderPair
                 "  gl_Position.z += uDepthBiasNDC * gl_Position.w;\n" +
                 "}";
         String fs =
+                "#version 300 es\n" +
                 "precision mediump float;\n" +
                 "uniform vec4 uColor;\n" +
+                "out vec4 fragColor;\n" +
                 "void main(){\n" +
-                "  gl_FragColor = uColor;\n" +
+                "  fragColor = uColor;\n" +
                 "}";
         return new Builder().fromSource(vs, fs).build();
     }
 
     @Override
-    public void enableAndPointVertexAttribs() {
-        final int stride = 8 * 4;
-        GLES20.glEnableVertexAttribArray(aPosA);
-        GLES20.glVertexAttribPointer(aPosA, 3, GLES20.GL_FLOAT, false, stride, 0);
-        GLES20.glEnableVertexAttribArray(aPosB);
-        GLES20.glVertexAttribPointer(aPosB, 3, GLES20.GL_FLOAT, false, stride, 3 * 4);
-        GLES20.glEnableVertexAttribArray(aEnd);
-        GLES20.glVertexAttribPointer(aEnd, 1, GLES20.GL_FLOAT, false, stride, 6 * 4);
-        GLES20.glEnableVertexAttribArray(aSide);
-        GLES20.glVertexAttribPointer(aSide, 1, GLES20.GL_FLOAT, false, stride, 7 * 4);
+    protected void enableAndPointVertexAttribs(L layout) {
+        final int stride = layout.strideBytes();
+        layout.positionA().enableAndPoint(aPosA, stride);
+        layout.positionB().enableAndPoint(aPosB, stride);
+        layout.edgeEnd().enableAndPoint(aEnd, stride);
+        layout.edgeSide().enableAndPoint(aSide, stride);
     }
 
     @Override
@@ -125,13 +130,14 @@ public final class PortalWireframeShaderPair
     }
 
     public static final class Builder
-            extends ShaderPair.BaseBuilder<PortalWireframeShaderPair, Builder> {
+            extends ShaderPair.BaseBuilder<PortalWireframeShaderPair<VertexLayout.EdgeABLayout>, Builder> {
         @Override
         protected Builder self() { return this; }
 
         @Override
-        protected PortalWireframeShaderPair create(int programHandle, String vs, String fs) {
-            return new PortalWireframeShaderPair(programHandle, vs, fs);
+        protected PortalWireframeShaderPair<VertexLayout.EdgeABLayout> create(
+                int programHandle, String vs, String fs) {
+            return new PortalWireframeShaderPair<>(programHandle, vs, fs);
         }
     }
 }

@@ -9,19 +9,10 @@ import java.util.Arrays;
 public final class GridBuildScratch {
     private static final int DEFAULT_CAPACITY = 128;
 
-    private static final int ORDER_END_HORIZONTAL = 1;
-    private static final int ORDER_END_VERTICAL = 2;
-    private static final int ORDER_COL_ROW = 3;
-    private static final int ORDER_HASH = 4;
-
     private int[] rows;
     private int[] cols;
     private int[] lengths;
     private int size = 0;
-
-    private int orderMode = ORDER_END_HORIZONTAL;
-    private int hashTotalRows = 0;
-    private int hashCols = 0;
 
     public GridBuildScratch() {
         this(DEFAULT_CAPACITY);
@@ -65,46 +56,8 @@ public final class GridBuildScratch {
         size++;
     }
 
-    public void sortByEndPosition(boolean vertical) {
-        orderMode = vertical ? ORDER_END_VERTICAL : ORDER_END_HORIZONTAL;
+    public void sortByLengthThenPosition() {
         sort();
-    }
-
-    public void sortByColumnThenRow() {
-        orderMode = ORDER_COL_ROW;
-        sort();
-    }
-
-    public void sortByHash(int totalRows, int nCols) {
-        hashTotalRows = totalRows;
-        hashCols = nCols;
-        orderMode = ORDER_HASH;
-        sort();
-    }
-
-    public void mergeVerticalIntervalsInPlace() {
-        if (size <= 1) {
-            return;
-        }
-        sortByColumnThenRow();
-        int write = 0;
-        for (int read = 0; read < size; ++read) {
-            if (write == 0) {
-                copy(read, 0);
-                write = 1;
-                continue;
-            }
-            int prev = write - 1;
-            int prevEnd = rows[prev] + lengths[prev] - 1;
-            if (cols[prev] == cols[read] && rows[read] <= prevEnd + 1) {
-                int mergedEnd = Math.max(prevEnd, rows[read] + lengths[read] - 1);
-                lengths[prev] = mergedEnd - rows[prev] + 1;
-            } else {
-                copy(read, write);
-                write++;
-            }
-        }
-        size = write;
     }
 
     private void ensureCapacity(int requiredCapacity) {
@@ -158,39 +111,13 @@ public final class GridBuildScratch {
     }
 
     private int compare(int first, int second) {
-        switch (orderMode) {
-            case ORDER_END_HORIZONTAL:
-                if (rows[first] != rows[second]) {
-                    return Integer.compare(rows[first], rows[second]);
-                }
-                return Integer.compare(cols[first] + lengths[first], cols[second] + lengths[second]);
-            case ORDER_END_VERTICAL:
-                if (cols[first] != cols[second]) {
-                    return Integer.compare(cols[first], cols[second]);
-                }
-                return Integer.compare(rows[first] + lengths[first], rows[second] + lengths[second]);
-            case ORDER_COL_ROW:
-                if (cols[first] != cols[second]) {
-                    return Integer.compare(cols[first], cols[second]);
-                }
-                return Integer.compare(rows[first], rows[second]);
-            case ORDER_HASH:
-                return Integer.compare(hashAt(first), hashAt(second));
-            default:
-                throw new IllegalStateException("Unknown scratch sort mode: " + orderMode);
+        if (lengths[first] != lengths[second]) {
+            return Integer.compare(lengths[first], lengths[second]);
         }
-    }
-
-    private int hashAt(int index) {
-        return lengths[index] * hashTotalRows * hashCols
-                + (rows[index] - 1) * hashCols
-                + (cols[index] - 1);
-    }
-
-    private void copy(int from, int to) {
-        rows[to] = rows[from];
-        cols[to] = cols[from];
-        lengths[to] = lengths[from];
+        if (rows[first] != rows[second]) {
+            return Integer.compare(rows[first], rows[second]);
+        }
+        return Integer.compare(cols[first], cols[second]);
     }
 
     private void swap(int first, int second) {

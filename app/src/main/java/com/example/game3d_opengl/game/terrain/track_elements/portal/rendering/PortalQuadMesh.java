@@ -1,16 +1,22 @@
 package com.example.game3d_opengl.game.terrain.track_elements.portal.rendering;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
-public final class PortalQuadMesh extends AbstractMesh3D<PortalQuadDrawArgs, PortalShaderPair> {
+public final class PortalQuadMesh extends AbstractMesh3D<
+        PortalQuadDrawArgs,
+        PortalShaderPair<VertexLayout.PositionUvLayout>,
+        VertexLayout.PositionUvLayout> {
 
     private PortalQuadMesh(Builder builder) {
         super(builder);
     }
 
     @Override
-    protected void setVariableArgsValues(PortalQuadDrawArgs args, PortalShaderPair targetShader) {
+    protected void setVariableArgsValues(
+            PortalQuadDrawArgs args,
+            PortalShaderPair<VertexLayout.PositionUvLayout> targetShader) {
         PortalShaderArgs.VS vs = new PortalShaderArgs.VS();
         vs.mvp = args.vp;
         PortalShaderArgs.FS fs = new PortalShaderArgs.FS();
@@ -18,7 +24,12 @@ public final class PortalQuadMesh extends AbstractMesh3D<PortalQuadDrawArgs, Por
         targetShader.setArgs(vs, fs);
     }
 
-    public static final class Builder extends BaseBuilder<PortalQuadMesh, Builder, PortalShaderPair> {
+    public static final class Builder extends BaseBuilder<
+            PortalQuadMesh,
+            Builder,
+            PortalQuadDrawArgs,
+            PortalShaderPair<VertexLayout.PositionUvLayout>,
+            VertexLayout.PositionUvLayout> {
         private float[] uvs;
 
         public Builder uvs(float[] uvs) {
@@ -50,6 +61,11 @@ public final class PortalQuadMesh extends AbstractMesh3D<PortalQuadDrawArgs, Por
                 out[o + 4] = uvs[uo + 1];
             }
             return out;
+        }
+
+        @Override
+        protected VertexLayout.PositionUvLayout createLayout() {
+            return VertexLayout.PositionUvLayout.INSTANCE;
         }
 
         @Override

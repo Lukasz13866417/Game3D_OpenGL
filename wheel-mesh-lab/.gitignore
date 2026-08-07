@@ -1,0 +1,7 @@
+/build/
+/exports/*
+!/exports/mint-wheel.obj
+!/exports/mint-wheel.mtl
+!/exports/violet-wheel.obj
+!/exports/violet-wheel.mtl
+/screenshots/

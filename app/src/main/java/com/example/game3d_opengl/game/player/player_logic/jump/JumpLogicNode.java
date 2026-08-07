@@ -184,9 +184,16 @@ public final class JumpLogicNode extends StateInfoNode<JumpLogicNode.Data> {
         int lookAheadFrames = Math.max(1, jumpConfig.jumpAirReleaseBufferFrames);
 
         Vector3D dir = in.getMoveDir();
-        Vector3D horizontalVel = dir != null ? dir.withLen(playerConfig.playerSpeed) : null;
-        float vx = horizontalVel != null ? horizontalVel.x : 0f;
-        float vz = horizontalVel != null ? horizontalVel.z : 0f;
+        float vx = 0f;
+        float vz = 0f;
+        if (dir != null) {
+            float dirLen = (float) Math.sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+            if (dirLen > 1e-8f) {
+                float scale = in.getActiveHorizontalSpeed() / dirLen;
+                vx = dir.x * scale;
+                vz = dir.z * scale;
+            }
+        }
 
         float px = in.position.x;
         float py = in.position.y;

@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Game3D_OpenGL</string>
+    <string name="screenshot_button_label">SHOT</string>
+    <string name="screenshot_button_description">Save gameplay screenshot</string>
+    <string name="screenshot_already_in_progress">A screenshot is already being saved</string>
+    <string name="screenshot_surface_unavailable">The game image is not ready to capture</string>
+    <string name="screenshot_capture_failed">Could not capture the game image</string>
+    <string name="screenshot_capture_failed_with_code">Could not capture the game image (error %1$d)</string>
+    <string name="screenshot_save_failed">Could not save the screenshot</string>
+    <string name="screenshot_saved">Screenshot saved to %1$s</string>
 </resources>

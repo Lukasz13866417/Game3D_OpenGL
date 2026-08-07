@@ -2,12 +2,15 @@ package com.example.game3d_opengl.game.progress_bar;
 
 import android.opengl.GLES20;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 public final class ProgressBarFillShaderPair
-        extends ShaderPair<ProgressBarFillShaderArgs.VS, ProgressBarFillShaderArgs.FS> {
+        <L extends VertexLayout.HasPosition>
+        extends MeshShaderPair<ProgressBarFillShaderArgs.VS, ProgressBarFillShaderArgs.FS, L> {
 
-    private static ProgressBarFillShaderPair sharedShader;
+    private static ProgressBarFillShaderPair<VertexLayout.PositionLayout> sharedShader;
 
     private int aPosition;
     private int uMVP;
@@ -18,7 +21,7 @@ public final class ProgressBarFillShaderPair
         super(programHandle, vs, fs);
     }
 
-    public static ProgressBarFillShaderPair getSharedShader() {
+    public static ProgressBarFillShaderPair<VertexLayout.PositionLayout> getSharedShader() {
         if (sharedShader == null) {
             sharedShader = new Builder().fromSource(buildVS(), buildFS()).build();
         }
@@ -26,9 +29,10 @@ public final class ProgressBarFillShaderPair
     }
 
     private static String buildVS() {
-        return "uniform mat4 uMVPMatrix;\n" +
-               "attribute vec3 aPosition;\n" +
-               "varying float vU;\n" +
+        return "#version 300 es\n" +
+               "uniform mat4 uMVPMatrix;\n" +
+               "in vec3 aPosition;\n" +
+               "out float vU;\n" +
                "void main(){\n" +
                "  gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n" +
                "  vU = aPosition.x;\n" +
@@ -36,13 +40,15 @@ public final class ProgressBarFillShaderPair
     }
 
     private static String buildFS() {
-        return "precision mediump float;\n" +
+        return "#version 300 es\n" +
+               "precision mediump float;\n" +
                "uniform vec4 uColor;\n" +
                "uniform float uProgress;\n" +
-               "varying float vU;\n" +
+               "in float vU;\n" +
+               "out vec4 fragColor;\n" +
                "void main(){\n" +
                "  if (vU > uProgress) discard;\n" +
-               "  gl_FragColor = uColor;\n" +
+               "  fragColor = uColor;\n" +
                "}";
     }
 
@@ -56,10 +62,8 @@ public final class ProgressBarFillShaderPair
     }
 
     @Override
-    public void enableAndPointVertexAttribs() {
-        final int stride = 3 * 4;
-        GLES20.glEnableVertexAttribArray(aPosition);
-        GLES20.glVertexAttribPointer(aPosition, 3, GLES20.GL_FLOAT, false, stride, 0);
+    protected void enableAndPointVertexAttribs(L layout) {
+        layout.position().enableAndPoint(aPosition, layout.strideBytes());
     }
 
     @Override
@@ -74,13 +78,15 @@ public final class ProgressBarFillShaderPair
         GLES20.glUniform1f(uProgress, f.progress);
     }
 
-    public static final class Builder extends ShaderPair.BaseBuilder<ProgressBarFillShaderPair, Builder> {
+    public static final class Builder
+            extends ShaderPair.BaseBuilder<ProgressBarFillShaderPair<VertexLayout.PositionLayout>, Builder> {
         @Override
         protected Builder self() { return this; }
 
         @Override
-        protected ProgressBarFillShaderPair create(int programHandle, String vs, String fs) {
-            return new ProgressBarFillShaderPair(programHandle, vs, fs);
+        protected ProgressBarFillShaderPair<VertexLayout.PositionLayout> create(
+                int programHandle, String vs, String fs) {
+            return new ProgressBarFillShaderPair<>(programHandle, vs, fs);
         }
     }
 }

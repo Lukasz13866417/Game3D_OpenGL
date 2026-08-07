@@ -16,6 +16,7 @@ import com.example.game3d_opengl.game.terrain.track_elements.potion.Potion;
 public class ExitPortalStructure extends AdvancedTerrainStructure {
 
     private final ExitPortal exitPortal;
+    private int lastGeneratedRows = -1;
 
     public ExitPortalStructure(ExitPortal exitPortal) {
         this(PortalConfig.EXIT_STRUCTURE_ROWS, exitPortal);
@@ -38,6 +39,7 @@ public class ExitPortalStructure extends AdvancedTerrainStructure {
 
     @Override
     protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
+        lastGeneratedRows = nRows;
         int portalSegLen = portalSegmentLength(nCols);
         int portalCol = centeredStartCol(nCols, portalSegLen);
         brush.reserveHorizontalRegion(1, portalCol, portalSegLen, exitPortal);
@@ -74,6 +76,10 @@ public class ExitPortalStructure extends AdvancedTerrainStructure {
         }
         int desired = 1 + max(1, PortalConfig.MIN_ENTRANCE_EXIT_ROW_GAP / 2);
         return min(nRows, desired);
+    }
+
+    int getLastGeneratedRows() {
+        return lastGeneratedRows;
     }
 
 }

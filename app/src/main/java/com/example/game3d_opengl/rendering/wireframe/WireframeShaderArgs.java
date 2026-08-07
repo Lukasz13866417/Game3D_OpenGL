@@ -7,6 +7,8 @@ public final class WireframeShaderArgs {
 
     public static final class VS extends ShaderArgValues {
         public float[] mvp; // not owned
+        public int viewportX;
+        public int viewportY;
         public int viewportW;
         public int viewportH;
         public float halfPx;
@@ -21,5 +23,4 @@ public final class WireframeShaderArgs {
         public FColor color;
     }
 }
-
 

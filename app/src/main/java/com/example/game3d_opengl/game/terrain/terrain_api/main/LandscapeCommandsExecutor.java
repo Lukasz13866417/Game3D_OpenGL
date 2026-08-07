@@ -16,10 +16,12 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
     public static final int CMD_LIFT_UP = 7;
     public static final int CMD_START_STRUCTURE_LANDSCAPE = 8;
     public static final int CMD_SET_ALPHAS = 9;
-    public static final int CMD_LANDSCAPE_USER_LAST = 9;
+    public static final int CMD_SET_TILE_PROFILE = 10;
+    public static final int CMD_SET_TILE_BRIGHTNESS = 11;
+    public static final int CMD_LANDSCAPE_USER_LAST = 11;
 
     // Internal commands
-    public static final int CMD_FINISH_STRUCTURE_LANDSCAPE = 10;
+    public static final int CMD_FINISH_STRUCTURE_LANDSCAPE = 12;
 
     private final Terrain terrain;
 
@@ -69,6 +71,7 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 terrain.gridCreatorWrapperStack.push(
                         new GridCreatorWrapper(terrain.gridResourcePack.partialSegmentHandlerResourcePack())
                 );
+                terrain.recordStructureLandscapeStart();
                 if (!isChild) {
                     what.generateTiles(terrain.tileBrush);
                     terrain.commandBuffer.addCommand(CMD_FINISH_STRUCTURE_LANDSCAPE);
@@ -86,7 +89,6 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                 int nRowsAdded = terrain.tileManager.getCurrRowCount() - startRowCount;
                 boolean propagateToParent = thatStructure.shouldPropagateReservationsToParent();
                 int[][] blockedRowsForThisCreator = myGridCreatorWrapper.consumePendingBlockedRowsRanges();
-                System.out.println("<> ROWS ADDED: "+nRowsAdded+" , " +terrain.tileManager.getCurrRowCount() + " , " + startRowCount+ " name: "+thatStructure.name);
                 boolean isAdvanced = thatStructure instanceof AdvancedTerrainStructure;
                 myGridCreatorWrapper.configureStructure(
                         isAdvanced,
@@ -98,6 +100,7 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                         propagateToParent,
                         blockedRowsForThisCreator
                 );
+                myGridCreatorWrapper.setDebugName(thatStructure.name);
                 if (parentGridCreatorWrapper != null) {
                     parentGridCreatorWrapper.addChildWrapper(myGridCreatorWrapper, ourRowOffsetFromParent);
                 }
@@ -119,15 +122,30 @@ public class LandscapeCommandsExecutor implements CommandExecutor {
                         parentGridCreatorWrapper.addPendingBlockedRowsRange(absStart, absEnd);
                     }
                 }
+                terrain.recordStructureLandscapeFinish();
                 terrain.gridCreatorWrapperQueue.enqueue(myGridCreatorWrapper);
                 terrain.rowOffsetQueue.enqueue(startRowCount);
-                terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_START_STRUCTURE_ADDONS);
-                thatStructure.generateAddons(terrain, nRowsAdded, terrain.nCols);
+                terrain.enqueueDeferredAddonPhase(thatStructure, nRowsAdded, terrain.nCols);
+                terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_BEGIN_STRUCTURE_ADDONS);
+                if (isAdvanced) {
+                    terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_BUILD_AGC_HORIZONTAL);
+                    terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_BUILD_AGC_VERTICAL);
+                    terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_FINALIZE_AGC);
+                }
+                terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_EMIT_STRUCTURE_ADDONS);
                 terrain.commandBuffer.addCommand(AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS);
                 break;
             case CMD_SET_ALPHAS:
                 float alphaL = buffer[offset + 2], alphaR = buffer[offset + 3];
                 terrain.tileManager.setUpcomingAlphas(alphaL, alphaR);
+                break;
+            case CMD_SET_TILE_PROFILE:
+                terrain.tileManager.setUpcomingTileProfile(
+                        TileProfile.fromCommandId((int) buffer[offset + 2])
+                );
+                break;
+            case CMD_SET_TILE_BRIGHTNESS:
+                terrain.tileManager.setUpcomingBrightnessMultiplier(buffer[offset + 2]);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown command code: " + code);

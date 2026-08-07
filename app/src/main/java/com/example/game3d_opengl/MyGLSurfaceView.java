@@ -5,10 +5,13 @@ import android.opengl.GLSurfaceView;
 import android.view.Display;
 import android.view.MotionEvent;
 
+import com.example.game3d_opengl.game.util.AndroidGameClock;
+
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGLConfig;
 
 public class MyGLSurfaceView extends GLSurfaceView {
+    private static final int EGL_OPENGL_ES3_BIT_KHR = 0x40;
 
     private final MyGLRenderer renderer;
     private volatile int vsyncDivisor = 1; // 1 = render every vsync
@@ -17,7 +20,7 @@ public class MyGLSurfaceView extends GLSurfaceView {
     public MyGLSurfaceView(Context context){
         super(context);
 
-        setEGLContextClientVersion(2);
+        setEGLContextClientVersion(3);
 
         setEGLConfigChooser((egl, display) -> {
             int[] attribList = {
@@ -26,7 +29,7 @@ public class MyGLSurfaceView extends GLSurfaceView {
                     EGL10.EGL_BLUE_SIZE, 8,
                     EGL10.EGL_ALPHA_SIZE, 8,
                     EGL10.EGL_DEPTH_SIZE, 24,
-                    EGL10.EGL_RENDERABLE_TYPE, 4,
+                    EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT_KHR,
                     EGL10.EGL_SAMPLE_BUFFERS, 1,
                     EGL10.EGL_SAMPLES, 4,
                     EGL10.EGL_NONE
@@ -106,35 +109,92 @@ public class MyGLSurfaceView extends GLSurfaceView {
         setVsyncDivisor(divisor);
     }
 
+    private static final int INVALID_POINTER_ID = -1;
     private float lastX = 0f;
     private float lastY = 0f;
+    private int activePointerId = INVALID_POINTER_ID;
+    private boolean activePointerWasDispatched;
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        float x = event.getX();
-        float y = event.getY();
+        long eventTimeNanos = AndroidGameClock.eventTimeNanos(event);
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_MOVE:
+                if (activePointerId == INVALID_POINTER_ID
+                        || !activePointerWasDispatched) {
+                    break;
+                }
+                int moveIndex = event.findPointerIndex(activePointerId);
+                if (moveIndex < 0) {
+                    if (renderer.getCurrentStage().isInitialized()) {
+                        renderer.getCurrentStage().enqueueTouchCancel(
+                                lastX, lastY, eventTimeNanos);
+                    }
+                    clearActivePointer();
+                    break;
+                }
+                float moveX = event.getX(moveIndex);
+                float moveY = event.getY(moveIndex);
                 if (!renderer.getCurrentStage().isInitialized()) break;
-                if (x == lastX && y == lastY) break;
-                renderer.getCurrentStage().enqueueTouchMove(lastX, lastY, x, y);
-                lastX = x;
-                lastY = y;
+                if (moveX == lastX && moveY == lastY) break;
+                renderer.getCurrentStage().enqueueTouchMove(
+                        lastX, lastY, moveX, moveY, eventTimeNanos);
+                lastX = moveX;
+                lastY = moveY;
                 break;
             case MotionEvent.ACTION_DOWN:
-                lastX = x;
-                lastY = y;
-                if(renderer.getCurrentStage().isInitialized()) {
-                    renderer.getCurrentStage().enqueueTouchDown(x, y);
+                int downIndex = event.getActionIndex();
+                activePointerId = event.getPointerId(downIndex);
+                float downX = event.getX(downIndex);
+                float downY = event.getY(downIndex);
+                lastX = downX;
+                lastY = downY;
+                activePointerWasDispatched =
+                        renderer.getCurrentStage().isInitialized();
+                if (activePointerWasDispatched) {
+                    renderer.getCurrentStage().enqueueTouchDown(
+                            downX, downY, eventTimeNanos);
+                }
+                break;
+            case MotionEvent.ACTION_POINTER_UP:
+                int pointerUpIndex = event.getActionIndex();
+                if (event.getPointerId(pointerUpIndex) == activePointerId) {
+                    float pointerUpX = event.getX(pointerUpIndex);
+                    float pointerUpY = event.getY(pointerUpIndex);
+                    if (activePointerWasDispatched
+                            && renderer.getCurrentStage().isInitialized()) {
+                        renderer.getCurrentStage().enqueueTouchUp(
+                                pointerUpX, pointerUpY, eventTimeNanos);
+                    }
+                    clearActivePointer();
                 }
                 break;
             case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
-                if(renderer.getCurrentStage().isInitialized()) {
-                    renderer.getCurrentStage().enqueueTouchUp(x, y);
+                int upIndex = event.getActionIndex();
+                if (event.getPointerId(upIndex) == activePointerId
+                        && activePointerWasDispatched
+                        && renderer.getCurrentStage().isInitialized()) {
+                    renderer.getCurrentStage().enqueueTouchUp(
+                            event.getX(upIndex),
+                            event.getY(upIndex),
+                            eventTimeNanos);
                 }
+                clearActivePointer();
+                break;
+            case MotionEvent.ACTION_CANCEL:
+                if (activePointerWasDispatched
+                        && renderer.getCurrentStage().isInitialized()) {
+                    renderer.getCurrentStage().enqueueTouchCancel(
+                            lastX, lastY, eventTimeNanos);
+                }
+                clearActivePointer();
                 break;
         }
         return true;
+    }
+
+    private void clearActivePointer() {
+        activePointerId = INVALID_POINTER_ID;
+        activePointerWasDispatched = false;
     }
 }

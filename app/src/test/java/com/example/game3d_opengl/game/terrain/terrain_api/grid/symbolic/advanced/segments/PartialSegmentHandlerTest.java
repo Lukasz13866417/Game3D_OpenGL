@@ -5,6 +5,7 @@ import static org.junit.Assert.assertArrayEquals;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridSegment;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.AdvancedGridCreator;
+import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.GridBuildScratch;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.advanced.segments.by_end_pos.EndPosTreeKind;
 
 import org.junit.Test;
@@ -111,5 +112,59 @@ public class PartialSegmentHandlerTest {
             destroyIfMaterialized(parentWrapper);
             destroyIfMaterialized(childWrapper);
         }
+    }
+
+    @Test
+    public void append_maximal_free_segments_exports_horizontal_segments_into_scratch() {
+        PartialSegmentHandler handler = new PartialSegmentHandler(4, 4, false, EndPosTreeKind.POOLED_TREAP);
+        GridBuildScratch scratch = new GridBuildScratch();
+        try {
+            handler.reserve(2, 2, 2);
+
+            handler.appendMaximalFreeSegments(scratch);
+
+            assertArrayEquals(
+                    new GridSegment[]{
+                            GridSegment.GS(1, 1, 4),
+                            GridSegment.GS(2, 1, 1),
+                            GridSegment.GS(2, 4, 1),
+                            GridSegment.GS(3, 1, 4),
+                            GridSegment.GS(4, 1, 4)
+                    },
+                    scratchToSegments(scratch)
+            );
+        } finally {
+            handler.destroy();
+        }
+    }
+
+    @Test
+    public void append_maximal_free_segments_exports_vertical_segments_into_scratch() {
+        PartialSegmentHandler handler = new PartialSegmentHandler(5, 2, true, EndPosTreeKind.POOLED_TREAP);
+        GridBuildScratch scratch = new GridBuildScratch();
+        try {
+            handler.reserve(2, 1, 2);
+
+            handler.appendMaximalFreeSegments(scratch);
+
+            assertArrayEquals(
+                    new GridSegment[]{
+                            GridSegment.GS(1, 1, 1),
+                            GridSegment.GS(4, 1, 2),
+                            GridSegment.GS(1, 2, 5)
+                    },
+                    scratchToSegments(scratch)
+            );
+        } finally {
+            handler.destroy();
+        }
+    }
+
+    private static GridSegment[] scratchToSegments(GridBuildScratch scratch) {
+        GridSegment[] out = new GridSegment[scratch.size()];
+        for (int i = 0; i < scratch.size(); ++i) {
+            out[i] = GridSegment.GS(scratch.rowAt(i), scratch.colAt(i), scratch.lengthAt(i));
+        }
+        return out;
     }
 }

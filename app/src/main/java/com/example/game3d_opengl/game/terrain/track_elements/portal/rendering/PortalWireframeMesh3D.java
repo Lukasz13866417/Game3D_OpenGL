@@ -2,6 +2,7 @@ package com.example.game3d_opengl.game.terrain.track_elements.portal.rendering;
 
 import android.opengl.GLES20;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
 import com.example.game3d_opengl.rendering.mesh.AbstractMesh3D;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -11,7 +12,10 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  * Vertex layout: aPosA(3), aPosB(3), aEnd(1), aSide(1) = 8 floats per vertex.
  */
 public final class PortalWireframeMesh3D
-        extends AbstractMesh3D<PortalWireframeDrawArgs, PortalWireframeShaderPair> {
+        extends AbstractMesh3D<
+                PortalWireframeDrawArgs,
+                PortalWireframeShaderPair<VertexLayout.EdgeABLayout>,
+                VertexLayout.EdgeABLayout> {
 
     private static final int[] VIEWPORT_TMP = new int[4];
     private static final float DEPTH_BIAS_NDC = -2e-4f;
@@ -37,7 +41,7 @@ public final class PortalWireframeMesh3D
 
     @Override
     protected void setVariableArgsValues(PortalWireframeDrawArgs args,
-                                         PortalWireframeShaderPair shader) {
+                                         PortalWireframeShaderPair<VertexLayout.EdgeABLayout> shader) {
         vs.vp = args.vp;
         vs.centerX = args.centerX;
         vs.centerY = args.centerY;
@@ -55,7 +59,12 @@ public final class PortalWireframeMesh3D
     }
 
     public static final class Builder
-            extends BaseBuilder<PortalWireframeMesh3D, Builder, PortalWireframeShaderPair> {
+            extends BaseBuilder<
+                    PortalWireframeMesh3D,
+                    Builder,
+                    PortalWireframeDrawArgs,
+                    PortalWireframeShaderPair<VertexLayout.EdgeABLayout>,
+                    VertexLayout.EdgeABLayout> {
 
         private float halfPx = 0.7f;
         private int[][] edges;
@@ -66,7 +75,24 @@ public final class PortalWireframeMesh3D
         @Override
         public void checkValid() {
             shader(PortalWireframeShaderPair.getSharedShader());
-            super.checkValid();
+            if (verts == null) {
+                throw new IllegalStateException("verts == null");
+            }
+            if (edges == null) {
+                throw new IllegalStateException("edges == null");
+            }
+            if (shader == null) {
+                throw new IllegalStateException("shader == null");
+            }
+            for (int i = 0; i < edges.length; ++i) {
+                int[] edge = edges[i];
+                if (edge == null || edge.length != 2) {
+                    throw new IllegalStateException("edge[" + i + "] must contain exactly 2 indices");
+                }
+                if (edge[0] < 0 || edge[0] >= verts.length || edge[1] < 0 || edge[1] >= verts.length) {
+                    throw new IllegalStateException("edge[" + i + "] index out of range");
+                }
+            }
         }
 
         @Override
@@ -101,6 +127,11 @@ public final class PortalWireframeMesh3D
             dst[o++] = end;
             dst[o++] = side;
             return o;
+        }
+
+        @Override
+        protected VertexLayout.EdgeABLayout createLayout() {
+            return VertexLayout.EdgeABLayout.INSTANCE;
         }
 
         @Override

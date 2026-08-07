@@ -3,6 +3,7 @@ package com.example.game3d_opengl.game.terrain.terrain_api.terrainutil;
 
 import com.example.game3d_opengl.game.pooling.PooledResourcesOwner;
 import com.example.game3d_opengl.game.pooling.PooledSlotLease;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.TileProfile;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.tilemanager.TileManager.SegmentHistory;
 
 /**
@@ -75,7 +76,9 @@ public class OverflowingPreallocatedSegmentHistoryBuffer extends PooledResources
                     float lastLx, float lastLy, float lastLz,
                     float lastRx, float lastRy, float lastRz,
                     float leftover,
-                    float alphaL, float alphaR) {
+                    float alphaL, float alphaR,
+                    TileProfile tileProfile,
+                    float brightnessMultiplier) {
         int writeIdx;
         if (size < MAX_SIZE) {
             writeIdx = (head + size) % MAX_SIZE;
@@ -94,7 +97,9 @@ public class OverflowingPreallocatedSegmentHistoryBuffer extends PooledResources
                 lastLx, lastLy, lastLz,
                 lastRx, lastRy, lastRz,
                 leftover,
-                alphaL, alphaR);
+                alphaL, alphaR,
+                tileProfile,
+                brightnessMultiplier);
     }
 
     @Override

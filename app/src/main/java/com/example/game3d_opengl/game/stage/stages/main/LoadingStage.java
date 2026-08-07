@@ -5,6 +5,7 @@ import android.opengl.GLES20;
 import android.opengl.Matrix;
 
 import com.example.game3d_opengl.MyGLRenderer;
+import com.example.game3d_opengl.game.settings.SlowFrameStats;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.rendering.infill.Mesh3DInfill;
 import com.example.game3d_opengl.rendering.mesh.MVPDrawArgs;
@@ -13,15 +14,22 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
  * Minimal transition stage shown before gameplay starts/restarts.
- * The bar covers the full screen height and shrinks in width by:
- *   w(t+1) = 0.95 * w(t) - 3 px
+ * On normal startup this stage is purely visual; on restart fallback it can finish
+ * the last bit of terrain preparation for an already-created gameplay session.
+ * The bar covers the full screen height and shrinks in width, using the formula:
+ *   w(t+1) = 0.9 * w(t) - 2 px
  */
 public final class LoadingStage extends Stage {
-    private static final float WIDTH_MULTIPLIER_PER_STEP = 0.95f;
-    private static final float WIDTH_DECAY_PX_PER_STEP = 3f;
-    private static final float STEP_MS = 16.6667f;
-    private static final float GAMEPLAY_START_CUTOFF_WIDTH_FRACTION = 0.24f;
-    private static final float GAMEPLAY_START_CUTOFF_MIN_PX = 96f;
+    interface ReadyAction {
+        void onReady(PreparedGameplaySession session);
+    }
+
+    private static final float WIDTH_MULTIPLIER_PER_STEP = 0.9f;
+    private static final float WIDTH_DECAY_PX_PER_STEP = 2f;
+    private static final float STEP_MS = 10f;
+    private static final float GAMEPLAY_START_CUTOFF_WIDTH_FRACTION = 0f;
+    private static final float GAMEPLAY_START_CUTOFF_MIN_PX = 0f;
+    private static final int SESSION_PREPARATION_CHUNK_BUDGET = 96;
     private static final FColor BAR_COLOR = FColor.CLR(1f, 1f, 1f, 1f);
 
     private static final Vector3D[] UNIT_QUAD = new Vector3D[]{
@@ -41,9 +49,23 @@ public final class LoadingStage extends Stage {
     private float gameplayStartCutoffPx = 0f;
     private float stepAccumulatorMs = 0f;
     private boolean requestedGameplayStart = false;
+    private PreparedGameplaySession preparedGameplaySession;
+    private final ReadyAction readyAction;
 
-    public LoadingStage(MyGLRenderer.StageManager stageManager) {
+    public LoadingStage(MyGLRenderer.StageManager stageManager, PreparedGameplaySession preparedGameplaySession) {
+        this(stageManager, preparedGameplaySession, null);
+    }
+
+    LoadingStage(
+            MyGLRenderer.StageManager stageManager,
+            PreparedGameplaySession preparedGameplaySession,
+            ReadyAction readyAction) {
         super(stageManager);
+        if (preparedGameplaySession == null) {
+            throw new IllegalArgumentException("preparedGameplaySession == null");
+        }
+        this.preparedGameplaySession = preparedGameplaySession;
+        this.readyAction = readyAction;
     }
 
     @Override
@@ -93,6 +115,14 @@ public final class LoadingStage extends Stage {
         if (barMesh == null || barArgs == null) {
             return;
         }
+        if (preparedGameplaySession != null && !preparedGameplaySession.isSpawnPlayableReady()) {
+            SlowFrameStats.markTerrainGenerating();
+            preparedGameplaySession.generateTerrainChunks(SESSION_PREPARATION_CHUNK_BUDGET);
+        }
+        if (preparedGameplaySession != null
+                && preparedGameplaySession.isSpawnPlayableReady()) {
+            preparedGameplaySession.beginRuntimePreparationAsync();
+        }
 
         stepAccumulatorMs += Math.max(0f, dt);
         while (stepAccumulatorMs >= STEP_MS && barWidthPx > 0f) {
@@ -110,26 +140,29 @@ public final class LoadingStage extends Stage {
             GLES20.glEnable(GLES20.GL_DEPTH_TEST);
         }
 
-        if (!requestedGameplayStart && barWidthPx <= gameplayStartCutoffPx) {
+        if (!requestedGameplayStart
+                && barWidthPx <= gameplayStartCutoffPx
+                && preparedGameplaySession != null
+                && preparedGameplaySession.isRuntimePreparedReady()) {
             requestedGameplayStart = true;
-            stageManager.toGameplay();
+            PreparedGameplaySession session = preparedGameplaySession;
+            preparedGameplaySession = null;
+            if (readyAction != null) {
+                readyAction.onReady(session);
+                stageManager.pop();
+            } else {
+                stageManager.startGameplay(session);
+            }
         }
     }
 
     @Override
-    public void onClose() {
-        if (barMesh != null) {
-            barMesh.cleanupGPUResourcesRecursively();
-        }
+    protected void onDeactivated(DeactivationReason reason) {
+        // No-op.
     }
 
     @Override
-    public void onSwitch() {
-        onClose();
-    }
-
-    @Override
-    public void onReturn() {
+    protected void onActivated(ActivationReason reason) {
         // No-op.
     }
 
@@ -148,6 +181,9 @@ public final class LoadingStage extends Stage {
         if (barMesh != null) {
             barMesh.reloadGPUResourcesRecursivelyOnContextLoss();
         }
+        if (preparedGameplaySession != null) {
+            preparedGameplaySession.reloadGPUResourcesRecursivelyOnContextLoss();
+        }
     }
 
     @Override
@@ -155,6 +191,21 @@ public final class LoadingStage extends Stage {
         if (barMesh != null) {
             barMesh.cleanupGPUResourcesRecursively();
         }
+        if (preparedGameplaySession != null) {
+            preparedGameplaySession.cleanupGPUResourcesRecursively();
+        }
+    }
+
+    @Override
+    protected void releaseOwnedResourcesOnDiscard() {
+        barMesh = null;
+        barArgs = null;
+        screenW = 1;
+        barWidthPx = 0f;
+        gameplayStartCutoffPx = 0f;
+        stepAccumulatorMs = 0f;
+        requestedGameplayStart = false;
+        preparedGameplaySession = null;
     }
 
     private void updateBarTransform() {

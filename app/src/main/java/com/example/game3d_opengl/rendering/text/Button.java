@@ -28,6 +28,12 @@ public final class Button implements GPUResourceOwner {
     private final MVPDrawArgs fillDrawArgs;
     private final RectOverlay outline;
     private final TextRenderer.TextLabel label;
+    private final TextRenderer textRenderer;
+    private final boolean autoFitText;
+    private final float preferredTextScale;
+    private final float autoFitPaddingXPx;
+    private final float autoFitPaddingYPx;
+    private final float minAutoFitTextScale;
 
     private Button(Builder builder) {
         this.rectPx = builder.rectPx;
@@ -35,6 +41,15 @@ public final class Button implements GPUResourceOwner {
         this.fillDrawArgs = builder.fillDrawArgs;
         this.outline = builder.outline;
         this.label = builder.label;
+        this.textRenderer = builder.textRenderer;
+        this.autoFitText = builder.autoFitText;
+        this.preferredTextScale = builder.textScale;
+        this.autoFitPaddingXPx = builder.autoFitPaddingXPx;
+        this.autoFitPaddingYPx = builder.autoFitPaddingYPx;
+        this.minAutoFitTextScale = builder.textScale * builder.autoFitMinScaleFactor;
+        if (label != null && autoFitText) {
+            label.setScale(resolveTextScale(label.getText()));
+        }
     }
 
     public void draw() {
@@ -54,7 +69,13 @@ public final class Button implements GPUResourceOwner {
 
     public Button setText(String text) {
         if (label != null) {
-            label.setText(text);
+            String safeText = text != null ? text : "";
+            if (!safeText.equals(label.getText())) {
+                label.setText(safeText);
+                if (autoFitText) {
+                    label.setScale(resolveTextScale(safeText));
+                }
+            }
         }
         return this;
     }
@@ -62,6 +83,13 @@ public final class Button implements GPUResourceOwner {
     public Button setTextColor(FColor color) {
         if (label != null && color != null) {
             label.setColor(color);
+        }
+        return this;
+    }
+
+    public Button setFillColor(FColor color) {
+        if (fillMesh != null && color != null) {
+            fillMesh.setFillColor(color);
         }
         return this;
     }
@@ -78,6 +106,22 @@ public final class Button implements GPUResourceOwner {
         if (outline != null) outline.cleanupGPUResourcesRecursively();
     }
 
+    private float resolveTextScale(String text) {
+        if (!autoFitText || textRenderer == null || rectPx == null) {
+            return preferredTextScale;
+        }
+        BitmapFont.TextMetrics metrics = textRenderer.measureText(text, 1f);
+        if (metrics.width <= 1e-6f || metrics.height <= 1e-6f) {
+            return preferredTextScale;
+        }
+        float availableWidth = Math.max(1e-6f, rectPx.w - 2f * autoFitPaddingXPx);
+        float availableHeight = Math.max(1e-6f, rectPx.h - 2f * autoFitPaddingYPx);
+        float widthScale = availableWidth / metrics.width;
+        float heightScale = availableHeight / metrics.height;
+        float fittedScale = Math.min(preferredTextScale, Math.min(widthScale, heightScale));
+        return Math.max(minAutoFitTextScale, fittedScale);
+    }
+
     public static final class Builder {
         private static final float DEFAULT_EDGE_PX = 2f;
 
@@ -89,6 +133,10 @@ public final class Button implements GPUResourceOwner {
         private FColor textColor = FColor.CLR(1f, 1f, 1f, 1f);
         private float edgePx = DEFAULT_EDGE_PX;
         private float textScale = 1f;
+        private boolean autoFitText = false;
+        private float autoFitPaddingXPx = 0f;
+        private float autoFitPaddingYPx = 0f;
+        private float autoFitMinScaleFactor = 0f;
         private TextRenderer textRenderer;
 
         private Mesh3DInfill fillMesh;
@@ -138,6 +186,14 @@ public final class Button implements GPUResourceOwner {
 
         public Builder textScale(float scale) {
             this.textScale = scale;
+            return this;
+        }
+
+        public Builder autoFitText(float paddingXPx, float paddingYPx, float minScaleFactor) {
+            this.autoFitText = true;
+            this.autoFitPaddingXPx = Math.max(0f, paddingXPx);
+            this.autoFitPaddingYPx = Math.max(0f, paddingYPx);
+            this.autoFitMinScaleFactor = Math.max(0f, Math.min(1f, minScaleFactor));
             return this;
         }
 

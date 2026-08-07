@@ -93,8 +93,8 @@ public class TestTerrainStage extends Stage {
         currEye = cameraPos;
         currLook = cameraLookAt;
 
-        DeathSpike.LOAD_DEATHSPIKE_ASSETS();
-        Potion.LOAD_POTION_ASSETS(context.getAssets());
+        com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers
+                .ensureDefaultLoaded(context.getAssets());
 
         // build terrain
         /*tileManager = new TileManager(
@@ -128,9 +128,24 @@ public class TestTerrainStage extends Stage {
 
         terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
         terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
-        terrain.enqueueStructure(new TerrainStairs(100,4,1, PI/6,-1f));
+        terrain.enqueueStructure(
+                TerrainStairs.builder()
+                        .tilesPerStair(100)
+                        .stairCount(4)
+                        .emptyBetween(1)
+                        .horizontalAngleDelta(PI / 6f)
+                        .jump(-1f)
+                        .build()
+        );
         terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
-        terrain.enqueueStructure(new Terrain2DCurve(50,0,PI/8f));
+        terrain.enqueueStructure(
+                Terrain2DCurve.builder()
+                        .tilesToMake(50)
+                        .horizontalAngleDelta(0f)
+                        .verticalAngleDelta(PI / 8f)
+                        .verticalAngleFadeoutTiles(5)
+                        .build()
+        );
 
         terrain.generateChunks(-1);
 
@@ -177,17 +192,12 @@ public class TestTerrainStage extends Stage {
     }
 
     @Override
-    public void onClose() {
+    protected void onDeactivated(DeactivationReason reason) {
 
     }
 
     @Override
-    public void onSwitch() {
-
-    }
-
-    @Override
-    public void onReturn() {
+    protected void onActivated(ActivationReason reason) {
 
     }
 

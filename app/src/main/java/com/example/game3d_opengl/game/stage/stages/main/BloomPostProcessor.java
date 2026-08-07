@@ -17,7 +17,12 @@ final class BloomPostProcessor implements GPUResourceOwner {
     private static final float BLOOM_THRESHOLD = 0.64f;
     private static final float BLOOM_INTENSITY = 0.95f;
     private static final int BLUR_ITERATIONS = 2;
-    private static final float DOWNSAMPLE = 0.5f;
+    // Quarter-resolution bloom is the mobile-friendly trade-off here: the full-resolution
+    // scene and composite stay sharp while the deliberately blurred signal uses 75% fewer
+    // pixels per intermediate pass than half resolution.
+    private static final float DOWNSAMPLE = 0.25f;
+    // Preserve the previous half-resolution glow radius after moving to quarter resolution.
+    private static final float BLUR_TEXEL_STEP_SCALE = 0.5f;
 
     private static final float[] FSQ_VERTS = new float[]{
             -1f, -1f, 0f, 0f, 0f,
@@ -46,6 +51,7 @@ final class BloomPostProcessor implements GPUResourceOwner {
     private int preApos = -1;
     private int preAuv = -1;
     private int preTex = -1;
+    private int preSceneTexelStep = -1;
     private int preThreshold = -1;
 
     private int blurApos = -1;
@@ -87,34 +93,49 @@ final class BloomPostProcessor implements GPUResourceOwner {
             return;
         }
 
+        // Full-screen post-processing is color-only. Leaving depth writes/testing enabled makes
+        // a later pass back into bloom A fail GL_LESS at the same quad depth, so bloom becomes
+        // black while still paying for every pass.
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+        GLES20.glDepthMask(false);
+        GLES20.glDisable(GLES20.GL_BLEND);
+
         // 1) Bright prefilter from scene -> bloom A
         bloomTargetA.bind();
         GLES20.glViewport(0, 0, bloomW, bloomH);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-        drawPrefilter(sceneTarget.getTextureId());
-        bloomTargetA.unbind();
+        drawPrefilter(
+                sceneTarget.getTextureId(),
+                1f / Math.max(1f, surfaceW),
+                1f / Math.max(1f, surfaceH)
+        );
 
         // 2) Blur ping-pong
         for (int i = 0; i < BLUR_ITERATIONS; ++i) {
             bloomTargetB.bind();
             GLES20.glViewport(0, 0, bloomW, bloomH);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-            drawBlur(bloomTargetA.getTextureId(), 1f / Math.max(1f, bloomW), 0f);
-            bloomTargetB.unbind();
+            drawBlur(
+                    bloomTargetA.getTextureId(),
+                    BLUR_TEXEL_STEP_SCALE / Math.max(1f, bloomW),
+                    0f
+            );
 
             bloomTargetA.bind();
             GLES20.glViewport(0, 0, bloomW, bloomH);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-            drawBlur(bloomTargetB.getTextureId(), 0f, 1f / Math.max(1f, bloomH));
-            bloomTargetA.unbind();
+            drawBlur(
+                    bloomTargetB.getTextureId(),
+                    0f,
+                    BLUR_TEXEL_STEP_SCALE / Math.max(1f, bloomH)
+            );
         }
 
         // 3) Composite scene + bloom to screen
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
         GLES20.glViewport(0, 0, surfaceW, surfaceH);
-        GLES20.glDisable(GLES20.GL_DEPTH_TEST);
-        GLES20.glDisable(GLES20.GL_BLEND);
         drawComposite(sceneTarget.getTextureId(), bloomTargetA.getTextureId());
+        GLES20.glDepthMask(true);
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
     }
 
@@ -161,9 +182,9 @@ final class BloomPostProcessor implements GPUResourceOwner {
 
         bloomW = Math.max(1, Math.round(surfaceW * DOWNSAMPLE));
         bloomH = Math.max(1, Math.round(surfaceH * DOWNSAMPLE));
-        sceneTarget = new PortalRenderTarget(surfaceW, surfaceH);
-        bloomTargetA = new PortalRenderTarget(bloomW, bloomH);
-        bloomTargetB = new PortalRenderTarget(bloomW, bloomH);
+        sceneTarget = new PortalRenderTarget(surfaceW, surfaceH, true);
+        bloomTargetA = new PortalRenderTarget(bloomW, bloomH, false);
+        bloomTargetB = new PortalRenderTarget(bloomW, bloomH, false);
     }
 
     private void initFullscreenQuadBuffers() {
@@ -193,13 +214,16 @@ final class BloomPostProcessor implements GPUResourceOwner {
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
-    private void drawPrefilter(int inputTex) {
+    private void drawPrefilter(
+            int inputTex, float sourceTexelX, float sourceTexelY) {
         GLES20.glUseProgram(prefilterProgram);
         bindQuadAttributes(preApos, preAuv);
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, inputTex);
         GLES20.glUniform1i(preTex, 0);
+        GLES20.glUniform2f(
+                preSceneTexelStep, sourceTexelX, sourceTexelY);
         GLES20.glUniform1f(preThreshold, BLOOM_THRESHOLD);
 
         drawQuadElements();
@@ -271,6 +295,8 @@ final class BloomPostProcessor implements GPUResourceOwner {
         preApos = GLES20.glGetAttribLocation(prefilterProgram, "aPosition");
         preAuv = GLES20.glGetAttribLocation(prefilterProgram, "aUV");
         preTex = GLES20.glGetUniformLocation(prefilterProgram, "uSceneTex");
+        preSceneTexelStep = GLES20.glGetUniformLocation(
+                prefilterProgram, "uSceneTexelStep");
         preThreshold = GLES20.glGetUniformLocation(prefilterProgram, "uThreshold");
 
         blurApos = GLES20.glGetAttribLocation(blurProgram, "aPosition");
@@ -348,49 +374,64 @@ final class BloomPostProcessor implements GPUResourceOwner {
     }
 
     private static final String VS_FULLSCREEN =
-            "attribute vec3 aPosition;\n" +
-            "attribute vec2 aUV;\n" +
-            "varying vec2 vUV;\n" +
+            "#version 300 es\n" +
+            "in vec3 aPosition;\n" +
+            "in vec2 aUV;\n" +
+            "out vec2 vUV;\n" +
             "void main(){\n" +
             "  vUV = aUV;\n" +
             "  gl_Position = vec4(aPosition, 1.0);\n" +
             "}\n";
 
     private static final String FS_PREFILTER =
+            "#version 300 es\n" +
             "precision mediump float;\n" +
             "uniform sampler2D uSceneTex;\n" +
+            "uniform vec2 uSceneTexelStep;\n" +
             "uniform float uThreshold;\n" +
-            "varying vec2 vUV;\n" +
-            "void main(){\n" +
-            "  vec3 c = texture2D(uSceneTex, vUV).rgb;\n" +
+            "in vec2 vUV;\n" +
+            "out vec4 fragColor;\n" +
+            "vec3 extractBright(vec3 c){\n" +
             "  float br = max(max(c.r, c.g), c.b);\n" +
             "  float k = max((br - uThreshold) / max(1e-4, (1.0 - uThreshold)), 0.0);\n" +
-            "  gl_FragColor = vec4(c * k, 1.0);\n" +
+            "  return c * k;\n" +
+            "}\n" +
+            "void main(){\n" +
+            "  vec2 d = uSceneTexelStep;\n" +
+            "  vec3 bloom = extractBright(texture(uSceneTex, vUV + vec2(-d.x, -d.y)).rgb);\n" +
+            "  bloom += extractBright(texture(uSceneTex, vUV + vec2( d.x, -d.y)).rgb);\n" +
+            "  bloom += extractBright(texture(uSceneTex, vUV + vec2(-d.x,  d.y)).rgb);\n" +
+            "  bloom += extractBright(texture(uSceneTex, vUV + vec2( d.x,  d.y)).rgb);\n" +
+            "  fragColor = vec4(bloom * 0.25, 1.0);\n" +
             "}\n";
 
     private static final String FS_BLUR =
+            "#version 300 es\n" +
             "precision mediump float;\n" +
             "uniform sampler2D uInputTex;\n" +
             "uniform vec2 uTexelStep;\n" +
-            "varying vec2 vUV;\n" +
+            "in vec2 vUV;\n" +
+            "out vec4 fragColor;\n" +
             "void main(){\n" +
-            "  vec3 s = texture2D(uInputTex, vUV).rgb * 0.227027;\n" +
-            "  s += texture2D(uInputTex, vUV + uTexelStep * 1.384615).rgb * 0.316216;\n" +
-            "  s += texture2D(uInputTex, vUV - uTexelStep * 1.384615).rgb * 0.316216;\n" +
-            "  s += texture2D(uInputTex, vUV + uTexelStep * 3.230769).rgb * 0.070270;\n" +
-            "  s += texture2D(uInputTex, vUV - uTexelStep * 3.230769).rgb * 0.070270;\n" +
-            "  gl_FragColor = vec4(s, 1.0);\n" +
+            "  vec3 s = texture(uInputTex, vUV).rgb * 0.227027;\n" +
+            "  s += texture(uInputTex, vUV + uTexelStep * 1.384615).rgb * 0.316216;\n" +
+            "  s += texture(uInputTex, vUV - uTexelStep * 1.384615).rgb * 0.316216;\n" +
+            "  s += texture(uInputTex, vUV + uTexelStep * 3.230769).rgb * 0.070270;\n" +
+            "  s += texture(uInputTex, vUV - uTexelStep * 3.230769).rgb * 0.070270;\n" +
+            "  fragColor = vec4(s, 1.0);\n" +
             "}\n";
 
     private static final String FS_COMPOSITE =
+            "#version 300 es\n" +
             "precision mediump float;\n" +
             "uniform sampler2D uSceneTex;\n" +
             "uniform sampler2D uBloomTex;\n" +
             "uniform float uBloomIntensity;\n" +
-            "varying vec2 vUV;\n" +
+            "in vec2 vUV;\n" +
+            "out vec4 fragColor;\n" +
             "void main(){\n" +
-            "  vec3 scene = texture2D(uSceneTex, vUV).rgb;\n" +
-            "  vec3 bloom = texture2D(uBloomTex, vUV).rgb;\n" +
-            "  gl_FragColor = vec4(scene + bloom * uBloomIntensity, 1.0);\n" +
+            "  vec3 scene = texture(uSceneTex, vUV).rgb;\n" +
+            "  vec3 bloom = texture(uBloomTex, vUV).rgb;\n" +
+            "  fragColor = vec4(scene + bloom * uBloomIntensity, 1.0);\n" +
             "}\n";
 }

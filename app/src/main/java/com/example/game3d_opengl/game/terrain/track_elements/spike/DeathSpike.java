@@ -1,10 +1,7 @@
 package com.example.game3d_opengl.game.terrain.track_elements.spike;
 
 import static com.example.game3d_opengl.game.util.GameMath.getNormal;
-import static com.example.game3d_opengl.rendering.util3d.RenderingUtils.ID_NOT_SET;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3S;
-
-import android.opengl.GLES20;
 
 import com.example.game3d_opengl.game.player.player_character.Player;
 import com.example.game3d_opengl.game.util.GameRandom;
@@ -12,95 +9,95 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 
-public class DeathSpike extends Addon {
+public class DeathSpike extends Addon
+        implements SpikeBatchInstance {
+    private static final float MIN_RANDOM_HEIGHT = 0.225f * 1.25f;
+    private static final float MAX_RANDOM_HEIGHT = 0.5f * 1.25f;
 
     private final float height;
     private final float baseOffset = 0.025f;
 
-    private static int SPIKE_FILL_VBO_ID = ID_NOT_SET;
+    private static SpikeBatchRenderer defaultBatchRenderer;
 
-    private static SpikeInfillMesh3D SHARED_FILL_MESH;
-
+    private SpikeBatchRenderer batchRenderer;
     private SpikeInfillDrawArgs infillArgs;
 
-    public static void LOAD_DEATHSPIKE_ASSETS(){
-        SpikeInfillShaderPair.LOAD_SHADER_CODE();
-        assert SPIKE_FILL_VBO_ID == ID_NOT_SET;
-        int[] ids = new int[1];
-        GLES20.glGenBuffers(1, ids,0);
-        SPIKE_FILL_VBO_ID = ids[0];
-
-        SpikeInfillShaderPair fillShader = SpikeInfillShaderPair.getSharedShader();
-        SHARED_FILL_MESH = new SpikeInfillMesh3D.Builder()
-                .shader(fillShader)
-                .vboId(SPIKE_FILL_VBO_ID)
-                .color(FColor.CLR(0.5f,0.5f,0,1))
-                .verts(new Vector3D[]{
-                        new Vector3D(0,0,0), new Vector3D(0,0,0), new Vector3D(0,0,0),
-                        new Vector3D(0,0,0), new Vector3D(0,0,0)
-                })
-                .faces(new int[][]{
-                        new int[]{0,1,4},
-                        new int[]{1,2,4},
-                        new int[]{2,3,4},
-                        new int[]{3,0,4}
-                })
-                .buildObject();
+    public static void installDefaultBatchRenderer(SpikeBatchRenderer renderer) {
+        defaultBatchRenderer = renderer;
     }
 
     private DeathSpike(float height) {
+        this(defaultBatchRenderer, height);
+    }
+
+    public DeathSpike(SpikeBatchRenderer batchRenderer, float height) {
         super();
+        this.batchRenderer = batchRenderer;
         this.height = height;
     }
     
     public static DeathSpike createDeathSpike() {
-        float height = GameRandom.randFloat(0.225f, 0.5f, 5);
+        float height = GameRandom.randFloat(MIN_RANDOM_HEIGHT, MAX_RANDOM_HEIGHT, 5);
         return new DeathSpike(height); // object3D will be set in onPlace
     }
 
-    private static Vector3D[] computeCornerTargets(Vector3D fieldNearLeft, Vector3D fieldNearRight,
-                                        Vector3D fieldFarLeft, Vector3D fieldFarRight) {
-        Vector3D fieldMid = fieldFarLeft.add(fieldFarRight)
-                .add(fieldNearRight).add(fieldNearLeft).div(4);
-        Vector3D myNL = fieldNearLeft;//fieldMid.add(fieldNearLeft.sub(fieldMid).mult(0.8f));
-        Vector3D myNR = fieldNearRight;//fieldMid.add(fieldNearRight.sub(fieldMid).mult(0.8f));
-        Vector3D myFL = fieldFarLeft;//fieldMid.add(fieldFarLeft.sub(fieldMid).mult(0.8f));
-        Vector3D myFR = fieldFarRight;//fieldMid.add(fieldFarRight.sub(fieldMid).mult(0.8f));
-        return V3S(myNL, myNR, myFR, myFL);
-    }
-
     @Override
-    protected void onPlace(Vector3D fieldNearLeft, Vector3D fieldNearRight,
-                           Vector3D fieldFarLeft, Vector3D fieldFarRight) {
-        Vector3D[] corners = computeCornerTargets(fieldNearLeft,
-                                                  fieldNearRight,
-                                                  fieldFarLeft,
-                                                  fieldFarRight);
-        Vector3D fieldMid = fieldFarLeft.add(fieldFarRight).add(fieldNearRight).add(fieldNearLeft).div(4);
-        Vector3D normal = getNormal(fieldNearLeft, fieldFarLeft, fieldFarRight);
-        Vector3D unitNormal = normal.withLen(1f);
-        Vector3D apex = fieldMid.sub(unitNormal.withLen(height));
-        Vector3D baseNormal = unitNormal.mult(-1f);
+    protected void onPlace(float nearLeftX, float nearLeftY, float nearLeftZ,
+                           float nearRightX, float nearRightY, float nearRightZ,
+                           float farLeftX, float farLeftY, float farLeftZ,
+                           float farRightX, float farRightY, float farRightZ) {
+        float fieldMidX = 0.25f * (farLeftX + farRightX + nearRightX + nearLeftX);
+        float fieldMidY = 0.25f * (farLeftY + farRightY + nearRightY + nearLeftY);
+        float fieldMidZ = 0.25f * (farLeftZ + farRightZ + nearRightZ + nearLeftZ);
 
+        float edge1X = farLeftX - nearLeftX;
+        float edge1Y = farLeftY - nearLeftY;
+        float edge1Z = farLeftZ - nearLeftZ;
+        float edge2X = farRightX - nearLeftX;
+        float edge2Y = farRightY - nearLeftY;
+        float edge2Z = farRightZ - nearLeftZ;
+        float normalX = edge1Y * edge2Z - edge1Z * edge2Y;
+        float normalY = edge1Z * edge2X - edge1X * edge2Z;
+        float normalZ = edge1X * edge2Y - edge1Y * edge2X;
+        float normalLen = (float) Math.sqrt(
+                normalX * normalX + normalY * normalY + normalZ * normalZ
+        );
+        if (normalLen <= 1e-8f) {
+            normalX = 0f;
+            normalY = 1f;
+            normalZ = 0f;
+        } else {
+            float invLen = 1f / normalLen;
+            normalX *= invLen;
+            normalY *= invLen;
+            normalZ *= invLen;
+        }
+
+        float apexX = fieldMidX - normalX * height;
+        float apexY = fieldMidY - normalY * height;
+        float apexZ = fieldMidZ - normalZ * height;
         final float[] uNL = new float[3],
                       uNR = new float[3],
                       uFL = new float[3],
                       uFR = new float[3];
         final float[] uApex = new float[3],
                       uNormal = new float[3];
-        uNL[0]=corners[0].x; uNL[1]=corners[0].y; uNL[2]=corners[0].z;
-        uNR[0]=corners[1].x; uNR[1]=corners[1].y; uNR[2]=corners[1].z;
-        uFR[0]=corners[2].x; uFR[1]=corners[2].y; uFR[2]=corners[2].z;
-        uFL[0]=corners[3].x; uFL[1]=corners[3].y; uFL[2]=corners[3].z;
-        uApex[0]=apex.x; uApex[1]=apex.y; uApex[2]=apex.z;
-        uNormal[0]=baseNormal.x; uNormal[1]=baseNormal.y; uNormal[2]=baseNormal.z;
+        uNL[0]=nearLeftX; uNL[1]=nearLeftY; uNL[2]=nearLeftZ;
+        uNR[0]=nearRightX; uNR[1]=nearRightY; uNR[2]=nearRightZ;
+        uFR[0]=farRightX; uFR[1]=farRightY; uFR[2]=farRightZ;
+        uFL[0]=farLeftX; uFL[1]=farLeftY; uFL[2]=farLeftZ;
+        uApex[0]=apexX; uApex[1]=apexY; uApex[2]=apexZ;
+        uNormal[0]=-normalX; uNormal[1]=-normalY; uNormal[2]=-normalZ;
 
         this.infillArgs = new SpikeInfillDrawArgs(uNL, uNR, uFR, uFL, uApex, uNormal, baseOffset);
     }
 
     @Override
     public void draw(float[] vpMatrix) {
-        if (infillArgs != null) { infillArgs.vp = vpMatrix; SHARED_FILL_MESH.draw(infillArgs); }
+        SpikeBatchRenderer renderer = resolveBatchRenderer();
+        if (infillArgs != null && renderer != null) {
+            renderer.drawSingle(vpMatrix, this);
+        }
     }
 
     @Override
@@ -140,17 +137,50 @@ public class DeathSpike extends Addon {
 
     @Override
     public void cleanupGPUResourcesRecursively() {
-        SHARED_FILL_MESH.cleanupGPUResourcesRecursively();
+        // Renderer ownership lives outside the addon instance.
     }
 
     @Override
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
-        SHARED_FILL_MESH.reloadGPUResourcesRecursivelyOnContextLoss();
+        // Renderer ownership lives outside the addon instance.
     }
 
 
     @Override
     public void accept(Player player) {
         player.interactWith(this);
+    }
+
+    boolean hasBatchData() {
+        return infillArgs != null;
+    }
+
+    public boolean usesBatchRenderer(SpikeBatchRenderer renderer) {
+        if (renderer == null) {
+            return false;
+        }
+        if (batchRenderer == null) {
+            batchRenderer = defaultBatchRenderer;
+        }
+        return batchRenderer == renderer;
+    }
+
+    SpikeInfillDrawArgs getBatchArgs() {
+        if (infillArgs == null) {
+            throw new IllegalStateException("Spike batch args are not initialized");
+        }
+        return infillArgs;
+    }
+
+    @Override
+    public SpikeInfillDrawArgs spikeBatchArgs() {
+        return getBatchArgs();
+    }
+
+    private SpikeBatchRenderer resolveBatchRenderer() {
+        if (batchRenderer == null) {
+            batchRenderer = defaultBatchRenderer;
+        }
+        return batchRenderer;
     }
 }

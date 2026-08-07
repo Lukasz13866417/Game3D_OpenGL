@@ -1,14 +1,20 @@
 package com.example.game3d_opengl.game.player.player_logic;
 
-import static com.example.game3d_opengl.game.util.GameMath.getNormal;
+import static com.example.game3d_opengl.game.util.GameMath.getUnitNormalTo;
 import static com.example.game3d_opengl.game.util.GameMath.rayTriangleDistance;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import com.example.game3d_opengl.game.player.player_character.PlayerConfig;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
+import com.example.game3d_opengl.game.util.GameMath.MutableVec3;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 public final class FrameStartPlayerState {
+    private static final float SUPPORT_SEPARATION_MIN_DISTANCE = 0.008f;
+    private static final float SUPPORT_SEPARATION_DISTANCE_FACTOR = 0.025f;
+    private static final float SUPPORT_SEPARATION_MIN_CLEARANCE = 0.0015f;
+    private static final float SUPPORT_SEPARATION_CLEARANCE_FACTOR = 0.0025f;
+
     public float dtMillis;
     public Vector3D position;
     public float swipeDx;
@@ -19,9 +25,12 @@ public final class FrameStartPlayerState {
     private Vector3D moveDir;
     private Vector3D lastMove = V3(0, 0, 0);
     private float fallSpeed = 0f;
+    private float activeHorizontalSpeed;
     private Tile tileBelow = null;
-    private Vector3D[] collisionTriangle = null;
+    private int collisionTriangleIndex = -1;
+    private float collisionProbeDistance = Float.POSITIVE_INFINITY;
     private float nearestGroundDistance = Float.POSITIVE_INFINITY;
+    private float nearestGroundY = Float.POSITIVE_INFINITY;
     private static final int MAX_NEARBY_DEATH_SPIKES = 12;
     private final float[] nearbySpikeX = new float[MAX_NEARBY_DEATH_SPIKES];
     private final float[] nearbySpikeY = new float[MAX_NEARBY_DEATH_SPIKES];
@@ -32,6 +41,7 @@ public final class FrameStartPlayerState {
     private float stickyRotationTime = 0f;
     private float stickyRotationAng = 0f;
     private final PlayerConfig config;
+    private final MutableVec3 collisionNormalTmp = new MutableVec3();
 
     public Vector3D getDir() {
         return dir;
@@ -65,6 +75,14 @@ public final class FrameStartPlayerState {
         this.fallSpeed = fallSpeed;
     }
 
+    public float getActiveHorizontalSpeed() {
+        return activeHorizontalSpeed;
+    }
+
+    public void setActiveHorizontalSpeed(float activeHorizontalSpeed) {
+        this.activeHorizontalSpeed = Math.max(0f, activeHorizontalSpeed);
+    }
+
     public Tile getTileBelow() {
         return tileBelow;
     }
@@ -76,16 +94,24 @@ public final class FrameStartPlayerState {
         }
     }
 
-    public Vector3D[] getCollisionTriangle() {
-        return collisionTriangle;
+    public int getCollisionTriangleIndex() {
+        return collisionTriangleIndex;
     }
 
-    public void setCollisionTriangle(Vector3D[] collisionTriangle) {
-        this.collisionTriangle = collisionTriangle;
+    public void setCollisionTriangleIndex(int collisionTriangleIndex) {
+        this.collisionTriangleIndex = collisionTriangleIndex;
+    }
+
+    public float getCollisionProbeDistance() {
+        return collisionProbeDistance;
     }
 
     public float getNearestGroundDistance() {
         return nearestGroundDistance;
+    }
+
+    public float getNearestGroundY() {
+        return nearestGroundY;
     }
 
     public int getNearbyDeathSpikeCount() {
@@ -160,36 +186,85 @@ public final class FrameStartPlayerState {
 
     public void resetFrame() {
         tileBelow = null;
-        collisionTriangle = null;
+        collisionTriangleIndex = -1;
+        collisionProbeDistance = Float.POSITIVE_INFINITY;
         nearestGroundDistance = Float.POSITIVE_INFINITY;
+        nearestGroundY = Float.POSITIVE_INFINITY;
         nearbySpikeCount = 0;
     }
 
-    public Vector3D[] findCollisionTriangle(Tile tileBelow, float verticalTravel) {
-        if (tileBelow == null || position == null) return null;
+    public int probeCollisionTriangleIndex(Tile tileBelow, float verticalTravel) {
+        collisionProbeDistance = Float.POSITIVE_INFINITY;
+        if (tileBelow == null || position == null) return -1;
         float travel = Math.max(0f, verticalTravel);
         float maxDist = (config.playerHeight + travel) * config.fallCollisionSafetyMultiplier;
-        Vector3D[] bestTri = null;
+        int bestTriangleIndex = -1;
         float bestTriDist = Float.POSITIVE_INFINITY;
-        for (Vector3D[] tri : tileBelow.triangles) {
-            Vector3D triNormal = getNormal(tri);
+        float posX = position.x;
+        float posY = position.y;
+        float posZ = position.z;
+        for (int triangleIndex = 0; triangleIndex < tileBelow.getTriangleCount(); ++triangleIndex) {
+            Vector3D a = tileBelow.getTriangleVertex(triangleIndex, 0);
+            Vector3D b = tileBelow.getTriangleVertex(triangleIndex, 1);
+            Vector3D c = tileBelow.getTriangleVertex(triangleIndex, 2);
+            getUnitNormalTo(collisionNormalTmp, a, b, c);
             float d = rayTriangleDistance(
-                    position,
-                    triNormal.mult(-1),
-                    tri[0], tri[1], tri[2]
+                    posX, posY, posZ,
+                    -collisionNormalTmp.x, -collisionNormalTmp.y, -collisionNormalTmp.z,
+                    a.x, a.y, a.z,
+                    b.x, b.y, b.z,
+                    c.x, c.y, c.z
             );
             if (!Float.isInfinite(d)
                     && d > config.playerHeight / 2f) {
                 if (d < nearestGroundDistance) {
                     nearestGroundDistance = d;
+                    nearestGroundY = posY - collisionNormalTmp.y * d;
+                }
+                if (isSeparatingFromTriangle(d, collisionNormalTmp.x, collisionNormalTmp.y, collisionNormalTmp.z)) {
+                    continue;
                 }
                 if (d < maxDist && d < bestTriDist) {
                     bestTriDist = d;
-                    bestTri = tri;
+                    bestTriangleIndex = triangleIndex;
                 }
             }
         }
-        return bestTri;
+        collisionProbeDistance = bestTriDist;
+        return bestTriangleIndex;
+    }
+
+    private boolean isSeparatingFromTriangle(
+            float hitDistance,
+            float normalX,
+            float normalY,
+            float normalZ
+    ) {
+        if (lastMove == null) {
+            return false;
+        }
+        float supportClearance = hitDistance - config.playerHeight / 2f;
+        float minClearance = Math.max(
+                SUPPORT_SEPARATION_MIN_CLEARANCE,
+                config.playerHeight * SUPPORT_SEPARATION_CLEARANCE_FACTOR
+        );
+        if (supportClearance <= minClearance) {
+            return false;
+        }
+        float dt = Math.max(0f, dtMillis);
+        if (dt <= 0f) {
+            return false;
+        }
+        float separationSpeed = lastMove.x * normalX + lastMove.y * normalY + lastMove.z * normalZ;
+        if (separationSpeed <= 0f) {
+            return false;
+        }
+        float separationDistance = separationSpeed * dt;
+        float minSeparationDistance = Math.max(
+                SUPPORT_SEPARATION_MIN_DISTANCE,
+                config.playerHeight * SUPPORT_SEPARATION_DISTANCE_FACTOR
+        );
+        return separationDistance > minSeparationDistance;
     }
 
     public FrameStartPlayerState(PlayerConfig cfg){
@@ -200,6 +275,7 @@ public final class FrameStartPlayerState {
                 cfg.initialDirectionZ
         );
         moveDir = dir;
+        activeHorizontalSpeed = cfg.playerSpeed;
     }
 
 }

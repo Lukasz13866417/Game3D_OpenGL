@@ -3,31 +3,35 @@ package com.example.game3d_opengl.game.terrain.track_elements.spike;
 import android.opengl.GLES20;
 
 import com.example.game3d_opengl.rendering.infill.InfillShaderArgs;
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 /**
  * Shader for spikes with non-affine bases and Blinn-Phong lighting.
  * Vertex positions are computed from canonical (weights + t) and per-instance
- * quad corners + apex. For stable flat shading, each face also carries a
- * per-face anchor point used to keep light/view vectors constant per face.
- * Face normals come from derivatives when available; otherwise it falls back
- * to the provided base normal.
+ * quad corners + apex. Each face also carries its two base corners so the
+ * vertex shader can reconstruct a stable per-face normal and anchor point.
  */
 public final class SpikeInfillShaderPair
-        extends ShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS> {
+        <L extends VertexLayout.HasWeights
+                & VertexLayout.HasT
+                & VertexLayout.HasFaceBaseAWeights
+                & VertexLayout.HasFaceBaseBWeights>
+        extends MeshShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS, L> {
 
     private int uMVP, uColor;
     private int uNL, uNR, uFR, uFL, uApex, uNormal, uBaseOffset;
     private int uLightPos, uLightColor, uCameraPos, uSpecular, uShininess;
-    private int aWeights, aT, aFaceAnchorWeights, aFaceAnchorT;
+    private int aWeights, aT, aFaceBaseAWeights, aFaceBaseBWeights;
 
     private SpikeInfillShaderPair(int programHandle, String vs, String fs) {
         super(programHandle, vs, fs);
     }
 
-    public static SpikeInfillShaderPair sharedShader = null;
+    public static SpikeInfillShaderPair<VertexLayout.SpikeCanonicalFillLayout> sharedShader = null;
 
-    public static SpikeInfillShaderPair getSharedShader() {
+    public static SpikeInfillShaderPair<VertexLayout.SpikeCanonicalFillLayout> getSharedShader() {
         if (sharedShader == null) {
             throw new IllegalStateException(
                     "Shader instance is null. Needs calling LOAD_SHADER_CODE first");
@@ -37,33 +41,43 @@ public final class SpikeInfillShaderPair
 
     public static void LOAD_SHADER_CODE() {
         String vs =
+                "#version 300 es\n" +
                 "uniform mat4 uMVPMatrix;\n" +
                 "uniform vec3 uNL, uNR, uFR, uFL;\n" +
                 "uniform vec3 uApex;\n" +
                 "uniform vec3 uNormal;\n" +
                 "uniform float uBaseOffset;\n" +
-                "attribute vec4 aWeights;\n" +
-                "attribute float aT;\n" +
-                "attribute vec4 aFaceAnchorWeights;\n" +
-                "attribute float aFaceAnchorT;\n" +
-                "varying vec3 vWorldPos;\n" +
-                "varying vec3 vFaceAnchorPos;\n" +
-                "varying vec3 vFallbackNormal;\n" +
-                "vec3 mapWorld(vec4 w, float t){\n" +
+                "in vec4 aWeights;\n" +
+                "in float aT;\n" +
+                "in vec4 aFaceBaseAWeights;\n" +
+                "in vec4 aFaceBaseBWeights;\n" +
+                "flat out vec3 vFaceAnchorPos;\n" +
+                "flat out vec3 vFaceNormal;\n" +
+                "vec3 safeNormalize(vec3 v, vec3 fallback){\n" +
+                "  float lenSq = dot(v, v);\n" +
+                "  return (lenSq > 1e-8) ? v * inversesqrt(lenSq) : fallback;\n" +
+                "}\n" +
+                "vec3 mapBase(vec4 w){\n" +
                 "  vec3 pBase = w.x * uNL + w.y * uNR + w.z * uFR + w.w * uFL;\n" +
-                "  return mix(pBase + uNormal * uBaseOffset, uApex, t);\n" +
+                "  return pBase + uNormal * uBaseOffset;\n" +
+                "}\n" +
+                "vec3 mapWorld(vec4 w, float t){\n" +
+                "  return mix(mapBase(w), uApex, t);\n" +
                 "}\n" +
                 "void main(){\n" +
                 "  vec3 worldPos = mapWorld(aWeights, aT);\n" +
-                "  vWorldPos = worldPos;\n" +
-                "  vFaceAnchorPos = mapWorld(aFaceAnchorWeights, aFaceAnchorT);\n" +
-                "  vFallbackNormal = -uNormal;\n" +
+                "  vec3 faceBaseA = mapBase(aFaceBaseAWeights);\n" +
+                "  vec3 faceBaseB = mapBase(aFaceBaseBWeights);\n" +
+                "  vec3 faceNormal = safeNormalize(cross(faceBaseB - faceBaseA, uApex - faceBaseA), uNormal);\n" +
+                "  if (dot(faceNormal, uNormal) < 0.0) {\n" +
+                "    faceNormal = -faceNormal;\n" +
+                "  }\n" +
+                "  vFaceNormal = faceNormal;\n" +
+                "  vFaceAnchorPos = (faceBaseA + faceBaseB + uApex) / 3.0;\n" +
                 "  gl_Position = uMVPMatrix * vec4(worldPos, 1.0);\n" +
                 "}";
         String fs =
-                "#ifdef GL_OES_standard_derivatives\n" +
-                "#extension GL_OES_standard_derivatives : enable\n" +
-                "#endif\n" +
+                "#version 300 es\n" +
                 "precision highp float;\n" +
                 "uniform vec4 vColor;\n" +
                 "uniform vec3 uLightPos;\n" +
@@ -71,50 +85,41 @@ public final class SpikeInfillShaderPair
                 "uniform vec3 uCameraPos;\n" +
                 "uniform float uSpecular;\n" +
                 "uniform float uShininess;\n" +
-                "varying vec3 vWorldPos;\n" +
-                "varying vec3 vFaceAnchorPos;\n" +
-                "varying vec3 vFallbackNormal;\n" +
+                "flat in vec3 vFaceAnchorPos;\n" +
+                "flat in vec3 vFaceNormal;\n" +
+                "out vec4 fragColor;\n" +
+                "vec3 safeNormalize(vec3 v, vec3 fallback){\n" +
+                "  float lenSq = dot(v, v);\n" +
+                "  return (lenSq > 1e-8) ? v * inversesqrt(lenSq) : fallback;\n" +
+                "}\n" +
                 "void main(){\n" +
-                "  vec3 fallbackN = normalize(vFallbackNormal);\n" +
-                "  vec3 N = fallbackN;\n" +
-                "#ifdef GL_OES_standard_derivatives\n" +
-                "  vec3 dPosDx = dFdx(vWorldPos);\n" +
-                "  vec3 dPosDy = dFdy(vWorldPos);\n" +
-                "  vec3 faceN = normalize(cross(dPosDx, dPosDy));\n" +
-                "  if (dot(faceN, faceN) > 1e-8) N = faceN;\n" +
-                "#endif\n" +
-                "  vec3 L = normalize(uLightPos - vFaceAnchorPos);\n" +
-                "  vec3 V = normalize(uCameraPos - vFaceAnchorPos);\n" +
-                "  if (dot(N, L) < 0.0) N = -N;\n" +
-                "  vec3 H = normalize(L + V);\n" +
-                "  float NdotL = max(dot(N, L), 0.0);\n" +
-                "  float NdotH = max(dot(N, H), 0.0);\n" +
-                "  float spec = (NdotL > 0.0) ? pow(NdotH, uShininess) : 0.0;\n" +
-                "  vec3 color = vColor.rgb * (0.2 + 1.2 * NdotL) + uLightColor * uSpecular * spec;\n" +
-                "  gl_FragColor = vec4(color, vColor.a);\n" +
+                "  vec3 N = safeNormalize(vFaceNormal, vec3(0.0, 1.0, 0.0));\n" +
+                "  vec3 V = safeNormalize(uCameraPos - vFaceAnchorPos, N);\n" +
+                "  vec3 L = safeNormalize(uLightPos - vFaceAnchorPos, N);\n" +
+                "  float playerFacing = clamp(0.5 + 0.5 * dot(N, V), 0.0, 1.0);\n" +
+                "  float lightFacing = max(dot(N, L), 0.0);\n" +
+                "  float shade = min(0.90, mix(0.58, 0.82, playerFacing) + 0.06 * lightFacing);\n" +
+                "  vec3 color = vColor.rgb * shade;\n" +
+                "  fragColor = vec4(color, vColor.a);\n" +
                 "}";
         sharedShader = new Builder().fromSource(vs, fs).build();
     }
 
     @Override
-    public void enableAndPointVertexAttribs() {
-        GLES20.glEnableVertexAttribArray(aWeights);
-        final int stride = 10 * 4;
-        GLES20.glVertexAttribPointer(aWeights, 4, GLES20.GL_FLOAT, false, stride, 0);
-        GLES20.glEnableVertexAttribArray(aT);
-        GLES20.glVertexAttribPointer(aT, 1, GLES20.GL_FLOAT, false, stride, 4 * 4);
-        GLES20.glEnableVertexAttribArray(aFaceAnchorWeights);
-        GLES20.glVertexAttribPointer(aFaceAnchorWeights, 4, GLES20.GL_FLOAT, false, stride, 5 * 4);
-        GLES20.glEnableVertexAttribArray(aFaceAnchorT);
-        GLES20.glVertexAttribPointer(aFaceAnchorT, 1, GLES20.GL_FLOAT, false, stride, 9 * 4);
+    protected void enableAndPointVertexAttribs(L layout) {
+        final int stride = layout.strideBytes();
+        layout.weights().enableAndPoint(aWeights, stride);
+        layout.t().enableAndPoint(aT, stride);
+        layout.faceBaseAWeights().enableAndPoint(aFaceBaseAWeights, stride);
+        layout.faceBaseBWeights().enableAndPoint(aFaceBaseBWeights, stride);
     }
 
     @Override
     public void disableVertexAttribs() {
         GLES20.glDisableVertexAttribArray(aWeights);
         GLES20.glDisableVertexAttribArray(aT);
-        GLES20.glDisableVertexAttribArray(aFaceAnchorWeights);
-        GLES20.glDisableVertexAttribArray(aFaceAnchorT);
+        GLES20.glDisableVertexAttribArray(aFaceBaseAWeights);
+        GLES20.glDisableVertexAttribArray(aFaceBaseBWeights);
     }
 
     @Override
@@ -136,8 +141,8 @@ public final class SpikeInfillShaderPair
         this.uShininess = GLES20.glGetUniformLocation(p, "uShininess");
         this.aWeights = GLES20.glGetAttribLocation(p, "aWeights");
         this.aT = GLES20.glGetAttribLocation(p, "aT");
-        this.aFaceAnchorWeights = GLES20.glGetAttribLocation(p, "aFaceAnchorWeights");
-        this.aFaceAnchorT = GLES20.glGetAttribLocation(p, "aFaceAnchorT");
+        this.aFaceBaseAWeights = GLES20.glGetAttribLocation(p, "aFaceBaseAWeights");
+        this.aFaceBaseBWeights = GLES20.glGetAttribLocation(p, "aFaceBaseBWeights");
     }
 
     @Override
@@ -173,13 +178,15 @@ public final class SpikeInfillShaderPair
         GLES20.glUniform1f(uShininess, Math.max(1f, fragmentArgs.shininess));
     }
 
-    public static final class Builder extends ShaderPair.BaseBuilder<SpikeInfillShaderPair, Builder> {
+    public static final class Builder
+            extends ShaderPair.BaseBuilder<SpikeInfillShaderPair<VertexLayout.SpikeCanonicalFillLayout>, Builder> {
         @Override
         protected Builder self() { return this; }
 
         @Override
-        protected SpikeInfillShaderPair create(int programHandle, String vs, String fs) {
-            return new SpikeInfillShaderPair(programHandle, vs, fs);
+        protected SpikeInfillShaderPair<VertexLayout.SpikeCanonicalFillLayout> create(
+                int programHandle, String vs, String fs) {
+            return new SpikeInfillShaderPair<>(programHandle, vs, fs);
         }
     }
 }

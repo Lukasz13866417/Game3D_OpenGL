@@ -25,11 +25,12 @@ public final class TextShaderPair extends ShaderPair<TextShaderArgs.VS, TextShad
     }
 
     private static String buildVS() {
-        return "attribute vec2 aPosition;\n" +
-               "attribute vec2 aUV;\n" +
-               "attribute vec4 aColor;\n" +
-               "varying vec2 vUV;\n" +
-               "varying vec4 vColor;\n" +
+        return "#version 300 es\n" +
+               "in vec2 aPosition;\n" +
+               "in vec2 aUV;\n" +
+               "in vec4 aColor;\n" +
+               "out vec2 vUV;\n" +
+               "out vec4 vColor;\n" +
                "void main(){\n" +
                "  gl_Position = vec4(aPosition.xy, 0.0, 1.0);\n" +
                "  vUV = aUV;\n" +
@@ -38,13 +39,15 @@ public final class TextShaderPair extends ShaderPair<TextShaderArgs.VS, TextShad
     }
 
     private static String buildFS() {
-        return "precision mediump float;\n" +
+        return "#version 300 es\n" +
+               "precision mediump float;\n" +
                "uniform sampler2D uTexture;\n" +
-               "varying vec2 vUV;\n" +
-               "varying vec4 vColor;\n" +
+               "in vec2 vUV;\n" +
+               "in vec4 vColor;\n" +
+               "out vec4 fragColor;\n" +
                "void main(){\n" +
-               "  float alpha = texture2D(uTexture, vUV).a;\n" +
-               "  gl_FragColor = vec4(vColor.rgb, vColor.a * alpha);\n" +
+               "  float alpha = texture(uTexture, vUV).a;\n" +
+               "  fragColor = vec4(vColor.rgb, vColor.a * alpha);\n" +
                "}";
     }
 

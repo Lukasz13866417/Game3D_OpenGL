@@ -246,6 +246,19 @@ public class Camera {
                         new Vector3D(eyeX, eyeY, eyeZ)).normalized();
     }
 
+    /** Scalar accessors avoid allocating a temporary vector in per-frame render plumbing. */
+    public float getEyeX() {
+        return eyeX;
+    }
+
+    public float getEyeY() {
+        return eyeY;
+    }
+
+    public float getEyeZ() {
+        return eyeZ;
+    }
+
     public Vector3D getUp() {
         return new Vector3D(upX, upY, upZ).normalized();
     }

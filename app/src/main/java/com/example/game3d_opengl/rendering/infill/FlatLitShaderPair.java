@@ -2,6 +2,8 @@ package com.example.game3d_opengl.rendering.infill;
 
 import android.opengl.GLES20;
 
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 /**
@@ -11,11 +13,13 @@ import com.example.game3d_opengl.rendering.shader.ShaderPair;
  *
  * Material parameters (ambient, diffuse, specular, shininess) are passed as uniforms.
  */
-public final class FlatLitShaderPair extends ShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS> {
+public final class FlatLitShaderPair<
+        L extends VertexLayout.HasPosition & VertexLayout.HasNormals>
+        extends MeshShaderPair<InfillShaderArgs.VS, InfillShaderArgs.FS, L> {
 
-    private static FlatLitShaderPair sharedShader = null;
+    private static FlatLitShaderPair<VertexLayout.PositionNormalLayout> sharedShader = null;
 
-    public static FlatLitShaderPair getSharedShader() {
+    public static FlatLitShaderPair<VertexLayout.PositionNormalLayout> getSharedShader() {
         if (sharedShader == null) {
             throw new IllegalStateException(
                     "Shader instance is null. Call LOAD_SHADER_CODE first");
@@ -24,6 +28,7 @@ public final class FlatLitShaderPair extends ShaderPair<InfillShaderArgs.VS, Inf
     }
 
     private int uMVP, uModel, uColor, aPos, aNormal;
+    private int uSpinAngleStart, uSpinAngleStep, uOpacityMultiplier;
     private int uLightPos, uLightColor, uCameraPos, uAmbient, uDiffuse, uSpecular, uShininess;
 
     public FlatLitShaderPair(int programHandle, String vs, String fs) {
@@ -31,7 +36,11 @@ public final class FlatLitShaderPair extends ShaderPair<InfillShaderArgs.VS, Inf
     }
 
     public static void LOAD_SHADER_CODE() {
+        if (sharedShader != null) {
+            return;
+        }
         String vs =
+                "#version 300 es\n" +
                 "uniform mat4 uMVPMatrix;\n" +
                 "uniform mat4 uModelMatrix;\n" +
                 "uniform vec4 vColor;\n" +
@@ -42,13 +51,21 @@ public final class FlatLitShaderPair extends ShaderPair<InfillShaderArgs.VS, Inf
                 "uniform float uDiffuse;\n" +
                 "uniform float uSpecular;\n" +
                 "uniform float uShininess;\n" +
-                "attribute vec3 vPosition;\n" +
-                "attribute vec3 aNormal;\n" +
-                "varying vec4 vLitColor;\n" +
+                "uniform float uSpinAngleStart;\n" +
+                "uniform float uSpinAngleStep;\n" +
+                "uniform float uOpacityMultiplier;\n" +
+                "in vec3 vPosition;\n" +
+                "in vec3 aNormal;\n" +
+                "out vec4 vLitColor;\n" +
                 "void main(){\n" +
-                "  vec4 wp = uModelMatrix * vec4(vPosition, 1.0);\n" +
+                "  float spinAngle = uSpinAngleStart + float(gl_InstanceID) * uSpinAngleStep;\n" +
+                "  float spinCos = cos(spinAngle);\n" +
+                "  float spinSin = sin(spinAngle);\n" +
+                "  vec3 localPosition = vec3(vPosition.x, spinCos * vPosition.y - spinSin * vPosition.z, spinSin * vPosition.y + spinCos * vPosition.z);\n" +
+                "  vec3 localNormal = vec3(aNormal.x, spinCos * aNormal.y - spinSin * aNormal.z, spinSin * aNormal.y + spinCos * aNormal.z);\n" +
+                "  vec4 wp = uModelMatrix * vec4(localPosition, 1.0);\n" +
                 "  vec3 worldPos = wp.xyz;\n" +
-                "  vec3 worldNormal = normalize(mat3(uModelMatrix) * aNormal);\n" +
+                "  vec3 worldNormal = normalize(mat3(uModelMatrix) * localNormal);\n" +
                 "  vec3 L = normalize(uLightPos - worldPos);\n" +
                 "  vec3 V = normalize(uCameraPos - worldPos);\n" +
                 "  vec3 H = normalize(L + V);\n" +
@@ -56,26 +73,25 @@ public final class FlatLitShaderPair extends ShaderPair<InfillShaderArgs.VS, Inf
                 "  float NdotH = max(dot(worldNormal, H), 0.0);\n" +
                 "  float spec = pow(NdotH, uShininess);\n" +
                 "  vec3 color = vColor.rgb * (uAmbient + uDiffuse * NdotL) + uLightColor * uSpecular * spec;\n" +
-                "  vLitColor = vec4(color, vColor.a);\n" +
-                "  gl_Position = uMVPMatrix * vec4(vPosition, 1.0);\n" +
+                "  vLitColor = vec4(color, vColor.a * uOpacityMultiplier);\n" +
+                "  gl_Position = uMVPMatrix * vec4(localPosition, 1.0);\n" +
                 "}";
         String fs =
+                "#version 300 es\n" +
                 "precision mediump float;\n" +
-                "varying vec4 vLitColor;\n" +
+                "in vec4 vLitColor;\n" +
+                "out vec4 fragColor;\n" +
                 "void main(){\n" +
-                "  gl_FragColor = vLitColor;\n" +
+                "  fragColor = vLitColor;\n" +
                 "}";
         sharedShader = new Builder().fromSource(vs, fs).build();
     }
 
-    private static final int STRIDE = 6 * 4;
-
     @Override
-    public void enableAndPointVertexAttribs() {
-        GLES20.glEnableVertexAttribArray(aPos);
-        GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, STRIDE, 0);
-        GLES20.glEnableVertexAttribArray(aNormal);
-        GLES20.glVertexAttribPointer(aNormal, 3, GLES20.GL_FLOAT, false, STRIDE, 3 * 4);
+    protected void enableAndPointVertexAttribs(L layout) {
+        int stride = layout.strideBytes();
+        layout.position().enableAndPoint(aPos, stride);
+        layout.normals().enableAndPoint(aNormal, stride);
     }
 
     @Override
@@ -97,6 +113,9 @@ public final class FlatLitShaderPair extends ShaderPair<InfillShaderArgs.VS, Inf
         this.uDiffuse = GLES20.glGetUniformLocation(p, "uDiffuse");
         this.uSpecular = GLES20.glGetUniformLocation(p, "uSpecular");
         this.uShininess = GLES20.glGetUniformLocation(p, "uShininess");
+        this.uSpinAngleStart = GLES20.glGetUniformLocation(p, "uSpinAngleStart");
+        this.uSpinAngleStep = GLES20.glGetUniformLocation(p, "uSpinAngleStep");
+        this.uOpacityMultiplier = GLES20.glGetUniformLocation(p, "uOpacityMultiplier");
         this.aPos = GLES20.glGetAttribLocation(p, "vPosition");
         this.aNormal = GLES20.glGetAttribLocation(p, "aNormal");
     }
@@ -121,15 +140,20 @@ public final class FlatLitShaderPair extends ShaderPair<InfillShaderArgs.VS, Inf
         GLES20.glUniform1f(uDiffuse, fragmentArgs.diffuse);
         GLES20.glUniform1f(uSpecular, fragmentArgs.specular);
         GLES20.glUniform1f(uShininess, Math.max(1f, fragmentArgs.shininess));
+        GLES20.glUniform1f(uSpinAngleStart, vertexArgs.spinAngleStartRadians);
+        GLES20.glUniform1f(uSpinAngleStep, vertexArgs.spinAngleStepRadians);
+        GLES20.glUniform1f(uOpacityMultiplier, fragmentArgs.opacityMultiplier);
     }
 
-    public static final class Builder extends ShaderPair.BaseBuilder<FlatLitShaderPair, Builder> {
+    public static final class Builder
+            extends ShaderPair.BaseBuilder<FlatLitShaderPair<VertexLayout.PositionNormalLayout>, Builder> {
         @Override
         protected Builder self() { return this; }
 
         @Override
-        protected FlatLitShaderPair create(int programHandle, String vs, String fs) {
-            return new FlatLitShaderPair(programHandle, vs, fs);
+        protected FlatLitShaderPair<VertexLayout.PositionNormalLayout> create(
+                int programHandle, String vs, String fs) {
+            return new FlatLitShaderPair<>(programHandle, vs, fs);
         }
     }
 }

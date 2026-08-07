@@ -63,13 +63,32 @@ public class TerrainCommandInterpreterTest {
         }
     }
 
+    private static void assertPrintedGridLayoutEquals(AdvancedGridCreator expected, AdvancedGridCreator actual) {
+        String[] expectedLines = capturePrintedGridLines(expected);
+        String[] actualLines = capturePrintedGridLines(actual);
+        assertEquals(expectedLines.length, actualLines.length);
+        assertEquals(normalizeGridDebugHeader(expectedLines[1]), normalizeGridDebugHeader(actualLines[1]));
+        for (int i = 2; i < expectedLines.length; ++i) {
+            assertEquals(expectedLines[i], actualLines[i]);
+        }
+    }
+
+    private static String normalizeGridDebugHeader(String line) {
+        int comma = line.lastIndexOf(',');
+        int lastSpaceBeforeComma = comma >= 0 ? line.lastIndexOf(' ', comma) : -1;
+        if (comma < 0 || lastSpaceBeforeComma < 0) {
+            return line;
+        }
+        return line.substring(0, lastSpaceBeforeComma + 1) + "<hash>" + line.substring(comma);
+    }
+
     private static final class NoOpAddon extends Addon {
         @Override
         protected void onPlace(
-                Vector3D fieldNearLeft,
-                Vector3D fieldNearRight,
-                Vector3D fieldFarLeft,
-                Vector3D fieldFarRight
+                float nearLeftX, float nearLeftY, float nearLeftZ,
+                float nearRightX, float nearRightY, float nearRightZ,
+                float farLeftX, float farLeftY, float farLeftZ,
+                float farRightX, float farRightY, float farRightZ
         ) {}
 
         @Override
@@ -145,6 +164,50 @@ public class TerrainCommandInterpreterTest {
 
         @Override
         protected void generateTiles(Terrain.TileBrush brush) {
+            for (int i = 0; i < tilesToMake; ++i) {
+                brush.addSegment();
+            }
+        }
+
+        @Override
+        protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
+            seenRows = nRows;
+        }
+    }
+
+    private static final class SingleReserveStructure extends AdvancedTerrainStructure {
+        int seenRows = -1;
+
+        SingleReserveStructure(int ownSegments) {
+            super(ownSegments);
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            for (int i = 0; i < tilesToMake; ++i) {
+                brush.addSegment();
+            }
+        }
+
+        @Override
+        protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
+            seenRows = nRows;
+            brush.reserveVertical(1, 1, 1, noOpAddons(1));
+        }
+    }
+
+    private static final class ParentWithEmptyChild extends AdvancedTerrainStructure {
+        private final EmptyAddonStructure child;
+        int seenRows = -1;
+
+        ParentWithEmptyChild(int ownSegments, EmptyAddonStructure child) {
+            super(ownSegments);
+            this.child = child;
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            addChild(child, brush);
             for (int i = 0; i < tilesToMake; ++i) {
                 brush.addSegment();
             }
@@ -255,6 +318,170 @@ public class TerrainCommandInterpreterTest {
         }
     }
 
+    private static final class BasicParentWithReservingChild extends BasicTerrainStructure {
+        private final ReservingChildStructure child;
+        int seenRows = -1;
+
+        BasicParentWithReservingChild(int ownSegments, ReservingChildStructure child) {
+            super(ownSegments);
+            this.child = child;
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            addChild(child, brush);
+            for (int i = 0; i < tilesToMake; ++i) {
+                brush.addSegment();
+            }
+        }
+
+        @Override
+        protected void generateAddons(Terrain.BasicGridBrush brush, int nRows, int nCols) {
+            seenRows = nRows;
+            assertEquals(4, nCols);
+            brush.reserveVertical(4, 4, 2, noOpAddons(2));
+        }
+    }
+
+    private static final class AdvancedGrandparentWithBasicReservingChild extends AdvancedTerrainStructure {
+        private final BasicParentWithReservingChild child;
+        int seenRows = -1;
+
+        AdvancedGrandparentWithBasicReservingChild(BasicParentWithReservingChild child) {
+            super(0);
+            this.child = child;
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            addChild(child, brush);
+        }
+
+        @Override
+        protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
+            seenRows = nRows;
+            assertEquals(4, nCols);
+        }
+    }
+
+    private static final class BasicParentWithBasicReservingChild extends BasicTerrainStructure {
+        private final BasicParentWithReservingChild child;
+
+        BasicParentWithBasicReservingChild(BasicParentWithReservingChild child) {
+            super(0);
+            this.child = child;
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            addChild(child, brush);
+        }
+
+        @Override
+        protected void generateAddons(Terrain.BasicGridBrush brush, int nRows, int nCols) {}
+    }
+
+    private static final class AdvancedGrandparentWithNestedBasicReservingChild extends AdvancedTerrainStructure {
+        private final BasicParentWithBasicReservingChild child;
+        int seenRows = -1;
+
+        AdvancedGrandparentWithNestedBasicReservingChild(BasicParentWithBasicReservingChild child) {
+            super(0);
+            this.child = child;
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            addChild(child, brush);
+        }
+
+        @Override
+        protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
+            seenRows = nRows;
+            assertEquals(4, nCols);
+        }
+    }
+
+    private static final class BasicParentWithBlockingChild extends BasicTerrainStructure {
+        private final BlockingChildStructure child;
+        int seenRows = -1;
+
+        BasicParentWithBlockingChild(int ownSegments, BlockingChildStructure child) {
+            super(ownSegments);
+            this.child = child;
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            addChild(child, brush);
+            for (int i = 0; i < tilesToMake; ++i) {
+                brush.addSegment();
+            }
+        }
+
+        @Override
+        protected void generateAddons(Terrain.BasicGridBrush brush, int nRows, int nCols) {
+            seenRows = nRows;
+        }
+    }
+
+    private static final class AdvancedGrandparentWithBasicBlockingChild extends AdvancedTerrainStructure {
+        private final BasicParentWithBlockingChild child;
+        int seenRows = -1;
+
+        AdvancedGrandparentWithBasicBlockingChild(BasicParentWithBlockingChild child) {
+            super(0);
+            this.child = child;
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            addChild(child, brush);
+        }
+
+        @Override
+        protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
+            seenRows = nRows;
+        }
+    }
+
+    private static final class BasicParentWithBasicBlockingChild extends BasicTerrainStructure {
+        private final BasicParentWithBlockingChild child;
+
+        BasicParentWithBasicBlockingChild(BasicParentWithBlockingChild child) {
+            super(0);
+            this.child = child;
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            addChild(child, brush);
+        }
+
+        @Override
+        protected void generateAddons(Terrain.BasicGridBrush brush, int nRows, int nCols) {}
+    }
+
+    private static final class AdvancedGrandparentWithNestedBasicBlockingChild extends AdvancedTerrainStructure {
+        private final BasicParentWithBasicBlockingChild child;
+        int seenRows = -1;
+
+        AdvancedGrandparentWithNestedBasicBlockingChild(BasicParentWithBasicBlockingChild child) {
+            super(0);
+            this.child = child;
+        }
+
+        @Override
+        protected void generateTiles(Terrain.TileBrush brush) {
+            addChild(child, brush);
+        }
+
+        @Override
+        protected void generateAddons(Terrain.AdvancedGridBrush brush, int nRows, int nCols) {
+            seenRows = nRows;
+        }
+    }
+
     private Terrain createTerrain(int nCols) {
         Terrain terrain = new Terrain(
                 1024,
@@ -320,16 +547,127 @@ public class TerrainCommandInterpreterTest {
         advanceUntil(
                 terrain,
                 256,
-                () -> structure.seenRows > 0 && terrain.gridCreatorWrapperQueue.size() == 1
+                () -> terrain.gridCreatorWrapperQueue.size() == 1
+                        && terrain.peekDeferredAddonPhase() != null
         );
 
+        assertNull(terrain.gridCreatorWrapperQueue.peek().getContent());
+
+        terrain.generateChunks(1);
+        assertNull(terrain.gridCreatorWrapperQueue.peek().getContent());
+
+        terrain.generateChunks(1);
+        assertNull(terrain.gridCreatorWrapperQueue.peek().getContent());
+
+        terrain.generateChunks(1);
         assertNull(terrain.gridCreatorWrapperQueue.peek().getContent());
 
         terrain.generateChunks(1);
         assertNotNull(terrain.gridCreatorWrapperQueue.peek().getContent());
 
         terrain.generateChunks(1);
+        assertTrue(structure.seenRows > 0);
+        assertNotNull(terrain.gridCreatorWrapperQueue.peek().getContent());
+
+        terrain.generateChunks(1);
         assertTrue(terrain.gridCreatorWrapperQueue.isEmpty());
+    }
+
+    @Test
+    public void addons_are_emitted_only_after_finalize_command_materializes_creator() {
+        SingleReserveStructure structure = new SingleReserveStructure(2);
+        Terrain terrain = createTerrain(4);
+        terrain.enqueueStructure(structure);
+
+        advanceUntil(
+                terrain,
+                256,
+                () -> terrain.gridCreatorWrapperQueue.size() == 1
+                        && terrain.peekDeferredAddonPhase() != null
+        );
+
+        assertEquals(0, terrain.getAddonCount());
+        assertNull(terrain.gridCreatorWrapperQueue.peek().getContent());
+        assertEquals(-1, structure.seenRows);
+
+        terrain.generateChunks(1);
+        terrain.generateChunks(1);
+        terrain.generateChunks(1);
+        assertNull(terrain.gridCreatorWrapperQueue.peek().getContent());
+        assertEquals(0, terrain.getAddonCount());
+        assertEquals(-1, structure.seenRows);
+
+        terrain.generateChunks(1);
+        assertNotNull(terrain.gridCreatorWrapperQueue.peek().getContent());
+        assertEquals(0, terrain.getAddonCount());
+        assertEquals(-1, structure.seenRows);
+
+        terrain.generateChunks(1);
+        assertNotNull(terrain.gridCreatorWrapperQueue.peek().getContent());
+        assertEquals(1, terrain.getAddonCount());
+        assertTrue(structure.seenRows > 0);
+    }
+
+    @Test
+    public void committed_frontier_does_not_advance_until_addon_finish() {
+        EmptyAddonStructure structure = new EmptyAddonStructure(2);
+        Terrain terrain = createTerrain(4);
+        int initialCommittedFrontier = terrain.getCommittedFrontierTileIndex();
+        terrain.enqueueStructure(structure);
+
+        advanceUntil(
+                terrain,
+                256,
+                () -> terrain.getPendingStructureFrontierCountForTesting() == 1
+        );
+
+        assertTrue(terrain.getLastGeneratedTileIndex() > initialCommittedFrontier);
+        assertEquals(initialCommittedFrontier, terrain.getCommittedFrontierTileIndex());
+
+        advanceUntil(
+                terrain,
+                16,
+                () -> terrain.gridCreatorWrapperQueue.peek() != null
+                        && terrain.gridCreatorWrapperQueue.peek().getContent() != null
+        );
+        assertEquals(initialCommittedFrontier, terrain.getCommittedFrontierTileIndex());
+
+        advanceUntil(
+                terrain,
+                16,
+                () -> terrain.getCommittedFrontierTileIndex() > initialCommittedFrontier
+        );
+        assertTrue(terrain.getCommittedFrontierTileIndex() > initialCommittedFrontier);
+        assertEquals(0, terrain.getPendingStructureFrontierCountForTesting());
+        assertEquals(terrain.getLastGeneratedTileIndex(), terrain.getCommittedFrontierTileIndex());
+    }
+
+    @Test
+    public void nested_child_addon_finish_advances_frontier_before_parent() {
+        EmptyAddonStructure child = new EmptyAddonStructure(1);
+        ParentWithEmptyChild parent = new ParentWithEmptyChild(1, child);
+        Terrain terrain = createTerrain(4);
+        int initialCommittedFrontier = terrain.getCommittedFrontierTileIndex();
+        terrain.enqueueStructure(parent);
+
+        advanceUntil(
+                terrain,
+                512,
+                () -> terrain.getCommittedFrontierTileIndex() > initialCommittedFrontier
+        );
+
+        int childCommittedFrontier = terrain.getCommittedFrontierTileIndex();
+        assertTrue(childCommittedFrontier > initialCommittedFrontier);
+        assertTrue(childCommittedFrontier < terrain.getLastGeneratedTileIndex());
+        assertEquals(1, terrain.getPendingStructureFrontierCountForTesting());
+
+        advanceUntil(
+                terrain,
+                512,
+                () -> terrain.getPendingStructureFrontierCountForTesting() == 0
+        );
+
+        assertEquals(terrain.getLastGeneratedTileIndex(), terrain.getCommittedFrontierTileIndex());
     }
 
     @Test
@@ -343,7 +681,9 @@ public class TerrainCommandInterpreterTest {
         advanceUntil(
                 terrain,
                 512,
-                () -> parent.seenRows > 0 && terrain.gridCreatorWrapperQueue.size() == 1
+                () -> child.seenRows > 0
+                        && parent.seenRows < 0
+                        && terrain.gridCreatorWrapperQueue.size() == 1
         );
 
         assertNull(
@@ -351,7 +691,12 @@ public class TerrainCommandInterpreterTest {
                 terrain.gridCreatorWrapperQueue.peek().getContent()
         );
 
-        terrain.generateChunks(1);
+        advanceUntil(
+                terrain,
+                16,
+                () -> terrain.gridCreatorWrapperQueue.peek() != null
+                        && terrain.gridCreatorWrapperQueue.peek().getContent() != null
+        );
         assertNotNull(terrain.gridCreatorWrapperQueue.peek().getContent());
     }
 
@@ -365,17 +710,25 @@ public class TerrainCommandInterpreterTest {
         advanceUntil(
                 terrain,
                 512,
-                () -> parent.seenRows > 0 && terrain.gridCreatorWrapperQueue.size() == 1
+                () -> parent.seenRows < 0
+                        && terrain.gridCreatorWrapperQueue.size() == 1
+                        && terrain.peekDeferredAddonPhase() != null
+                        && terrain.peekDeferredAddonPhase().structure == parent
+                        && terrain.peekDeferredAddonPhase().nRows == 7
         );
 
         assertNull(terrain.gridCreatorWrapperQueue.peek().getContent());
 
-        terrain.generateChunks(1);
+        advanceUntil(
+                terrain,
+                16,
+                () -> terrain.getAddonCount() == 4
+                        && terrain.gridCreatorWrapperQueue.peek() != null
+                        && terrain.gridCreatorWrapperQueue.peek().getContent() != null
+        );
         AdvancedGridCreator parentCreator =
                 (AdvancedGridCreator) terrain.gridCreatorWrapperQueue.peek().getContent();
         assertNotNull(parentCreator);
-
-        terrain.generateChunks(1);
         assertPrintedGrid(
                 parentCreator,
                 7,
@@ -417,5 +770,161 @@ public class TerrainCommandInterpreterTest {
                     parentCreator.reserveRandomFittingVertical(1).row > child.seenRows
             );
         }
+    }
+
+    @Test
+    public void advanced_grandparent_receives_summary_from_basic_middle_layer() {
+        ReservingChildStructure leaf = new ReservingChildStructure(2);
+        BasicParentWithReservingChild middle = new BasicParentWithReservingChild(3, leaf);
+        AdvancedGrandparentWithBasicReservingChild grandparent =
+                new AdvancedGrandparentWithBasicReservingChild(middle);
+        Terrain terrain = createTerrain(4);
+        terrain.enqueueStructure(grandparent);
+
+        advanceUntil(
+                terrain,
+                512,
+                () -> middle.seenRows > 0
+                        && grandparent.seenRows < 0
+                        && terrain.gridCreatorWrapperQueue.size() == 1
+        );
+
+        assertNull(terrain.gridCreatorWrapperQueue.peek().getContent());
+
+        advanceUntil(
+                terrain,
+                16,
+                () -> terrain.gridCreatorWrapperQueue.peek() != null
+                        && terrain.gridCreatorWrapperQueue.peek().getContent() != null
+        );
+        AdvancedGridCreator grandparentCreator =
+                (AdvancedGridCreator) terrain.gridCreatorWrapperQueue.peek().getContent();
+        assertNotNull(grandparentCreator);
+
+        assertPrintedGrid(
+                grandparentCreator,
+                7,
+                4,
+                "0 [., ., ., .]",
+                "1 [., #, #, .]",
+                "2 [., ., ., .]",
+                "3 [., ., ., #]",
+                "4 [., ., ., #]",
+                "5 [., ., ., .]",
+                "6 [., ., ., .]"
+        );
+    }
+
+    @Test
+    public void blocked_rows_survive_basic_middle_layer_summary_transfer() {
+        BlockingChildStructure leaf = new BlockingChildStructure(2);
+        BasicParentWithBlockingChild middle = new BasicParentWithBlockingChild(4, leaf);
+        AdvancedGrandparentWithBasicBlockingChild grandparent =
+                new AdvancedGrandparentWithBasicBlockingChild(middle);
+
+        Terrain terrain = createTerrain(3);
+        terrain.enqueueStructure(grandparent);
+
+        advanceUntil(
+                terrain,
+                512,
+                () -> grandparent.seenRows > 0
+                        && terrain.gridCreatorWrapperQueue.size() == 1
+                        && terrain.gridCreatorWrapperQueue.peek().getContent() != null
+        );
+
+        AdvancedGridCreator grandparentCreator =
+                (AdvancedGridCreator) terrain.gridCreatorWrapperQueue.peek().getContent();
+        assertNotNull(grandparentCreator);
+
+        int availableCells = (grandparent.seenRows - leaf.seenRows) * terrain.nCols;
+        for (int i = 0; i < availableCells; ++i) {
+            assertTrue(
+                    "Blocked rows from the advanced leaf should remain unavailable through the basic middle layer.",
+                    grandparentCreator.reserveRandomFittingVertical(1).row > leaf.seenRows
+            );
+        }
+    }
+
+    @Test
+    public void nested_basic_layers_match_single_basic_reservation_layout() {
+        ReservingChildStructure directLeaf = new ReservingChildStructure(2);
+        BasicParentWithReservingChild directMiddle = new BasicParentWithReservingChild(3, directLeaf);
+        AdvancedGrandparentWithBasicReservingChild directGrandparent =
+                new AdvancedGrandparentWithBasicReservingChild(directMiddle);
+
+        ReservingChildStructure nestedLeaf = new ReservingChildStructure(2);
+        BasicParentWithReservingChild nestedMiddle = new BasicParentWithReservingChild(3, nestedLeaf);
+        BasicParentWithBasicReservingChild nestedOuter = new BasicParentWithBasicReservingChild(nestedMiddle);
+        AdvancedGrandparentWithNestedBasicReservingChild nestedGrandparent =
+                new AdvancedGrandparentWithNestedBasicReservingChild(nestedOuter);
+
+        Terrain directTerrain = createTerrain(4);
+        directTerrain.enqueueStructure(directGrandparent);
+        advanceUntil(
+                directTerrain,
+                512,
+                () -> directTerrain.gridCreatorWrapperQueue.size() == 1
+                        && directTerrain.gridCreatorWrapperQueue.peek().getContent() != null
+        );
+        AdvancedGridCreator directCreator =
+                (AdvancedGridCreator) directTerrain.gridCreatorWrapperQueue.peek().getContent();
+        assertNotNull(directCreator);
+
+        Terrain nestedTerrain = createTerrain(4);
+        nestedTerrain.enqueueStructure(nestedGrandparent);
+        advanceUntil(
+                nestedTerrain,
+                512,
+                () -> nestedTerrain.gridCreatorWrapperQueue.size() == 1
+                        && nestedTerrain.gridCreatorWrapperQueue.peek().getContent() != null
+        );
+        AdvancedGridCreator nestedCreator =
+                (AdvancedGridCreator) nestedTerrain.gridCreatorWrapperQueue.peek().getContent();
+        assertNotNull(nestedCreator);
+
+        assertPrintedGridLayoutEquals(directCreator, nestedCreator);
+    }
+
+    @Test
+    public void nested_basic_layers_match_single_basic_blocked_row_layout() {
+        BlockingChildStructure directLeaf = new BlockingChildStructure(2);
+        BasicParentWithBlockingChild directMiddle = new BasicParentWithBlockingChild(4, directLeaf);
+        AdvancedGrandparentWithBasicBlockingChild directGrandparent =
+                new AdvancedGrandparentWithBasicBlockingChild(directMiddle);
+
+        BlockingChildStructure nestedLeaf = new BlockingChildStructure(2);
+        BasicParentWithBlockingChild nestedMiddle = new BasicParentWithBlockingChild(4, nestedLeaf);
+        BasicParentWithBasicBlockingChild nestedOuter = new BasicParentWithBasicBlockingChild(nestedMiddle);
+        AdvancedGrandparentWithNestedBasicBlockingChild nestedGrandparent =
+                new AdvancedGrandparentWithNestedBasicBlockingChild(nestedOuter);
+
+        Terrain directTerrain = createTerrain(3);
+        directTerrain.enqueueStructure(directGrandparent);
+        advanceUntil(
+                directTerrain,
+                512,
+                () -> directGrandparent.seenRows > 0
+                        && directTerrain.gridCreatorWrapperQueue.size() == 1
+                        && directTerrain.gridCreatorWrapperQueue.peek().getContent() != null
+        );
+        AdvancedGridCreator directCreator =
+                (AdvancedGridCreator) directTerrain.gridCreatorWrapperQueue.peek().getContent();
+        assertNotNull(directCreator);
+
+        Terrain nestedTerrain = createTerrain(3);
+        nestedTerrain.enqueueStructure(nestedGrandparent);
+        advanceUntil(
+                nestedTerrain,
+                512,
+                () -> nestedGrandparent.seenRows > 0
+                        && nestedTerrain.gridCreatorWrapperQueue.size() == 1
+                        && nestedTerrain.gridCreatorWrapperQueue.peek().getContent() != null
+        );
+        AdvancedGridCreator nestedCreator =
+                (AdvancedGridCreator) nestedTerrain.gridCreatorWrapperQueue.peek().getContent();
+        assertNotNull(nestedCreator);
+
+        assertPrintedGridLayoutEquals(directCreator, nestedCreator);
     }
 }

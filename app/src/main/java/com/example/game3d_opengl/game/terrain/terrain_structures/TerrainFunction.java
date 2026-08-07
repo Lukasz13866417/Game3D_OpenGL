@@ -17,6 +17,10 @@ public class TerrainFunction extends AdvancedTerrainStructure {
     private final float xStart;
     private final float xEnd;
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
     /**
      * @param tilesToMake number of tiles (segments) to generate
      * @param function    the function f(x) whose values will define the vertical shape
@@ -59,5 +63,41 @@ public class TerrainFunction extends AdvancedTerrainStructure {
     @Override
     protected void generateAddons(AdvancedGridBrush brush, int nRows, int nCols) {
        
+    }
+
+    public static final class Builder {
+        private Integer tilesToMake;
+        private Function<Float, Float> function;
+        private Float xStart;
+        private Float xEnd;
+
+        public Builder tilesToMake(int tilesToMake) {
+            this.tilesToMake = tilesToMake;
+            return this;
+        }
+
+        public Builder function(Function<Float, Float> function) {
+            this.function = function;
+            return this;
+        }
+
+        public Builder xRange(float xStart, float xEnd) {
+            this.xStart = xStart;
+            this.xEnd = xEnd;
+            return this;
+        }
+
+        public TerrainFunction build() {
+            if (tilesToMake == null) {
+                throw new IllegalStateException("tilesToMake not set");
+            }
+            if (function == null) {
+                throw new IllegalStateException("function not set");
+            }
+            if (xStart == null || xEnd == null) {
+                throw new IllegalStateException("xRange not set");
+            }
+            return new TerrainFunction(tilesToMake, function, xStart, xEnd);
+        }
     }
 }

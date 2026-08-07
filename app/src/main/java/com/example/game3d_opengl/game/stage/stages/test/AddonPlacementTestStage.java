@@ -89,7 +89,8 @@ public class AddonPlacementTestStage extends Stage {
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
-        DeathSpike.LOAD_DEATHSPIKE_ASSETS();
+        com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers
+                .ensureDefaultLoaded(context.getAssets());
         // initial camera setup (no rotation); roll will be applied via VP matrix during draw
         camera.set(
                 camX, camY, camZ,
@@ -152,17 +153,12 @@ public class AddonPlacementTestStage extends Stage {
     }
 
     @Override
-    public void onClose() {
+    protected void onDeactivated(DeactivationReason reason) {
 
     }
 
     @Override
-    public void onSwitch() {
-
-    }
-
-    @Override
-    public void onReturn() {
+    protected void onActivated(ActivationReason reason) {
 
     }
 

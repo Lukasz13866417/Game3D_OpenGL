@@ -87,7 +87,7 @@ public class SegmentsByEndPosition {
         );
     }
 
-    public static SegmentsByEndPosition fromScratch(
+    public static SegmentsByEndPosition fromEndSortedScratch(
             int nRows,
             int nCols,
             boolean vertical,
@@ -98,7 +98,6 @@ public class SegmentsByEndPosition {
         if (scratch == null || scratch.size() == 0) {
             return new SegmentsByEndPosition(nRows, nCols, vertical, treeKind, resourcePack);
         }
-        scratch.sortByEndPosition(vertical);
         return new SegmentsByEndPosition(
                 nRows,
                 nCols,
