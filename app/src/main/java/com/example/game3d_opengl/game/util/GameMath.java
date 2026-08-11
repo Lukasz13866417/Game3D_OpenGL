@@ -12,6 +12,19 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 public class GameMath {
 
+    public static final class MutableVec3 {
+        public float x;
+        public float y;
+        public float z;
+
+        public MutableVec3 set(float x, float y, float z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            return this;
+        }
+    }
+
     public static final float EPSILON = 1e-6f;
     public static final float PI = 3.1415926535f;
     public static final float INF = Float.POSITIVE_INFINITY, NINF = Float.NEGATIVE_INFINITY;
@@ -84,6 +97,27 @@ public class GameMath {
     public static Vector3D getNormal(Vector3D... points) {
         return _getNormal(points[0],points[1],points[2]);
     }
+
+    public static void getUnitNormalTo(MutableVec3 out, Vector3D point1, Vector3D point2, Vector3D point3) {
+        float edge1x = point2.x - point1.x;
+        float edge1y = point2.y - point1.y;
+        float edge1z = point2.z - point1.z;
+        float edge2x = point3.x - point1.x;
+        float edge2y = point3.y - point1.y;
+        float edge2z = point3.z - point1.z;
+
+        float normalX = edge1y * edge2z - edge1z * edge2y;
+        float normalY = edge1z * edge2x - edge1x * edge2z;
+        float normalZ = edge1x * edge2y - edge1y * edge2x;
+        float normalLen = (float) sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+        if (normalLen <= EPSILON) {
+            out.set(0f, 0f, 0f);
+            return;
+        }
+        float invLen = 1f / normalLen;
+        out.set(normalX * invLen, normalY * invLen, normalZ * invLen);
+    }
+
     private static Vector3D _getNormal(Vector3D point1, Vector3D point2, Vector3D point3) {
         Vector3D edge1 = sub(point2, point1);
         Vector3D edge2 = sub(point3, point1);
@@ -152,23 +186,87 @@ public class GameMath {
             Vector3D pointToRotate,    // the point you want to rotate
             float angleRadians         // rotation angle in radians
     ) {
-        // translate so axisPoint is at the origin
-        Vector3D translated = pointToRotate.sub(axisPoint);
+        float axisPx = axisPoint.x;
+        float axisPy = axisPoint.y;
+        float axisPz = axisPoint.z;
+        float axisDx = axisDirection.x;
+        float axisDy = axisDirection.y;
+        float axisDz = axisDirection.z;
+        float pointX = pointToRotate.x;
+        float pointY = pointToRotate.y;
+        float pointZ = pointToRotate.z;
 
-        // unit‐length axis vector
-        Vector3D k = axisDirection.normalized();
+        float translatedX = pointX - axisPx;
+        float translatedY = pointY - axisPy;
+        float translatedZ = pointZ - axisPz;
 
-        float cos_theta = (float) Math.cos(angleRadians);
-        float sin_theta = (float) Math.sin(angleRadians);
+        float axisLen = (float) Math.sqrt(axisDx * axisDx + axisDy * axisDy + axisDz * axisDz);
+        float kx = axisDx / axisLen;
+        float ky = axisDy / axisLen;
+        float kz = axisDz / axisLen;
 
-        Vector3D term1 = translated.mult(cos_theta);
-        Vector3D term2 = k.crossProduct(translated).mult(sin_theta);
-        Vector3D term3 = k.mult(k.dotProduct(translated) * (1 - cos_theta));
+        float cosTheta = (float) Math.cos(angleRadians);
+        float sinTheta = (float) Math.sin(angleRadians);
 
-        Vector3D rotated = term1.add(term2).add(term3);
+        float crossX = ky * translatedZ - kz * translatedY;
+        float crossY = kz * translatedX - kx * translatedZ;
+        float crossZ = kx * translatedY - ky * translatedX;
+        float dot = kx * translatedX + ky * translatedY + kz * translatedZ;
+        float oneMinusCos = 1f - cosTheta;
 
-        // translate back
-        return rotated.add(axisPoint);
+        float rotatedX = translatedX * cosTheta + crossX * sinTheta + kx * dot * oneMinusCos;
+        float rotatedY = translatedY * cosTheta + crossY * sinTheta + ky * dot * oneMinusCos;
+        float rotatedZ = translatedZ * cosTheta + crossZ * sinTheta + kz * dot * oneMinusCos;
+
+        return V3(rotatedX + axisPx, rotatedY + axisPy, rotatedZ + axisPz);
+    }
+
+    public static void rotateAroundAxisTo(
+            MutableVec3 out,
+            Vector3D axisPoint,
+            Vector3D axisDirection,
+            Vector3D pointToRotate,
+            float angleRadians
+    ) {
+        rotateAroundAxisTo(
+                out,
+                axisPoint.x, axisPoint.y, axisPoint.z,
+                axisDirection.x, axisDirection.y, axisDirection.z,
+                pointToRotate.x, pointToRotate.y, pointToRotate.z,
+                angleRadians
+        );
+    }
+
+    public static void rotateAroundAxisTo(
+            MutableVec3 out,
+            float axisPx, float axisPy, float axisPz,
+            float axisDx, float axisDy, float axisDz,
+            float pointX, float pointY, float pointZ,
+            float angleRadians
+    ) {
+        float translatedX = pointX - axisPx;
+        float translatedY = pointY - axisPy;
+        float translatedZ = pointZ - axisPz;
+
+        float axisLen = (float) Math.sqrt(axisDx * axisDx + axisDy * axisDy + axisDz * axisDz);
+        float kx = axisDx / axisLen;
+        float ky = axisDy / axisLen;
+        float kz = axisDz / axisLen;
+
+        float cosTheta = (float) Math.cos(angleRadians);
+        float sinTheta = (float) Math.sin(angleRadians);
+
+        float crossX = ky * translatedZ - kz * translatedY;
+        float crossY = kz * translatedX - kx * translatedZ;
+        float crossZ = kx * translatedY - ky * translatedX;
+        float dot = kx * translatedX + ky * translatedY + kz * translatedZ;
+        float oneMinusCos = 1f - cosTheta;
+
+        out.set(
+                translatedX * cosTheta + crossX * sinTheta + kx * dot * oneMinusCos + axisPx,
+                translatedY * cosTheta + crossY * sinTheta + ky * dot * oneMinusCos + axisPy,
+                translatedZ * cosTheta + crossZ * sinTheta + kz * dot * oneMinusCos + axisPz
+        );
     }
 
     public static Vector3D rotateAroundTwoPoints(
@@ -200,37 +298,56 @@ public class GameMath {
             Vector3D vertex1,
             Vector3D vertex2
     ) {
+        return rayTriangleDistance(
+                rayOrigin.x, rayOrigin.y, rayOrigin.z,
+                rayDirection.x, rayDirection.y, rayDirection.z,
+                vertex0.x, vertex0.y, vertex0.z,
+                vertex1.x, vertex1.y, vertex1.z,
+                vertex2.x, vertex2.y, vertex2.z
+        );
+    }
 
-        // triangle edges
-        Vector3D edge1 = vertex1.sub(vertex0);
-        Vector3D edge2 = vertex2.sub(vertex0);
+    public static float rayTriangleDistance(
+            float rayOriginX, float rayOriginY, float rayOriginZ,
+            float rayDirectionX, float rayDirectionY, float rayDirectionZ,
+            float vertex0X, float vertex0Y, float vertex0Z,
+            float vertex1X, float vertex1Y, float vertex1Z,
+            float vertex2X, float vertex2Y, float vertex2Z
+    ) {
+        float edge1X = vertex1X - vertex0X;
+        float edge1Y = vertex1Y - vertex0Y;
+        float edge1Z = vertex1Z - vertex0Z;
+        float edge2X = vertex2X - vertex0X;
+        float edge2Y = vertex2Y - vertex0Y;
+        float edge2Z = vertex2Z - vertex0Z;
 
-        // begin calculating determinant
-        Vector3D pVec = rayDirection.crossProduct(edge2);
-        float det = edge1.dotProduct(pVec);
+        float pVecX = rayDirectionY * edge2Z - rayDirectionZ * edge2Y;
+        float pVecY = rayDirectionZ * edge2X - rayDirectionX * edge2Z;
+        float pVecZ = rayDirectionX * edge2Y - rayDirectionY * edge2X;
+        float det = edge1X * pVecX + edge1Y * pVecY + edge1Z * pVecZ;
 
-        // if det is near zero, no intersection (ray parallel or back-facing)
         if (det > -EPSILON && det < EPSILON) {
             return Float.POSITIVE_INFINITY;
         }
         float invDet = 1.0f / det;
 
-        // calculate u parameter and test bounds
-        Vector3D tVec = rayOrigin.sub(vertex0);
-        float u = tVec.dotProduct(pVec) * invDet;
+        float tVecX = rayOriginX - vertex0X;
+        float tVecY = rayOriginY - vertex0Y;
+        float tVecZ = rayOriginZ - vertex0Z;
+        float u = (tVecX * pVecX + tVecY * pVecY + tVecZ * pVecZ) * invDet;
         if (u < 0.0f || u > 1.0f) {
             return Float.POSITIVE_INFINITY;
         }
 
-        // calculate v parameter and test bounds
-        Vector3D qVec = tVec.crossProduct(edge1);
-        float v = rayDirection.dotProduct(qVec) * invDet;
+        float qVecX = tVecY * edge1Z - tVecZ * edge1Y;
+        float qVecY = tVecZ * edge1X - tVecX * edge1Z;
+        float qVecZ = tVecX * edge1Y - tVecY * edge1X;
+        float v = (rayDirectionX * qVecX + rayDirectionY * qVecY + rayDirectionZ * qVecZ) * invDet;
         if (v < 0.0f || u + v > 1.0f) {
             return Float.POSITIVE_INFINITY;
         }
 
-        // calculate t (distance along the ray)
-        float t = edge2.dotProduct(qVec) * invDet;
+        float t = (edge2X * qVecX + edge2Y * qVecY + edge2Z * qVecZ) * invDet;
         return (t > EPSILON) ? t : Float.POSITIVE_INFINITY;
     }
 

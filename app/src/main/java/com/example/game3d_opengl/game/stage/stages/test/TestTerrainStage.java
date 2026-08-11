@@ -10,7 +10,7 @@ import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
-import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.tilemanager.TileManager;
 import com.example.game3d_opengl.game.terrain.terrain_structures.Terrain2DCurve;
 import com.example.game3d_opengl.game.terrain.terrain_structures.TerrainLineWithSpikeRect;
 import com.example.game3d_opengl.game.terrain.terrain_structures.TerrainStairs;
@@ -80,6 +80,11 @@ public class TestTerrainStage extends Stage {
     Terrain terrain;
 
     @Override
+    protected void setupAssets(android.content.res.AssetManager assetManager) {
+        // No-op.
+    }
+
+    @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera(cameraPos,cameraLookAt,cameraUp);
         camera.setProjectionAsScreen();
@@ -88,8 +93,8 @@ public class TestTerrainStage extends Stage {
         currEye = cameraPos;
         currLook = cameraLookAt;
 
-        DeathSpike.LOAD_DEATHSPIKE_ASSETS();
-        Potion.LOAD_POTION_ASSETS(context.getAssets());
+        com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers
+                .ensureDefaultLoaded(context.getAssets());
 
         // build terrain
         /*tileManager = new TileManager(
@@ -123,9 +128,24 @@ public class TestTerrainStage extends Stage {
 
         terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
         terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
-        terrain.enqueueStructure(new TerrainStairs(100,4,1, PI/6,-1f));
+        terrain.enqueueStructure(
+                TerrainStairs.builder()
+                        .tilesPerStair(100)
+                        .stairCount(4)
+                        .emptyBetween(1)
+                        .horizontalAngleDelta(PI / 6f)
+                        .jump(-1f)
+                        .build()
+        );
         terrain.enqueueStructure(new TerrainLineWithSpikeRect(30));
-        terrain.enqueueStructure(new Terrain2DCurve(50,0,PI/8f));
+        terrain.enqueueStructure(
+                Terrain2DCurve.builder()
+                        .tilesToMake(50)
+                        .horizontalAngleDelta(0f)
+                        .verticalAngleDelta(PI / 8f)
+                        .verticalAngleFadeoutTiles(5)
+                        .build()
+        );
 
         terrain.generateChunks(-1);
 
@@ -172,17 +192,12 @@ public class TestTerrainStage extends Stage {
     }
 
     @Override
-    public void onClose() {
+    protected void onDeactivated(DeactivationReason reason) {
 
     }
 
     @Override
-    public void onSwitch() {
-
-    }
-
-    @Override
-    public void onReturn() {
+    protected void onActivated(ActivationReason reason) {
 
     }
 
@@ -202,5 +217,5 @@ public class TestTerrainStage extends Stage {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
+    public void cleanupGPUResourcesRecursively() {}
 }

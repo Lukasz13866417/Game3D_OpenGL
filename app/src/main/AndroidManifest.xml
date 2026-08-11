@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.game3d_opengl">
 
-    <!-- Require OpenGL ES 2.0 support -->
+    <!-- Require OpenGL ES 3.1 support -->
     <uses-feature
-        android:glEsVersion="0x00020000"
+        android:glEsVersion="0x00030001"
         android:required="true" />
 
     <!-- Optional: Lock orientation if your game doesn't support both -->

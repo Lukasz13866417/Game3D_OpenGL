@@ -15,7 +15,12 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  * needed for rendering and collision detection.
  */
 public class Tile implements PlayerInteractable {
+    public static final int TRIANGLE_COUNT = 2;
+    public static final int TRIANGLE_VERTEX_COUNT = 3;
+
     private final long id;
+    private final TileProfile profile;
+    private final float brightnessMultiplier;
 
     public long getID() {
         return id;
@@ -31,6 +36,18 @@ public class Tile implements PlayerInteractable {
 
     private final boolean isEmptySegment;
 
+    public TileProfile getProfile() {
+        return profile;
+    }
+
+    public float getHorizontalSpeedMultiplier() {
+        return profile.getHorizontalSpeedMultiplier();
+    }
+
+    public float getBrightnessMultiplier() {
+        return brightnessMultiplier;
+    }
+
     /**
      * All four corners of this tile:
      * nearLeft, nearRight = "close edge" (closer to player)
@@ -40,14 +57,6 @@ public class Tile implements PlayerInteractable {
      */
     public Vector3D nearLeft, nearRight, farLeft, farRight;
     
-    /**
-     * The two triangles that make up this tile's surface.
-     * Triangle 0: nearLeft -> nearRight -> farRight
-     * Triangle 1: nearLeft -> farLeft -> farRight
-     * Used for collision detection and physics calculations.
-     */
-    public final Vector3D[][] triangles;
-
     /**
      * Constructs a Tile using 4 corners plus slope.
      * The Polygon3D is created separately via factory method.
@@ -59,20 +68,37 @@ public class Tile implements PlayerInteractable {
      * @param l unique identifier for this tile
      * @param isEmptySegment whether this tile represents empty space
      */
-    Tile(Vector3D nl, Vector3D nr, Vector3D fl, Vector3D fr, long l, boolean isEmptySegment) {
+    public Tile(
+            Vector3D nl,
+            Vector3D nr,
+            Vector3D fl,
+            Vector3D fr,
+            long l,
+            boolean isEmptySegment,
+            TileProfile profile
+    ) {
+        this(nl, nr, fl, fr, l, isEmptySegment, profile,
+                profile != null ? profile.getBrightnessMultiplier() : TileProfile.NORMAL.getBrightnessMultiplier());
+    }
+
+    public Tile(
+            Vector3D nl,
+            Vector3D nr,
+            Vector3D fl,
+            Vector3D fr,
+            long l,
+            boolean isEmptySegment,
+            TileProfile profile,
+            float brightnessMultiplier
+    ) {
         this.nearLeft = nl;
         this.nearRight = nr;
         this.farLeft = fl;
         this.farRight = fr;
         this.id = l;
         this.isEmptySegment = isEmptySegment;
-
-        // Create the two triangles that make up this tile
-        // This allows for proper collision detection and physics
-        this.triangles = new Vector3D[][]{
-                new Vector3D[]{this.nearLeft,this.nearRight,this.farRight},
-                new Vector3D[]{this.nearLeft,this.farRight,this.farLeft}
-        };
+        this.profile = profile != null ? profile : TileProfile.NORMAL;
+        this.brightnessMultiplier = brightnessMultiplier;
     }
 
     public void rebasePosition(Vector3D delta) {
@@ -81,12 +107,44 @@ public class Tile implements PlayerInteractable {
         nearRight = nearRight.add(delta);
         farLeft = farLeft.add(delta);
         farRight = farRight.add(delta);
-        triangles[0][0] = nearLeft;
-        triangles[0][1] = nearRight;
-        triangles[0][2] = farRight;
-        triangles[1][0] = nearLeft;
-        triangles[1][1] = farRight;
-        triangles[1][2] = farLeft;
+    }
+
+    public int getTriangleCount() {
+        return TRIANGLE_COUNT;
+    }
+
+    public Vector3D getTriangleVertex(int triangleIndex, int vertexIndex) {
+        switch (triangleIndex) {
+            case 0:
+                switch (vertexIndex) {
+                    case 0:
+                        return nearLeft;
+                    case 1:
+                        return nearRight;
+                    case 2:
+                        return farRight;
+                    default:
+                        break;
+                }
+                break;
+            case 1:
+                switch (vertexIndex) {
+                    case 0:
+                        return nearLeft;
+                    case 1:
+                        return farRight;
+                    case 2:
+                        return farLeft;
+                    default:
+                        break;
+                }
+                break;
+            default:
+                break;
+        }
+        throw new IndexOutOfBoundsException(
+                "triangleIndex=" + triangleIndex + ", vertexIndex=" + vertexIndex
+        );
     }
 
     @NonNull

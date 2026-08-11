@@ -10,7 +10,7 @@ import android.opengl.Matrix;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
-import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.tilemanager.TileManager;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.TerrainGridField;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.game.stage.stages.test.util.FourPoints3D;
@@ -59,6 +59,11 @@ public class TestGridRowsStage extends Stage {
     }
 
     FourPoints3D xd;
+
+    @Override
+    protected void setupAssets(android.content.res.AssetManager assetManager) {
+        // No-op.
+    }
 
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
@@ -132,17 +137,12 @@ public class TestGridRowsStage extends Stage {
     }
 
     @Override
-    public void onClose() {
+    protected void onDeactivated(DeactivationReason reason) {
 
     }
 
     @Override
-    public void onSwitch() {
-
-    }
-
-    @Override
-    public void onReturn() {
+    protected void onActivated(ActivationReason reason) {
 
     }
 
@@ -162,5 +162,5 @@ public class TestGridRowsStage extends Stage {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
+    public void cleanupGPUResourcesRecursively() {}
 }

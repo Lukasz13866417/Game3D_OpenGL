@@ -1,7 +1,10 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.terrainutil;
 
 
-import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager.SegmentHistory;
+import com.example.game3d_opengl.game.pooling.PooledResourcesOwner;
+import com.example.game3d_opengl.game.pooling.PooledSlotLease;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.TileProfile;
+import com.example.game3d_opengl.game.terrain.terrain_api.main.tilemanager.TileManager.SegmentHistory;
 
 /**
  * All objects are pre-allocated once and then reused.
@@ -9,50 +12,26 @@ import com.example.game3d_opengl.game.terrain.terrain_api.main.TileManager.Segme
  * instead of allocating new Vector3D instances. This eliminates per-row object creation while
  * retaining constant-time FIFO behaviour.
  */
-public class OverflowingPreallocatedSegmentHistoryBuffer {
+public class OverflowingPreallocatedSegmentHistoryBuffer extends PooledResourcesOwner {
 
     private static final int MAX_SIZE = 100_000;
-    private static final int MAX_BUFFER_COUNT = 2;
 
-    private static final SegmentHistory[][] BUFFERS = new SegmentHistory[MAX_BUFFER_COUNT][MAX_SIZE];
-    private static final boolean[] IS_TAKEN = new boolean[MAX_BUFFER_COUNT];
-
-    static {
-        // Pre-instantiate every GridRowHelper so they can be reused without allocation.
-        for (int i = 0; i < MAX_BUFFER_COUNT; i++) {
-            for (int j = 0; j < MAX_SIZE; j++) {
-                BUFFERS[i][j] = new SegmentHistory();
-            }
-        }
-    }
-
+    private final PooledSlotLease<SegmentHistory[]> bufferLease;
     private final SegmentHistory[] myBuffer;
-    private final int mySlot;
 
     // Circular indices
     private int head = 0; // points to oldest element
     private int size = 0; // number of valid elements
 
-    private static int findFreeSlot() {
-        for (int i = 0; i < MAX_BUFFER_COUNT; i++) {
-            if (!IS_TAKEN[i]) return i;
-        }
-        return -1;
-    }
-
-    public OverflowingPreallocatedSegmentHistoryBuffer() {
-        int slot = findFreeSlot();
-        if (slot == -1) {
-            throw new IllegalStateException("No more available preallocated row-info buffers.");
-        }
-        this.mySlot = slot;
-        this.myBuffer = BUFFERS[slot];
-        IS_TAKEN[slot] = true;
+    public OverflowingPreallocatedSegmentHistoryBuffer(PooledSlotLease<SegmentHistory[]> bufferLease) {
+        super(null);
+        this.bufferLease = bufferLease;
+        this.myBuffer = bufferLease.get();
     }
 
     /** Release this buffer slot so it can be reused by another instance. */
     public void free() {
-        IS_TAKEN[mySlot] = false;
+        releasePooledResourcesRecursively();
     }
 
     public int size() {
@@ -97,7 +76,9 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
                     float lastLx, float lastLy, float lastLz,
                     float lastRx, float lastRy, float lastRz,
                     float leftover,
-                    float alphaL, float alphaR) {
+                    float alphaL, float alphaR,
+                    TileProfile tileProfile,
+                    float brightnessMultiplier) {
         int writeIdx;
         if (size < MAX_SIZE) {
             writeIdx = (head + size) % MAX_SIZE;
@@ -116,6 +97,14 @@ public class OverflowingPreallocatedSegmentHistoryBuffer {
                 lastLx, lastLy, lastLz,
                 lastRx, lastRy, lastRz,
                 leftover,
-                alphaL, alphaR);
+                alphaL, alphaR,
+                tileProfile,
+                brightnessMultiplier);
+    }
+
+    @Override
+    public void releasePooledResourcesRecursively() {
+        clear();
+        bufferLease.release();
     }
 }

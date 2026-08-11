@@ -60,9 +60,9 @@ public class Icon implements GPUResourceOwner {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
-        fillMesh.cleanupGPUResourcesRecursivelyOnContextLoss();
-        edgeMesh.cleanupGPUResourcesRecursivelyOnContextLoss();
+    public void cleanupGPUResourcesRecursively() {
+        fillMesh.cleanupGPUResourcesRecursively();
+        edgeMesh.cleanupGPUResourcesRecursively();
     }
 
     // ---- helpers ----

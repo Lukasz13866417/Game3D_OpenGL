@@ -1,40 +1,42 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.execbuffer;
 
-public class PreallocatedCommandBuffer implements CommandBuffer {
+import com.example.game3d_opengl.game.pooling.PooledResourcesOwner;
+import com.example.game3d_opengl.game.pooling.PooledSlotLease;
+
+public class PreallocatedCommandBuffer extends PooledResourcesOwner implements CommandBuffer {
     private static final int MAX_SIZE = 20_000;
-    private static final int MAX_BUFFER_COUNT = 2;
-    private static final float[][] BUFFERS = new float[MAX_BUFFER_COUNT][MAX_SIZE];
-    private static final boolean[] isTaken = new boolean[MAX_BUFFER_COUNT];
 
-    private static int findFreeSlot() {
-        for (int i = 0; i < MAX_BUFFER_COUNT; i++) {
-            if (!isTaken[i]) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private final int mySlot;
+    private final PooledSlotLease<float[]> bufferLease;
     private final float[] myBuffer;
     private int mySize = 0;     // number of floats stored in the buffer
     private int readPos = 0;    // index of the next command in the ring buffer
 
-    public PreallocatedCommandBuffer() {
-        int slot = findFreeSlot();
-        if (slot == -1) {
-            throw new IllegalStateException("No more available preallocated buffers.");
-        }
-        mySlot = slot;
-        myBuffer = BUFFERS[mySlot];
-        isTaken[mySlot] = true;
+    public PreallocatedCommandBuffer(PooledSlotLease<float[]> bufferLease) {
+        super(null);
+        this.bufferLease = bufferLease;
+        this.myBuffer = bufferLease.get();
     }
 
     /**
      * Releases this buffer slot for reuse by another instance.
      */
     public void free() {
-        isTaken[mySlot] = false;
+        releasePooledResourcesRecursively();
+    }
+
+    /**
+     * Resets ring-buffer read/write state after acquiring an already-leased slot.
+     */
+    public void resetAfterAcquire() {
+        mySize = 0;
+        readPos = 0;
+    }
+
+    @Override
+    public void releasePooledResourcesRecursively() {
+        mySize = 0;
+        readPos = 0;
+        bufferLease.release();
     }
 
     /**

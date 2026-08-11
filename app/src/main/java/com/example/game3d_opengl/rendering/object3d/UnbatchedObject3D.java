@@ -21,11 +21,16 @@ public abstract class UnbatchedObject3D implements GPUResourceOwner {
     }
 
     public void draw(float[] vpMatrix) {
-        applyTransformations(this.modelMatrix);
-        drawUnderlying(modelMatrix, vpMatrix);
+        drawUnderlying(currentModelMatrix(), vpMatrix);
+    }
+
+    /** Returns the reusable model matrix for the object's current public transform. */
+    protected final float[] currentModelMatrix() {
+        applyTransformations(modelMatrix);
+        return modelMatrix;
     }
 
     protected abstract void drawUnderlying(float[] mMat, float[] vpMat);
     public abstract void reloadGPUResourcesRecursivelyOnContextLoss();
-    public abstract void cleanupGPUResourcesRecursivelyOnContextLoss();
+    public abstract void cleanupGPUResourcesRecursively();
 }

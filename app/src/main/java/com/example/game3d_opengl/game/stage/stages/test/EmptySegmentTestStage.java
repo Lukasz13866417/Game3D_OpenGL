@@ -32,6 +32,11 @@ public class EmptySegmentTestStage extends Stage {
     }
 
     @Override
+    protected void setupAssets(android.content.res.AssetManager assetManager) {
+        // No-op.
+    }
+
+    @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
         
@@ -41,7 +46,8 @@ public class EmptySegmentTestStage extends Stage {
         
         // Load player assets (needed for DeathSpike and Potion)
         PlayerAssets.LOAD_PLAYER_ASSETS(context.getAssets());
-        Potion.LOAD_POTION_ASSETS(context.getAssets());
+        com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers
+                .ensureDefaultLoaded(context.getAssets());
         
         // Create terrain with empty segment test structure
         terrain = new Terrain(50, 10, 
@@ -83,17 +89,12 @@ public class EmptySegmentTestStage extends Stage {
     }
 
     @Override
-    public void onClose() {
-        terrain.cleanupGPUResourcesRecursivelyOnContextLoss();
-    }
-
-    @Override
-    public void onSwitch() {
+    protected void onDeactivated(DeactivationReason reason) {
         // Nothing special needed
     }
 
     @Override
-    public void onReturn() {
+    protected void onActivated(ActivationReason reason) {
         // Nothing special needed
     }
 
@@ -113,7 +114,9 @@ public class EmptySegmentTestStage extends Stage {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
+    public void cleanupGPUResourcesRecursively() {
+        terrain.cleanupGPUResourcesRecursively();
+    }
 
     @Override
     protected void onTouchDown(float x, float y) {

@@ -16,11 +16,6 @@ import java.util.List;
  */
 public final class PlayerLogic extends StateInfoGraph<FrameStartPlayerState,
                                                       OutputNode.Data> {
-
-    private static final ThreadLocal<PlayerConfig> CONSTRUCTION_CONFIG = new ThreadLocal<>();
-
-    private final PlayerConfig config;
-    private final JumpConfig jumpConfig;
     private final InputNode input ;
     private final EffectsNode effects ;
     private final JumpLogicNode jumpLogic ;
@@ -28,13 +23,12 @@ public final class PlayerLogic extends StateInfoGraph<FrameStartPlayerState,
     private final OutputNode output ;
 
     public PlayerLogic(PlayerConfig config, JumpConfig jumpConfig) {
-        this.config = config;
-        this.jumpConfig = jumpConfig;
         this.input = new InputNode();
-        this.effects = new EffectsNode(input, config);
+        this.effects = new EffectsNode(input);
         this.jumpLogic = new JumpLogicNode(input, effects.getData(), config, jumpConfig);
         this.move = new MoveNode(input, config);
-        this.output = new OutputNode(move.getData(), jumpLogic.getData(), input, config);
+        this.output = new OutputNode(
+                move.getData(), jumpLogic.getData(), input);
     }
 
     public float getCumulativeSwipeDy(){

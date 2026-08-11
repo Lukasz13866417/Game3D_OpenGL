@@ -1,12 +1,18 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_FINISH_STRUCTURE_ADDONS;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_BEGIN_STRUCTURE_ADDONS;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_BUILD_AGC_HORIZONTAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_BUILD_AGC_VERTICAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_EMIT_STRUCTURE_ADDONS;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_FINALIZE_AGC;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_HORIZONTAL_REGION;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_K_RANDOM_FIELDS;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_HORIZONTAL_REGION;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_RANDOM_VERTICAL;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_RESERVE_VERTICAL;
-import static com.example.game3d_opengl.game.terrain.terrain_api.main.AddonsCommandsExecutor.CMD_START_STRUCTURE_ADDONS;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_H_ANG;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_SEG;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_ADD_V_ANG;
@@ -15,6 +21,8 @@ import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeC
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_LIFT_UP;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_ALPHAS;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_H_ANG;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_TILE_BRIGHTNESS;
+import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_TILE_PROFILE;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_SET_V_ANG;
 import static com.example.game3d_opengl.game.terrain.terrain_api.main.LandscapeCommandsExecutor.CMD_START_STRUCTURE_LANDSCAPE;
 
@@ -42,6 +50,11 @@ class Util {
             System.out.println("^& FINISH STRUCTURE LANDSCAPE");
         } else if (code == CMD_SET_ALPHAS) {
             System.out.println("tileManager.setUpcomingAlphas(" + buffer[offset + 2] + ", " + buffer[offset + 3] + ");");
+        } else if (code == CMD_SET_TILE_PROFILE) {
+            System.out.println("tileManager.setUpcomingTileProfile(TileProfile.fromCommandId("
+                    + (int) buffer[offset + 2] + "));");
+        } else if (code == CMD_SET_TILE_BRIGHTNESS) {
+            System.out.println("tileManager.setUpcomingBrightnessMultiplier(" + buffer[offset + 2] + ");");
         } else if (code == CMD_RESERVE_VERTICAL) {
             int row = (int) buffer[offset + 2];
             int col = (int) buffer[offset + 3];
@@ -52,16 +65,31 @@ class Util {
             int col = (int) buffer[offset + 3];
             int segLength = (int) buffer[offset + 4];
             System.out.println("^& RESERVE HORIZONTAL " + row + "," + col + "," + segLength);
+        } else if (code == CMD_RESERVE_HORIZONTAL_REGION) {
+            int row = (int) buffer[offset + 2];
+            int col = (int) buffer[offset + 3];
+            int segLength = (int) buffer[offset + 4];
+            System.out.println("^& RESERVE HORIZONTAL REGION " + row + "," + col + "," + segLength);
         } else if (code == CMD_RESERVE_RANDOM_VERTICAL) {
             System.out.println("^& RESERVE RANDOM VERTICAL " + buffer[offset + 2]);
         } else if (code == CMD_RESERVE_RANDOM_HORIZONTAL) {
             System.out.println("^& RESERVE RANDOM HORIZONTAL " + buffer[offset + 2]);
+        } else if (code == CMD_RESERVE_RANDOM_HORIZONTAL_REGION) {
+            System.out.println("^& RESERVE RANDOM HORIZONTAL REGION " + buffer[offset + 2]);
         } else if (code == CMD_RESERVE_K_RANDOM_FIELDS) {
             System.out.println("^& RESERVE " + (int) buffer[offset + 2] + " RANDOM FIELDS");
         } else if (code == CMD_FINISH_STRUCTURE_ADDONS) {
             System.out.println("^& FINISH STRUCTURE ADDONS");
-        } else if (code == CMD_START_STRUCTURE_ADDONS) {
-            System.out.println("^& START STRUCTURE ADDONS");
+        } else if (code == CMD_BEGIN_STRUCTURE_ADDONS) {
+            System.out.println("^& BEGIN STRUCTURE ADDONS");
+        } else if (code == CMD_BUILD_AGC_HORIZONTAL) {
+            System.out.println("^& BUILD AGC HORIZONTAL");
+        } else if (code == CMD_BUILD_AGC_VERTICAL) {
+            System.out.println("^& BUILD AGC VERTICAL");
+        } else if (code == CMD_FINALIZE_AGC) {
+            System.out.println("^& FINALIZE AGC");
+        } else if (code == CMD_EMIT_STRUCTURE_ADDONS) {
+            System.out.println("^& EMIT STRUCTURE ADDONS");
         } else {
             throw new IllegalArgumentException("Unknown command code: " + code);
         }

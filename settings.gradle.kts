@@ -21,4 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Game3D_OpenGL"
 include(":app")
- 
+include(":game-core")
+include(":simulator")

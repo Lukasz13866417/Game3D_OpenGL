@@ -1,7 +1,5 @@
 package com.example.game3d_opengl.game.player.player_logic;
 
-import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
-
 import com.example.game3d_opengl.game.logic_abstraction.StateInfoNode;
 import com.example.game3d_opengl.game.player.player_character.PlayerConfig;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
@@ -37,31 +35,65 @@ public final class MoveNode extends StateInfoNode<MoveNode.Data> {
         Vector3D dir = in.getMoveDir();
         Vector3D lastMove = in.getLastMove();
         float fallSpeed = in.getFallSpeed();
+        float activeHorizontalSpeed = in.getActiveHorizontalSpeed();
         Tile tileBelow = in.getTileBelow();
+        float dirX = dir != null ? dir.x : 0f;
+        float dirY = dir != null ? dir.y : 0f;
+        float dirZ = dir != null ? dir.z : 0f;
 
         if (tileBelow == null) {
             // Falling
-            Vector3D dwl = dir.withLen(config.playerSpeed);
-            Vector3D last = lastMove != null ? lastMove : V3(0, 0, 0);
-            move = V3(dwl.x, last.y, dwl.z);
-            move = V3(move.x, move.y - fallSpeed, move.z);
+            float horizontalScale = scaleToLength(dirX, dirY, dirZ, activeHorizontalSpeed);
+            float lastY = lastMove != null ? lastMove.y : 0f;
+            move = new Vector3D(
+                    dirX * horizontalScale,
+                    lastY - fallSpeed,
+                    dirZ * horizontalScale
+            );
             nextFallSpeed = fallSpeed + config.fallAcceleration;
         } else {
-            Vector3D[] hitTri = in.getCollisionTriangle();
-            if (hitTri != null) {
-                Vector3D u = hitTri[1].sub(hitTri[0]);
-                Vector3D w = hitTri[2].sub(hitTri[0]);
-                Vector3D n = u.crossProduct(w);
-                float det = calculateDeterminant(n, u, w);
+            int hitTriangleIndex = in.getCollisionTriangleIndex();
+            if (hitTriangleIndex >= 0) {
+                Vector3D tri0 = tileBelow.getTriangleVertex(hitTriangleIndex, 0);
+                Vector3D tri1 = tileBelow.getTriangleVertex(hitTriangleIndex, 1);
+                Vector3D tri2 = tileBelow.getTriangleVertex(hitTriangleIndex, 2);
+                float ux = tri1.x - tri0.x;
+                float uy = tri1.y - tri0.y;
+                float uz = tri1.z - tri0.z;
+                float wx = tri2.x - tri0.x;
+                float wy = tri2.y - tri0.y;
+                float wz = tri2.z - tri0.z;
+                float nx = uy * wz - uz * wy;
+                float ny = uz * wx - ux * wz;
+                float nz = ux * wy - uy * wx;
+                float det = calculateDeterminant(nx, ny, nz, ux, uy, uz, wx, wy, wz);
                 if (Math.abs(det) > 1e-6f) {
-                    float beta = calculateBeta(n, w, dir, det);
-                    float gamma = calculateGamma(n, u, dir, det);
-                    move = u.mult(beta).add(w.mult(gamma)).withLen(config.playerSpeed);
+                    float beta = calculateBeta(nx, ny, nz, wx, wy, wz, dirX, dirY, dirZ, det);
+                    float gamma = calculateGamma(nx, ny, nz, ux, uy, uz, dirX, dirY, dirZ, det);
+                    float moveX = ux * beta + wx * gamma;
+                    float moveY = uy * beta + wy * gamma;
+                    float moveZ = uz * beta + wz * gamma;
+                    float projectionScale = scaleToLength(moveX, moveY, moveZ, activeHorizontalSpeed);
+                    move = new Vector3D(
+                            moveX * projectionScale,
+                            moveY * projectionScale,
+                            moveZ * projectionScale
+                    );
                 } else {
-                    move = dir.withLen(config.playerSpeed);
+                    float horizontalScale = scaleToLength(dirX, dirY, dirZ, activeHorizontalSpeed);
+                    move = new Vector3D(
+                            dirX * horizontalScale,
+                            dirY * horizontalScale,
+                            dirZ * horizontalScale
+                    );
                 }
             } else {
-                move = dir.withLen(config.playerSpeed);
+                float horizontalScale = scaleToLength(dirX, dirY, dirZ, activeHorizontalSpeed);
+                move = new Vector3D(
+                        dirX * horizontalScale,
+                        dirY * horizontalScale,
+                        dirZ * horizontalScale
+                );
             }
             nextFallSpeed = 0f;
         }
@@ -70,22 +102,44 @@ public final class MoveNode extends StateInfoNode<MoveNode.Data> {
         data.nextFallSpeed = nextFallSpeed;
     }
 
-    private static float calculateDeterminant(Vector3D n, Vector3D u, Vector3D w) {
-        return n.x * u.y * w.z - n.x * u.z * w.y
-                - n.y * u.x * w.z + n.y * u.z * w.x
-                + n.z * u.x * w.y - n.z * u.y * w.x;
+    private static float scaleToLength(float x, float y, float z, float length) {
+        float currentLen = (float) Math.sqrt(x * x + y * y + z * z);
+        if (currentLen < 1e-8f) {
+            return 0f;
+        }
+        return length / currentLen;
     }
 
-    private static float calculateBeta(Vector3D n, Vector3D tangent2, Vector3D dir, float det) {
-        return (n.x * dir.y * tangent2.z - n.x * dir.z * tangent2.y
-                - n.y * dir.x * tangent2.z + n.y * dir.z * tangent2.x
-                + n.z * dir.x * tangent2.y - n.z * dir.y * tangent2.x) / det;
+    private static float calculateDeterminant(
+            float nx, float ny, float nz,
+            float ux, float uy, float uz,
+            float wx, float wy, float wz
+    ) {
+        return nx * uy * wz - nx * uz * wy
+                - ny * ux * wz + ny * uz * wx
+                + nz * ux * wy - nz * uy * wx;
     }
 
-    private static float calculateGamma(Vector3D n, Vector3D tangent1, Vector3D dir, float det) {
-        return (n.x * tangent1.y * dir.z - n.x * tangent1.z * dir.y
-                - n.y * tangent1.x * dir.z + n.y * tangent1.z * dir.x
-                + n.z * tangent1.x * dir.y - n.z * tangent1.y * dir.x) / det;
+    private static float calculateBeta(
+            float nx, float ny, float nz,
+            float tangent2x, float tangent2y, float tangent2z,
+            float dirX, float dirY, float dirZ,
+            float det
+    ) {
+        return (nx * dirY * tangent2z - nx * dirZ * tangent2y
+                - ny * dirX * tangent2z + ny * dirZ * tangent2x
+                + nz * dirX * tangent2y - nz * dirY * tangent2x) / det;
+    }
+
+    private static float calculateGamma(
+            float nx, float ny, float nz,
+            float tangent1x, float tangent1y, float tangent1z,
+            float dirX, float dirY, float dirZ,
+            float det
+    ) {
+        return (nx * tangent1y * dirZ - nx * tangent1z * dirY
+                - ny * tangent1x * dirZ + ny * tangent1z * dirX
+                + nz * tangent1x * dirY - nz * tangent1y * dirX) / det;
     }
 }
 

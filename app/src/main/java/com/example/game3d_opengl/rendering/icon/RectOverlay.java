@@ -33,8 +33,8 @@ public final class RectOverlay implements GPUResourceOwner {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
-        edgeMesh.cleanupGPUResourcesRecursivelyOnContextLoss();
+    public void cleanupGPUResourcesRecursively() {
+        edgeMesh.cleanupGPUResourcesRecursively();
     }
 
     public static final class Builder {

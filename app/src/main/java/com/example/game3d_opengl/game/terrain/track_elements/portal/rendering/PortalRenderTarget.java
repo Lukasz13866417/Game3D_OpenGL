@@ -10,14 +10,20 @@ public final class PortalRenderTarget implements RenderTarget {
 
     private final int width;
     private final int height;
+    private final boolean withDepth;
 
     private int fboId = 0;
     private int textureId = 0;
     private int depthRboId = 0;
 
     public PortalRenderTarget(int width, int height) {
+        this(width, height, true);
+    }
+
+    public PortalRenderTarget(int width, int height, boolean withDepth) {
         this.width = Math.max(1, width);
         this.height = Math.max(1, height);
+        this.withDepth = withDepth;
         create();
     }
 
@@ -73,12 +79,20 @@ public final class PortalRenderTarget implements RenderTarget {
         );
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
 
-        // Depth renderbuffer
-        GLES20.glGenRenderbuffers(1, ids, 0);
-        depthRboId = ids[0];
-        GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, depthRboId);
-        GLES20.glRenderbufferStorage(GLES20.GL_RENDERBUFFER, GLES20.GL_DEPTH_COMPONENT16, width, height);
-        GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, 0);
+        if (withDepth) {
+            // Only scene targets need depth. Color-only post-processing targets avoid both
+            // the allocation and the depth traffic of a renderbuffer that cannot affect them.
+            GLES20.glGenRenderbuffers(1, ids, 0);
+            depthRboId = ids[0];
+            GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, depthRboId);
+            GLES20.glRenderbufferStorage(
+                    GLES20.GL_RENDERBUFFER,
+                    GLES20.GL_DEPTH_COMPONENT16,
+                    width,
+                    height
+            );
+            GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, 0);
+        }
 
         // FBO
         GLES20.glGenFramebuffers(1, ids, 0);
@@ -91,12 +105,14 @@ public final class PortalRenderTarget implements RenderTarget {
                 textureId,
                 0
         );
-        GLES20.glFramebufferRenderbuffer(
-                GLES20.GL_FRAMEBUFFER,
-                GLES20.GL_DEPTH_ATTACHMENT,
-                GLES20.GL_RENDERBUFFER,
-                depthRboId
-        );
+        if (withDepth) {
+            GLES20.glFramebufferRenderbuffer(
+                    GLES20.GL_FRAMEBUFFER,
+                    GLES20.GL_DEPTH_ATTACHMENT,
+                    GLES20.GL_RENDERBUFFER,
+                    depthRboId
+            );
+        }
         int status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER);
         if (status != GLES20.GL_FRAMEBUFFER_COMPLETE) {
             Log.e(TAG, "FBO incomplete: status=" + status);
@@ -126,7 +142,7 @@ public final class PortalRenderTarget implements RenderTarget {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {
+    public void cleanupGPUResourcesRecursively() {
         cleanup();
     }
 }

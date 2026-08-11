@@ -7,6 +7,17 @@ import android.opengl.Matrix;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 public class Camera {
+    private static final float DEFAULT_FRUSTUM_HALF_HEIGHT = 1f;
+    private static final float DEFAULT_NEAR_CLIP = 3f;
+    private static final float DEFAULT_FAR_CLIP = 160f;
+    // Matches the old default frustum shape when near=3 and top=1: fovY ~= 36.87 deg
+    private static final float DEFAULT_FOV_Y_DEGREES = 36.869896f;
+
+    private enum ProjectionMode {
+        SYMMETRIC_FRUSTUM,
+        CUSTOM_FRUSTUM,
+        FOV
+    }
 
     private final float[] viewMatrix       = new float[16];
     private final float[] projectionMatrix = new float[16];
@@ -15,6 +26,25 @@ public class Camera {
     private float eyeX, eyeY, eyeZ;    // where the camera is
     private float lookX, lookY, lookZ; // where the camera is looking
     private float upX,   upY,   upZ;   // which way is up
+
+    private int projectionWidth = 1;
+    private int projectionHeight = 1;
+    private ProjectionMode projectionMode = ProjectionMode.SYMMETRIC_FRUSTUM;
+
+    private float nearClip = DEFAULT_NEAR_CLIP;
+    private float farClip = DEFAULT_FAR_CLIP;
+
+    // SYMMETRIC_FRUSTUM params (left/right derived from aspect ratio)
+    private float frustumHalfHeight = DEFAULT_FRUSTUM_HALF_HEIGHT;
+
+    // CUSTOM_FRUSTUM params
+    private float frustumLeft = -1f;
+    private float frustumRight = 1f;
+    private float frustumBottom = -1f;
+    private float frustumTop = 1f;
+
+    // FOV params
+    private float fovYDegrees = DEFAULT_FOV_Y_DEGREES;
 
     public Camera() {
         set(0f, 0f, 3f,
@@ -53,12 +83,116 @@ public class Camera {
     }
 
     public void setProjection(int width, int height) {
-        float ratio = (float) width / height;
-        // Simple frustum from -ratio..ratio, -1..1, near=3, far=160
-        Matrix.frustumM(projectionMatrix, 0,
-                -ratio, ratio,
-                -1, 1,
-                3, 160);
+        projectionWidth = Math.max(1, width);
+        projectionHeight = Math.max(1, height);
+        rebuildProjectionMatrix();
+    }
+
+    /**
+     * Set a symmetric frustum where horizontal planes are derived from aspect ratio.
+     */
+    public void setSymmetricFrustum(float halfHeight, float near, float far) {
+        if (halfHeight <= 0f) {
+            throw new IllegalArgumentException("halfHeight must be > 0");
+        }
+        validateNearFar(near, far);
+        projectionMode = ProjectionMode.SYMMETRIC_FRUSTUM;
+        frustumHalfHeight = halfHeight;
+        nearClip = near;
+        farClip = far;
+        rebuildProjectionMatrix();
+    }
+
+    /**
+     * Set all six frustum parameters directly.
+     */
+    public void setFrustum(float left, float right, float bottom, float top, float near, float far) {
+        if (!(left < right)) {
+            throw new IllegalArgumentException("left must be < right");
+        }
+        if (!(bottom < top)) {
+            throw new IllegalArgumentException("bottom must be < top");
+        }
+        validateNearFar(near, far);
+        projectionMode = ProjectionMode.CUSTOM_FRUSTUM;
+        frustumLeft = left;
+        frustumRight = right;
+        frustumBottom = bottom;
+        frustumTop = top;
+        nearClip = near;
+        farClip = far;
+        rebuildProjectionMatrix();
+    }
+
+    /**
+     * Set vertical FOV (degrees) for perspective projection with current clip planes.
+     */
+    public void setFov(float fovYDegrees) {
+        validateFov(fovYDegrees);
+        projectionMode = ProjectionMode.FOV;
+        this.fovYDegrees = fovYDegrees;
+        rebuildProjectionMatrix();
+    }
+
+    /**
+     * Set vertical FOV (degrees) and clip planes for perspective projection.
+     */
+    public void setFov(float fovYDegrees, float near, float far) {
+        validateFov(fovYDegrees);
+        validateNearFar(near, far);
+        projectionMode = ProjectionMode.FOV;
+        this.fovYDegrees = fovYDegrees;
+        nearClip = near;
+        farClip = far;
+        rebuildProjectionMatrix();
+    }
+
+    /**
+     * Update clip planes while preserving current projection mode.
+     */
+    public void setClipPlanes(float near, float far) {
+        validateNearFar(near, far);
+        nearClip = near;
+        farClip = far;
+        rebuildProjectionMatrix();
+    }
+
+    private static void validateNearFar(float near, float far) {
+        if (near <= 0f) {
+            throw new IllegalArgumentException("near must be > 0");
+        }
+        if (!(far > near)) {
+            throw new IllegalArgumentException("far must be > near");
+        }
+    }
+
+    private static void validateFov(float fovYDegrees) {
+        if (!(fovYDegrees > 0f && fovYDegrees < 179f)) {
+            throw new IllegalArgumentException("fovYDegrees must be in (0, 179)");
+        }
+    }
+
+    private void rebuildProjectionMatrix() {
+        float ratio = (float) projectionWidth / projectionHeight;
+        switch (projectionMode) {
+            case CUSTOM_FRUSTUM:
+                Matrix.frustumM(projectionMatrix, 0,
+                        frustumLeft, frustumRight,
+                        frustumBottom, frustumTop,
+                        nearClip, farClip);
+                break;
+            case FOV:
+                Matrix.perspectiveM(projectionMatrix, 0,
+                        fovYDegrees, ratio, nearClip, farClip);
+                break;
+            case SYMMETRIC_FRUSTUM:
+            default:
+                Matrix.frustumM(projectionMatrix, 0,
+                        -ratio * frustumHalfHeight, ratio * frustumHalfHeight,
+                        -frustumHalfHeight, frustumHalfHeight,
+                        nearClip, farClip);
+                break;
+        }
     }
 
     public float[] getViewProjectionMatrix() {
@@ -110,6 +244,19 @@ public class Camera {
     public Vector3D getForward() {
         return sub(new Vector3D(lookX, lookY, lookZ),
                         new Vector3D(eyeX, eyeY, eyeZ)).normalized();
+    }
+
+    /** Scalar accessors avoid allocating a temporary vector in per-frame render plumbing. */
+    public float getEyeX() {
+        return eyeX;
+    }
+
+    public float getEyeY() {
+        return eyeY;
+    }
+
+    public float getEyeZ() {
+        return eyeZ;
     }
 
     public Vector3D getUp() {

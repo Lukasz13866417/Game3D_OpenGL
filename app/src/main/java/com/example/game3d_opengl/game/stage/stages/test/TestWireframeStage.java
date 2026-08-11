@@ -40,6 +40,11 @@ public class TestWireframeStage extends Stage {
     }
 
     @Override
+    protected void setupAssets(android.content.res.AssetManager assetManager) {
+        // No-op.
+    }
+
+    @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         // Initialize camera
         this.camera = new Camera();
@@ -77,18 +82,17 @@ public class TestWireframeStage extends Stage {
     }
 
     @Override
-    public void onClose() {
-        // Cleanup player resources if needed
+    protected void onDeactivated(DeactivationReason reason) {
+        if (reason == DeactivationReason.COVERED) {
+            System.out.println("SWITCHING FROM TEST STAGE 3");
+        }
     }
 
     @Override
-    public void onSwitch() {
-        System.out.println("SWITCHING FROM TEST STAGE 3");
-    }
-
-    @Override
-    public void onReturn() {
-        System.out.println("RETURNING TO TEST STAGE 3");
+    protected void onActivated(ActivationReason reason) {
+        if (reason == ActivationReason.REVEALED) {
+            System.out.println("RETURNING TO TEST STAGE 3");
+        }
     }
 
     @Override
@@ -107,5 +111,5 @@ public class TestWireframeStage extends Stage {
     }
 
     @Override
-    public void cleanupGPUResourcesRecursivelyOnContextLoss() {}
+    public void cleanupGPUResourcesRecursively() {}
 }

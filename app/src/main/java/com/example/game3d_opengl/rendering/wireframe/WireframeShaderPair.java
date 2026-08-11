@@ -2,6 +2,8 @@ package com.example.game3d_opengl.rendering.wireframe;
 
 import android.content.res.AssetManager;
 import android.opengl.GLES20;
+import com.example.game3d_opengl.rendering.layout.VertexLayout;
+import com.example.game3d_opengl.rendering.shader.MeshShaderPair;
 import com.example.game3d_opengl.rendering.shader.ShaderPair;
 
 /**
@@ -9,14 +11,19 @@ import com.example.game3d_opengl.rendering.shader.ShaderPair;
  * Vertex layout per-vertex (interleaved):
  *   aPos0.xyz, aPos1.xyz, aT, aSide   // 8 floats per vertex
  */
-public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS, WireframeShaderArgs.FS> {
+public final class WireframeShaderPair<
+        L extends VertexLayout.HasPositionA
+                & VertexLayout.HasPositionB
+                & VertexLayout.HasEdgeEnd
+                & VertexLayout.HasEdgeSide>
+        extends MeshShaderPair<WireframeShaderArgs.VS, WireframeShaderArgs.FS, L> {
 
     // Uniforms
-    private int uMVP, uViewport, uColor, uHalfPx, uCapPx, uDepthBiasNDC;
+    private int uMVP, uViewport, uViewportOrigin, uColor, uHalfPx, uCapPx, uDepthBiasNDC;
     // Attributes
     private int aPosA, aPosB, aEnd, aSide;
     // Instance to use
-    private static WireframeShaderPair sharedShader = null;
+    private static WireframeShaderPair<VertexLayout.EdgeABLayout> sharedShader = null;
 
 
     public WireframeShaderPair(int programHandle, String vs, String fs) {
@@ -24,7 +31,7 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
     }
 
 
-    public static WireframeShaderPair getSharedShader(){
+    public static WireframeShaderPair<VertexLayout.EdgeABLayout> getSharedShader(){
         if (sharedShader == null){
             throw new IllegalStateException(
                     "Shader instance is null. Needs calling LOAD_SHADER_CODE first"
@@ -34,10 +41,14 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
     }
 
     public static void LOAD_SHADER_CODE(AssetManager assetManager) {
-        String vs = "attribute vec3 aPosA;\n" +
-                "attribute vec3 aPosB;\n" +
-                "attribute float aEnd;   // 0.0 -> A, 1.0 -> B\n" +
-                "attribute float aSide;  // -1.0 or +1.0\n" +
+        if (sharedShader != null) {
+            return;
+        }
+        String vs = "#version 300 es\n" +
+                "in vec3 aPosA;\n" +
+                "in vec3 aPosB;\n" +
+                "in float aEnd;   // 0.0 -> A, 1.0 -> B\n" +
+                "in float aSide;  // -1.0 or +1.0\n" +
                 "\n" +
                 "uniform mat4 uMVP;\n" +
                 "uniform vec2 uViewport; // (VW, VH)\n" +
@@ -46,8 +57,8 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
                 "uniform float uDepthBiasNDC;"+
                 "\n" +
                 "vec2 ndc(vec4 clip){ return clip.xy / clip.w; }\n" +
-                "varying vec2 vA_ndc;\n" +
-                "varying vec2 vB_ndc;\n" +
+                "out highp vec2 vA_ndc;\n" +
+                "out highp vec2 vB_ndc;\n" +
                 "\n" +
                 "void main(){\n" +
                 "    // Transform both endpoints to clip\n" +
@@ -85,15 +96,22 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
 
 
         String fs =
-                "precision mediump float;\n" +
+                "#version 300 es\n" +
+                        "#ifdef GL_FRAGMENT_PRECISION_HIGH\n" +
+                        "precision highp float;\n" +
+                        "#else\n" +
+                        "precision mediump float;\n" +
+                        "#endif\n" +
                         "uniform vec4 uColor;\n" +
                         "uniform vec2 uViewport;\n" +
+                        "uniform vec2 uViewportOrigin;\n" +
                         "uniform float uHalfPx;\n" +
-                        "varying vec2 vA_ndc;\n" +
-                        "varying vec2 vB_ndc;\n" +
+                        "in highp vec2 vA_ndc;\n" +
+                        "in highp vec2 vB_ndc;\n" +
+                        "out vec4 fragColor;\n" +
                         "void main(){\n" +
-                        "  vec2 A_px = (vA_ndc * 0.5 + 0.5) * uViewport;\n" +
-                        "  vec2 B_px = (vB_ndc * 0.5 + 0.5) * uViewport;\n" +
+                        "  vec2 A_px = uViewportOrigin + (vA_ndc * 0.5 + 0.5) * uViewport;\n" +
+                        "  vec2 B_px = uViewportOrigin + (vB_ndc * 0.5 + 0.5) * uViewport;\n" +
                         "  vec2 P_px = gl_FragCoord.xy;\n" +
                         "  vec2 AB = B_px - A_px;\n" +
                         "  float len2 = dot(AB, AB);\n" +
@@ -111,7 +129,7 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
                         "    dist = area / sqrt(len2 + 1e-6);\n" +
                         "  }\n" +
                         "  if (dist > uHalfPx) discard;\n" +
-                        "  gl_FragColor = uColor; }\n";
+                        "  fragColor = uColor; }\n";
         sharedShader = new Builder().fromSource(vs, fs).build();
     }
 
@@ -120,6 +138,7 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
         int p = getProgramHandle();
         uMVP = GLES20.glGetUniformLocation(p, "uMVP");
         uViewport = GLES20.glGetUniformLocation(p, "uViewport");
+        uViewportOrigin = GLES20.glGetUniformLocation(p, "uViewportOrigin");
         uHalfPx = GLES20.glGetUniformLocation(p, "uHalfPx");
         uCapPx = GLES20.glGetUniformLocation(p, "uCapPx");
         uColor = GLES20.glGetUniformLocation(p, "uColor");
@@ -132,19 +151,12 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
     }
 
     @Override
-    public void enableAndPointVertexAttribs() {
-        final int stride = 8 * 4;
-        GLES20.glEnableVertexAttribArray(aPosA);
-        GLES20.glVertexAttribPointer(aPosA, 3, GLES20.GL_FLOAT, false, stride, 0);
-
-        GLES20.glEnableVertexAttribArray(aPosB);
-        GLES20.glVertexAttribPointer(aPosB, 3, GLES20.GL_FLOAT, false, stride, 12);
-
-        GLES20.glEnableVertexAttribArray(aEnd);
-        GLES20.glVertexAttribPointer(aEnd, 1, GLES20.GL_FLOAT, false, stride, 24);
-
-        GLES20.glEnableVertexAttribArray(aSide);
-        GLES20.glVertexAttribPointer(aSide, 1, GLES20.GL_FLOAT, false, stride, 28);
+    protected void enableAndPointVertexAttribs(L layout) {
+        final int stride = layout.strideBytes();
+        layout.positionA().enableAndPoint(aPosA, stride);
+        layout.positionB().enableAndPoint(aPosB, stride);
+        layout.edgeEnd().enableAndPoint(aEnd, stride);
+        layout.edgeSide().enableAndPoint(aSide, stride);
     }
 
     @Override
@@ -159,16 +171,19 @@ public final class WireframeShaderPair extends ShaderPair<WireframeShaderArgs.VS
     protected void transferUniformArgsToGPU(WireframeShaderArgs.VS v, WireframeShaderArgs.FS f) {
         GLES20.glUniformMatrix4fv(uMVP, 1, false, v.mvp, 0);
         GLES20.glUniform2f(uViewport, v.viewportW, v.viewportH);
+        GLES20.glUniform2f(uViewportOrigin, v.viewportX, v.viewportY);
         GLES20.glUniform1f(uHalfPx, v.halfPx);
         GLES20.glUniform1f(uCapPx, v.capPx);
         GLES20.glUniform4f(uColor, f.color.r(), f.color.g(), f.color.b(), f.color.a());
         GLES20.glUniform1f(uDepthBiasNDC, v.uDepthBiasNDC);
     }
 
-    public static final class Builder extends ShaderPair.BaseBuilder<WireframeShaderPair, Builder> {
+    public static final class Builder
+            extends ShaderPair.BaseBuilder<WireframeShaderPair<VertexLayout.EdgeABLayout>, Builder> {
         @Override protected Builder self() { return this; }
-        @Override protected WireframeShaderPair create(int programHandle, String vs, String fs) {
-            return new WireframeShaderPair(programHandle, vs, fs);
+        @Override protected WireframeShaderPair<VertexLayout.EdgeABLayout> create(
+                int programHandle, String vs, String fs) {
+            return new WireframeShaderPair<>(programHandle, vs, fs);
         }
     }
 }
