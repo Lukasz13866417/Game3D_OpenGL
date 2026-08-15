@@ -852,7 +852,11 @@ def build_svg(
             fallback_time = tick["before"].get("timeNanos", tick.get("timeNanos", 0))
             time_ms = float(input_event.get("timeNanos", fallback_time)) / 1_000_000.0
             charge_status = ""
-            charge_path_known = "jumpChargePathEligible" in tick.get("after", {})
+            schema = int(header.get("schema", 0))
+            charge_eligibility_known = (
+                schema >= 10
+                or "jumpChargePathEligible" in tick.get("after", {})
+            )
             charge_path_blocked = False
             if marker_kind == "TOUCH_DOWN":
                 color, label = "#d7a7ff", "PRESS"
@@ -865,12 +869,23 @@ def build_svg(
                 detail = f"CANCEL_GESTURE at {time_ms:.3f} ms"
             elif marker_kind == "SWIPE_UP":
                 after_state = tick.get("after", {})
-                potential = float(after_state.get("gestureChargePotential", 0.0))
-                charge_path_blocked = (
-                    charge_path_known
-                    and potential > 1.0e-12
-                    and not bool(after_state.get("jumpChargePathEligible", False))
-                )
+                if schema >= 10:
+                    max_x_to_y = float(header.get("maxJumpChargeXToYRatio", 1.2))
+                    movement_contributed = (
+                        raw_dy < 0.0
+                        and abs(raw_dx) <= -raw_dy * max_x_to_y + 1.0e-12
+                    )
+                    charge_path_blocked = not movement_contributed
+                else:
+                    potential = float(after_state.get("gestureChargePotential", 0.0))
+                    movement_contributed = bool(
+                        after_state.get("jumpChargePathEligible", False)
+                    )
+                    charge_path_blocked = (
+                        charge_eligibility_known
+                        and potential > 1.0e-12
+                        and not movement_contributed
+                    )
                 if charge_path_blocked:
                     color, label = "#ff8f70", "BLOCKED"
                     charge_status = ' data-charge-status="blocked"'
@@ -882,14 +897,14 @@ def build_svg(
                     f"scaled=({dx:.6f}, {dy:.6f}), "
                     f"raw=({raw_dx:.6f}, {raw_dy:.6f}) screen heights"
                 )
-                if charge_path_known:
+                if charge_eligibility_known:
                     detail += (
                         f", max |raw X|="
                         f"{float(after_state.get('gestureMaxAbsRawDeltaX', 0.0)):.6f}, "
                         f"raw upward Y="
                         f"{float(after_state.get('gestureRawUpwardDistance', 0.0)):.6f}, "
-                        f"path eligible="
-                        f"{str(bool(after_state.get('jumpChargePathEligible', False))).lower()}"
+                        f"{'movement contributed' if schema >= 10 else 'path eligible'}="
+                        f"{str(movement_contributed).lower()}"
                     )
             else:
                 color, label = "#48e0b5", "DOWN"

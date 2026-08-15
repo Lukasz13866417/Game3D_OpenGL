@@ -1,46 +1,84 @@
 # OpenGL 3D Game From Scratch
-> **Has a custom 3D game & rendering engine AND a highly optimized terrain generation engine**
+
+> A custom Android/OpenGL renderer, deterministic 120 Hz simulation, and shared terrain-authoring pipeline.
 
 ## Introduction
-This began as an experiment to render 3D graphics on Android using the 2D **Canvas** API. Numerous tricks (aggressive culling, Painter’s algorithm modifications, and more) to achieve acceptable performance. However, this was far from enough for a production-ready game.
+This began as an experiment to render 3D graphics on Android using the 2D **Canvas** API. It has
+since grown into an OpenGL game with a renderer-neutral simulation and terrain model shared by the
+Android app, desktop simulator, and JavaFX editor.
 
 The codebase has since evolved into a **full OpenGL** rendering solution, complete with:
 ## Key Features
 - **Custom 3D Rendering Pipeline**: Built on OpenGL, encapsulated in clean classes like `Camera`, `Object3D`, and more.
-- **Modular Terrain API**: Create subclasses of `TerrainStructure` to define tiles, place “addons” (like spikes or potions), and customize your landscape.
-- **Lazy Terrain Generation**: Terrain structures can have child structures, which are compiled into commands and then “interpreted” at runtime to generate the environment as needed.
-- **Tons of Data structures&optimization**: Custom treap, hashing, segment trees, pre-alloacted data structures.
+- **Canonical terrain stream**: immutable `TerrainSnapshot`/`TerrainCommit` records feed physics
+  and rendering from one source of truth.
+- **Shared authoring**: Java `BaseTerrainStructure` recipes and versioned JSON documents compile
+  through the same deterministic Java 8 pipeline.
+- **Renderer-neutral addons**: spikes, potions, and portals are sealed core definitions; Android
+  owns their GPU resources and animation state.
+- **Desktop tooling**: a headless simulator validates physics and a JavaFX editor creates,
+  previews, saves, and publishes terrain content.
+- **Performance-focused internals**: bounded streaming, retained GPU caches, batching, and
+  specialized grid/reservation data structures.
 - **Performance-Focused**: Preallocation, minimal heap allocations, specialized data structures, shader tricks, efficient use of GPU resources.
 
 ## Project Structure
-Packages:
-- **`game`**: Core game logic, player handling, and world interactions.
-- **`game/terrain_api`**: Classes and interfaces for procedural terrain generation. Includes my data structure project  `SymbolicGrid`.
-- **`rendering`**: All OpenGL and 3D rendering classes, from camera setup to object definitions.
 
-## Terrain Generation & SymbolicGrid API
-The **terrain generation** system is designed for flexibility and performance.
-- All terrain patterns extend the **```TerrainStructure```** class - an API for arranging tiles and placing addons on a grid.
-- Terrain structures form a "tree" - each structure can incorporate child structures with their own addons and tiles. 
-- The ```Tile``` class can be extended for extra capabilities.
-- **lazy loading**:  Instead of instantly generating tiles & addons based on provided structures, the information is turned into commands. At any time, the user can tell the terrain to "interpret" a given number of commands. The commands generated for a structure can be reused. This approach resulted in better performance than running the terrain generation on a separate thread and synchronizing.
+```text
+:game-core          immutable terrain/addons, collision, and deterministic simulation
+:terrain-authoring  structures, brushes, reservations, and the bounded gameplay stream
+:terrain-io         versioned JSON, catalogs, validation, and atomic publishing
+:app                Android/OpenGL presentation and input adapter
+:simulator          headless scenarios, traces, and deterministic regression fixtures
+:terrain-editor     JavaFX desktop authoring UI
+```
 
-### Terrain
-A grid is built on top of the terrain to allow precise placement of addons (spikes, potions etc). Lots of data structures needed to allow randomization & more advanced queries.
-[SymbolicGrid](https://github.com/Lukasz13866417/SymbolicGrid) is my own, self-made library for efficient, randomized 2D grid queries. It significantly boosts performance by:
-- Reduced time complexity specialized data structures.
-- Minimizing random lookups and heap allocations with pre-allocation.
-- Tree-like system of grids (a terrain structure can have child structures who have their own grids within their parent grid)
+`app/.../terrain/terrain_api` and `app/.../terrain/terrain_structures` are compatibility copies
+used only by old diagnostic stages and algorithm tests. Production gameplay is guarded against
+importing them; new terrain work belongs in `:terrain-authoring` or versioned JSON.
+
+## Terrain Generation and Content
+
+Terrain patterns extend `com.example.game3d.authoring.BaseTerrainStructure` and capture tile and
+addon commands through the familiar brush API. A top-level structure is materialized atomically:
+connected seams reuse exact coordinates, addon placement is sealed only after a successful build,
+and consumers never observe half-authored content. The resulting immutable records are then
+published in bounded commits.
+
+A grid is derived from completed geometry for exact or randomized reservations. Random choices use
+a materialization-local seed and editor-created random layouts are saved as explicit placements.
+[SymbolicGrid](https://github.com/Lukasz13866417/SymbolicGrid) remains the origin of the specialized
+reservation algorithms.
+
+The checked-in source catalog lives under `terrain-content/`. Saving a draft and publishing it are
+separate operations:
+
+```bash
+./gradlew :terrain-editor:run
+./gradlew publishTerrainContent
+./gradlew validateTerrainContent
+```
+
+Publishing validates every enabled entry and atomically replaces the self-contained runtime asset.
+Android and the simulator fall back to the six built-in Java levels if that artifact is missing or
+invalid.
 
 ## Building & Running
-Should be very straightforward - no dependencies except what's already provided if you have a standard Android Studio setup
+Use Android Studio with its bundled JDK for the app. The desktop editor uses the configured JDK 21
+toolchain and JavaFX 21; shared terrain modules still target Java 8.
+
 1. **Clone the Repository**  
    ```bash
    git clone https://github.com/Lukasz13866417/Game3D_OpenGL.git
    ```
 2. **Open in Android Studio**  
    - Select “Open an Existing Project” and point to the cloned folder.
-3. **Build the Project**  
+3. **Build the Project**
+
+   ```bash
+   ./gradlew build
+   ```
+
    - Let Gradle sync and resolve all dependencies.
    - Compile via the standard “Run” or “Build” options in Android Studio.
 4. **Install on Device/Emulator**  

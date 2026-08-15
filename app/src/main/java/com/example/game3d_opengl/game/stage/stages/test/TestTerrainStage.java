@@ -93,8 +93,8 @@ public class TestTerrainStage extends Stage {
         currEye = cameraPos;
         currLook = cameraLookAt;
 
-        com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers
-                .ensureDefaultLoaded(context.getAssets());
+        com.example.game3d_opengl.game.terrain.terrain_api.main.LegacyGameplayElementRenderers
+                .ensureLoaded(context.getAssets());
 
         // build terrain
         /*tileManager = new TileManager(

@@ -10,7 +10,7 @@ import com.example.game3d_opengl.rendering.shader.ShaderPair;
  * Screen-space wireframe shader for the portal icosahedron.
  * Each edge is a quad (4 verts) with per-vertex attributes:
  *   aPosA(3), aPosB(3), aEnd(1), aSide(1) = 8 floats, stride 32 bytes.
- * The vertex shader transforms both endpoints through uCenter + uRotation * (pos * uRadius),
+ * The vertex shader transforms both endpoints through uCenter + uRotation * (pos * uScale),
  * projects to screen space, and offsets perpendicular to the edge direction.
  */
 public final class PortalWireframeShaderPair
@@ -20,9 +20,7 @@ public final class PortalWireframeShaderPair
                 & VertexLayout.HasEdgeSide>
         extends MeshShaderPair<PortalWireframeShaderArgs.VS, PortalWireframeShaderArgs.FS, L> {
 
-    private static PortalWireframeShaderPair<VertexLayout.EdgeABLayout> sharedShader = null;
-
-    private int uVP, uCenter, uRadius, uRotation;
+    private int uVP, uCenter, uScale, uRotation;
     private int uViewport, uHalfPx, uDepthBiasNDC, uColor;
     private int aPosA, aPosB, aEnd, aSide;
 
@@ -30,19 +28,13 @@ public final class PortalWireframeShaderPair
         super(programHandle, vs, fs);
     }
 
-    public static PortalWireframeShaderPair<VertexLayout.EdgeABLayout> getSharedShader() {
-        if (sharedShader == null) {
-            sharedShader = createDefault();
-        }
-        return sharedShader;
-    }
-
-    private static PortalWireframeShaderPair<VertexLayout.EdgeABLayout> createDefault() {
+    /** Creates a shader program for the caller's current GL context. */
+    public static PortalWireframeShaderPair<VertexLayout.EdgeABLayout> createContextShader() {
         String vs =
                 "#version 300 es\n" +
                 "uniform mat4 uVPMatrix;\n" +
                 "uniform vec3 uCenter;\n" +
-                "uniform float uRadius;\n" +
+                "uniform vec3 uScale;\n" +
                 "uniform mat3 uRotation;\n" +
                 "uniform vec2 uViewport;\n" +
                 "uniform float uHalfPx;\n" +
@@ -51,7 +43,7 @@ public final class PortalWireframeShaderPair
                 "in vec3 aPosB;\n" +
                 "in float aEnd;\n" +
                 "in float aSide;\n" +
-                "vec3 toWorld(vec3 p){ return uCenter + uRotation * p * uRadius; }\n" +
+                "vec3 toWorld(vec3 p){ return uCenter + uRotation * (p * uScale); }\n" +
                 "vec2 ndc(vec4 clip){ return clip.xy / clip.w; }\n" +
                 "void main(){\n" +
                 "  vec3 wA = toWorld(aPosA);\n" +
@@ -104,7 +96,7 @@ public final class PortalWireframeShaderPair
         int p = getProgramHandle();
         uVP = GLES20.glGetUniformLocation(p, "uVPMatrix");
         uCenter = GLES20.glGetUniformLocation(p, "uCenter");
-        uRadius = GLES20.glGetUniformLocation(p, "uRadius");
+        uScale = GLES20.glGetUniformLocation(p, "uScale");
         uRotation = GLES20.glGetUniformLocation(p, "uRotation");
         uViewport = GLES20.glGetUniformLocation(p, "uViewport");
         uHalfPx = GLES20.glGetUniformLocation(p, "uHalfPx");
@@ -121,12 +113,17 @@ public final class PortalWireframeShaderPair
                                             PortalWireframeShaderArgs.FS f) {
         GLES20.glUniformMatrix4fv(uVP, 1, false, v.vp, 0);
         GLES20.glUniform3f(uCenter, v.centerX, v.centerY, v.centerZ);
-        GLES20.glUniform1f(uRadius, v.radius);
+        GLES20.glUniform3f(uScale, v.scaleX, v.scaleY, v.scaleZ);
         GLES20.glUniformMatrix3fv(uRotation, 1, false, v.rotation, 0);
         GLES20.glUniform2f(uViewport, v.viewportW, v.viewportH);
         GLES20.glUniform1f(uHalfPx, v.halfPx);
         GLES20.glUniform1f(uDepthBiasNDC, v.depthBiasNDC);
         GLES20.glUniform4f(uColor, f.color.r(), f.color.g(), f.color.b(), f.color.a());
+    }
+
+    @Override
+    public void cleanupGPUResourcesRecursively() {
+        deleteOwnedProgram();
     }
 
     public static final class Builder

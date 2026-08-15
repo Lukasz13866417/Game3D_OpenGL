@@ -4,6 +4,11 @@ import com.example.game3d_opengl.game.PlayerInteractable;
 import com.example.game3d_opengl.game.terrain.terrain_api.TerrainElement;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
+/**
+ * @deprecated Android-only mutable addon retained for legacy diagnostic stages. Production uses
+ * renderer-neutral {@link com.example.game3d.core.terrain.addon.Addon} definitions.
+ */
+@Deprecated
 public abstract class Addon implements TerrainElement, PlayerInteractable {
     /**
      * Assign the owning tile's ID

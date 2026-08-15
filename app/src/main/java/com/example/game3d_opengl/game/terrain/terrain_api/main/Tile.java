@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 
 import com.example.game3d_opengl.game.PlayerInteractable;
 import com.example.game3d_opengl.game.player.player_character.Player;
+import com.example.game3d_opengl.game.player.player_logic.PlayerSupportSurface;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 /**
@@ -14,7 +15,7 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  * Each tile is defined by four corner vertices and contains the geometry
  * needed for rendering and collision detection.
  */
-public class Tile implements PlayerInteractable {
+public class Tile implements PlayerInteractable, PlayerSupportSurface {
     public static final int TRIANGLE_COUNT = 2;
     public static final int TRIANGLE_VERTEX_COUNT = 3;
 
@@ -42,6 +43,11 @@ public class Tile implements PlayerInteractable {
 
     public float getHorizontalSpeedMultiplier() {
         return profile.getHorizontalSpeedMultiplier();
+    }
+
+    @Override
+    public float applyHorizontalSpeed(float baseSpeed) {
+        return profile.applyHorizontalSpeed(baseSpeed);
     }
 
     public float getBrightnessMultiplier() {
@@ -158,7 +164,7 @@ public class Tile implements PlayerInteractable {
 
     @Override
     public void accept(Player player) {
-        player.interactWith(this);
+        player.interactWith((PlayerSupportSurface) this);
     }
 
 

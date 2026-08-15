@@ -8,14 +8,38 @@ import com.example.game3d.core.simulation.SimulationEvent;
 import com.example.game3d.core.simulation.StepResult;
 import com.example.game3d.core.input.PlayerInputEvent;
 import com.example.game3d.core.terrain.TerrainCommit;
+import com.example.game3d.authoring.AdvancedTerrainStructure;
+import com.example.game3d.authoring.BaseTerrainStructure;
+import com.example.game3d.authoring.GameplayLevelCatalog;
+import com.example.game3d.authoring.GameplayLevelProvider;
+import com.example.game3d.authoring.Terrain;
 
 import org.junit.Test;
 
+import java.util.Collections;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class ScenarioRegistryTest {
+    @Test
+    public void publishedCatalogIsPackagedForWorkingDirectoryIndependentRuns()
+            throws Exception {
+        try (java.io.InputStream input = ScenarioRegistry.class.getResourceAsStream(
+                ScenarioRegistry.PACKAGED_TERRAIN_CATALOG)) {
+            assertNotNull(input);
+            try (java.io.Reader reader = new java.io.InputStreamReader(
+                    input, java.nio.charset.StandardCharsets.UTF_8)) {
+                assertEquals(GameplayLevelCatalog.builtIns().entries().size(),
+                        new com.example.game3d.terrain.io.publish
+                                .PublishedGameplayCatalogLoader()
+                                .load(reader).entries().size());
+            }
+        }
+    }
+
     @Test
     public void scenariosRetainTheirExplicitInitialAirJumpCharges() {
         ScenarioRegistry registry = new ScenarioRegistry();
@@ -23,6 +47,38 @@ public class ScenarioRegistryTest {
         assertEquals(1, registry.require("gap_recovery").initialAirJumpCharges);
         assertEquals(1, registry.require("spike_avoidance").initialAirJumpCharges);
         assertEquals(0, registry.require("feather_collection").initialAirJumpCharges);
+    }
+
+    @Test
+    public void publishedCatalogScenarioMaterializesTheCustomExtension() {
+        GameplayLevelProvider custom = new GameplayLevelProvider() {
+            @Override public String stableId() {
+                return "simulator_custom_three_tiles";
+            }
+
+            @Override public BaseTerrainStructure<?> create(long levelOrdinal) {
+                return new AdvancedTerrainStructure(3) {
+                    @Override protected void generateTiles(Terrain.TileBrush brush) {
+                        brush.addSegment("custom-0");
+                        brush.addSegment("custom-1");
+                        brush.addSegment("custom-2");
+                    }
+
+                    @Override protected void generateAddons(
+                            Terrain.AdvancedGridBrush brush, int rows, int columns) {
+                    }
+                };
+            }
+        };
+        GameplayLevelCatalog catalog = GameplayLevelCatalog.builtIns()
+                .withAdditionalEntries(Collections.singletonList(custom));
+
+        Scenario scenario = new ScenarioRegistry(catalog)
+                .require("published_catalog_level");
+
+        assertEquals(3, scenario.terrainSnapshot.segments.size());
+        assertEquals(0L, scenario.terrainSnapshot.segments.get(0).id);
+        assertEquals(2L, scenario.terrainSnapshot.segments.get(2).id);
     }
 
     @Test
@@ -61,7 +117,7 @@ public class ScenarioRegistryTest {
     }
 
     @Test
-    public void jumpChargeXGuardScenariosBracketBothPhysicalLimits() {
+    public void jumpChargeScenariosBracketThePerMovementVerticalRatio() {
         PhysicsConfig config = new PhysicsConfig();
         ScenarioRegistry registry = new ScenarioRegistry();
 
@@ -69,9 +125,8 @@ public class ScenarioRegistryTest {
                 registry.require("jump_charge_x_boundary_accept"));
         double acceptedX = Math.abs(accepted.rawDeltaXScreenHeights);
         double acceptedUp = -accepted.rawDeltaYScreenHeights;
-        assertTrue(acceptedX < config.maxJumpChargeXScreenHeights);
         assertTrue(acceptedX < config.maxJumpChargeXToYRatio * acceptedUp);
-        assertTrue("accepted case is not close to the absolute boundary",
+        assertTrue("accepted case is not close to the legacy absolute boundary",
                 acceptedX >= config.maxJumpChargeXScreenHeights * 0.98);
 
         PlayerInputEvent ratioRejected = onlySwipe(
@@ -82,13 +137,13 @@ public class ScenarioRegistryTest {
         assertTrue(ratioRejectedX
                 > config.maxJumpChargeXToYRatio * ratioRejectedUp);
 
-        PlayerInputEvent absoluteRejected = onlySwipe(
-                registry.require("jump_charge_x_absolute_reject"));
-        double absoluteRejectedX = Math.abs(absoluteRejected.rawDeltaXScreenHeights);
-        double absoluteRejectedUp = -absoluteRejected.rawDeltaYScreenHeights;
-        assertTrue(absoluteRejectedX > config.maxJumpChargeXScreenHeights);
-        assertTrue(absoluteRejectedX
-                < config.maxJumpChargeXToYRatio * absoluteRejectedUp);
+        PlayerInputEvent largeAccepted = onlySwipe(
+                registry.require("jump_charge_x_large_accept"));
+        double largeAcceptedX = Math.abs(largeAccepted.rawDeltaXScreenHeights);
+        double largeAcceptedUp = -largeAccepted.rawDeltaYScreenHeights;
+        assertTrue(largeAcceptedX > config.maxJumpChargeXScreenHeights);
+        assertTrue(largeAcceptedX
+                < config.maxJumpChargeXToYRatio * largeAcceptedUp);
     }
 
     private static void assertAirJump(String scenarioName, JumpRuleId expectedRule) {

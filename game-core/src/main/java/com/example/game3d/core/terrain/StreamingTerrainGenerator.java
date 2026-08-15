@@ -1,6 +1,11 @@
 package com.example.game3d.core.terrain;
 
 import com.example.game3d.core.math.Vec3;
+import com.example.game3d.core.terrain.addon.Addon;
+import com.example.game3d.core.terrain.addon.AddonFootprint;
+import com.example.game3d.core.terrain.addon.DeathSpike;
+import com.example.game3d.core.terrain.addon.Portal;
+import com.example.game3d.core.terrain.addon.Potion;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -34,7 +39,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
     private TerrainVertexAppearance previousFarLeftAppearance;
     private TerrainVertexAppearance previousFarRightAppearance;
     private long nextSegmentId;
-    private long nextFeatureId = 1L;
+    private long nextAddonId = 1L;
     private long nextPortalPairId = 1L;
     private boolean previousAuthoredSolid;
     private boolean closed;
@@ -74,8 +79,8 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
 
         @Override
         public TerrainSegment emitNext(StreamingTerrainGenerator generator) {
-            List<TerrainFeatureSpec> features =
-                    Collections.<TerrainFeatureSpec>emptyList();
+            List<Addon> addons =
+                    Collections.<Addon>emptyList();
             boolean introSpike = kind == StraightKind.INTRO_HAZARDS
                     && (index == 20 || index == 40 || index == 60);
             boolean obstacleFeature = kind == StraightKind.OBSTACLE
@@ -86,32 +91,32 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
                     || index == (count * 2) / 3
                     || (portal && (index == 3 || index == count - 4)));
             if (introSpike || obstacleFeature) {
-                ArrayList<TerrainFeatureSpec> authoredFeatures =
-                        new ArrayList<TerrainFeatureSpec>();
+                ArrayList<Addon> authoredAddons =
+                        new ArrayList<Addon>();
                 if (introSpike) {
-                    generator.addSpike(authoredFeatures, index, count);
+                    generator.addSpike(authoredAddons, index, count);
                 } else if (kind == StraightKind.OBSTACLE) {
                     if (index == count / 4 || index == count / 2
                             || index == (count * 3) / 4) {
-                        generator.addCollectible(authoredFeatures);
+                        generator.addCollectible(authoredAddons);
                     }
                     if (index == count / 3
                             || index == (count * 2) / 3) {
-                        generator.addSpike(authoredFeatures, index, count);
+                        generator.addSpike(authoredAddons, index, count);
                     }
                     if (portal && index == 3) {
                         generator.addPortal(
-                                authoredFeatures,
+                                authoredAddons,
                                 portalPairId,
-                                TerrainFeatureSpec.Portal.Role.EXIT);
+                                Portal.Role.EXIT);
                     } else if (portal && index == count - 4) {
                         generator.addPortal(
-                                authoredFeatures,
+                                authoredAddons,
                                 portalPairId,
-                                TerrainFeatureSpec.Portal.Role.ENTRANCE);
+                                Portal.Role.ENTRANCE);
                     }
                 }
-                features = authoredFeatures;
+                addons = authoredAddons;
             }
             index++;
             return generator.createSegment(
@@ -119,7 +124,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
                     surface,
                     1f,
                     brightness(surface),
-                    features);
+                    addons);
         }
 
         @Override
@@ -155,17 +160,17 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
             if (index < curveSegments) {
                 generator.yawRadians += yawStep;
                 generator.pitchRadians += pitchStep;
-                List<TerrainFeatureSpec> features =
-                        Collections.<TerrainFeatureSpec>emptyList();
+                List<Addon> addons =
+                        Collections.<Addon>emptyList();
                 if (index == curveSegments / 3
                         || index == (curveSegments * 2) / 3) {
-                    ArrayList<TerrainFeatureSpec> spike =
-                            new ArrayList<TerrainFeatureSpec>(1);
+                    ArrayList<Addon> spike =
+                            new ArrayList<Addon>(1);
                     generator.addSpike(spike, index, curveSegments);
-                    features = spike;
+                    addons = spike;
                 }
                 TerrainSegment result = generator.createSegment(
-                        true, SurfaceProperties.NORMAL, 1f, 1f, features);
+                        true, SurfaceProperties.NORMAL, 1f, 1f, addons);
                 index++;
                 if (index == curveSegments
                         && pitchFadeSegments == 0
@@ -181,7 +186,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
                     SurfaceProperties.NORMAL,
                     1f,
                     1f,
-                    Collections.<TerrainFeatureSpec>emptyList());
+                    Collections.<Addon>emptyList());
         }
 
         @Override
@@ -224,23 +229,23 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
             }
             if (solidIndex < segmentsPerStair) {
                 generator.yawRadians += yawStep;
-                List<TerrainFeatureSpec> features =
-                        Collections.<TerrainFeatureSpec>emptyList();
+                List<Addon> addons =
+                        Collections.<Addon>emptyList();
                 if (solidIndex == segmentsPerStair / 2) {
-                    ArrayList<TerrainFeatureSpec> spike =
-                            new ArrayList<TerrainFeatureSpec>(1);
+                    ArrayList<Addon> spike =
+                            new ArrayList<Addon>(1);
                     generator.addSpike(
                             spike,
                             stair + solidIndex,
                             segmentsPerStair * stairCount);
-                    features = spike;
+                    addons = spike;
                 }
                 TerrainSegment result = generator.createSegment(
                         true,
                         SurfaceProperties.NORMAL,
                         0.5f,
                         1f,
-                        features);
+                        addons);
                 solidIndex++;
                 if (solidIndex == segmentsPerStair
                         && (stair == stairCount - 1 || gapSegments == 0)) {
@@ -253,7 +258,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
                     SurfaceProperties.NORMAL,
                     0.5f,
                     1f,
-                    Collections.<TerrainFeatureSpec>emptyList());
+                    Collections.<Addon>emptyList());
             gapIndex++;
             if (gapIndex >= gapSegments) {
                 finishStair(generator);
@@ -311,7 +316,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
                         surface,
                         1f,
                         1f + 0.35f * t,
-                        Collections.<TerrainFeatureSpec>emptyList());
+                        Collections.<Addon>emptyList());
                 index++;
                 if (index == rampSegments) {
                     generator.pitchRadians = 0.0;
@@ -325,7 +330,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
                         SurfaceProperties.NORMAL,
                         1f,
                         1f,
-                        Collections.<TerrainFeatureSpec>emptyList());
+                        Collections.<Addon>emptyList());
             }
             index++;
             return generator.createSegment(
@@ -333,7 +338,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
                     SurfaceProperties.NORMAL,
                     1f,
                     1f,
-                    Collections.<TerrainFeatureSpec>emptyList());
+                    Collections.<Addon>emptyList());
         }
 
         @Override
@@ -380,7 +385,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
     /**
      * Enqueues one deterministic rich gameplay level.
      *
-     * <p>The index selects the template and all feature placement; generation is reproducible
+     * <p>The index selects the template and all addon placement; generation is reproducible
      * without Android globals or renderer state.</p>
      */
     public synchronized void enqueueGameplayLevel(int levelIndex) {
@@ -676,7 +681,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
             SurfaceProperties surface,
             float alpha,
             float brightness,
-            List<TerrainFeatureSpec> features) {
+            List<Addon> addons) {
         Vec3 direction = direction();
         Vec3 right = right();
         Vec3 nearLeft = cursor.subtract(right.multiply(width * 0.5));
@@ -716,7 +721,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
                 nearRightAppearance,
                 targetAppearance,
                 targetAppearance,
-                features);
+                addons);
         cursor = next;
         previousFarLeft = farLeft;
         previousFarRight = farRight;
@@ -727,7 +732,7 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
     }
 
     private void addSpike(
-            List<TerrainFeatureSpec> destination,
+            List<Addon> destination,
             int positionIndex,
             int sectionCount) {
         long owner = nextSegmentId;
@@ -741,55 +746,54 @@ public final class StreamingTerrainGenerator implements TerrainOutput {
                 * unitHash(owner * 31L + positionIndex);
         Vec3 across = right().multiply(radius);
         Vec3 along = direction().normalized().multiply(radius);
-        long id = nextFeatureId++;
-        destination.add(new TerrainFeatureSpec.Spike(
-                id,
-                owner,
-                center.subtract(across).subtract(along),
-                center.add(across).subtract(along),
-                center.subtract(across).add(along),
-                center.add(across).add(along),
+        long id = nextAddonId++;
+        Vec3 nearLeft = center.subtract(across).subtract(along);
+        Vec3 nearRight = center.add(across).subtract(along);
+        Vec3 farLeft = center.subtract(across).add(along);
+        Vec3 farRight = center.add(across).add(along);
+        DeathSpike spike = new DeathSpike(
+                nearLeft, nearRight, farLeft, farRight,
                 center.add(normal.multiply(height)),
                 normal,
                 0.025,
                 center,
                 radius,
-                height));
+                height);
+        spike.place(id, owner, AddonFootprint.quadrilateral(
+                nearLeft, nearRight, farLeft, farRight));
+        destination.add(spike);
     }
 
     private void addCollectible(
-            List<TerrainFeatureSpec> destination) {
+            List<Addon> destination) {
         long owner = nextSegmentId;
         Vec3 center = cursor.add(direction().multiply(segmentLength * 0.5))
                 .add(surfaceNormal().multiply(0.56));
-        destination.add(new TerrainFeatureSpec.AirJumpCollectible(
-                nextFeatureId++,
-                owner,
-                center,
-                0.22,
-                "POTION_FEATHER"));
+        Potion potion = new Potion(center, 0.22, "POTION_FEATHER");
+        potion.place(nextAddonId++, owner,
+                AddonFootprint.around(center, 0.22, 0.22, 0.22));
+        destination.add(potion);
     }
 
     private void addPortal(
-            List<TerrainFeatureSpec> destination,
+            List<Addon> destination,
             long pairId,
-            TerrainFeatureSpec.Portal.Role role) {
+            Portal.Role role) {
         long owner = nextSegmentId;
         Vec3 forward = new Vec3(
                 Math.sin(yawRadians), 0.0, -Math.cos(yawRadians));
         Vec3 center = cursor.add(direction().multiply(segmentLength * 0.5))
                 .add(Vec3.UP.multiply(2.22));
-        destination.add(new TerrainFeatureSpec.Portal(
-                nextFeatureId++,
-                owner,
-                pairId,
-                role,
+        Portal portal = new Portal(pairId, role,
                 center,
                 forward,
                 Vec3.UP,
                 1.0,
                 1.0,
-                "BEACON"));
+                "BEACON");
+        portal.place(nextAddonId++, owner,
+                AddonFootprint.around(center, 0.5, 0.5, 0.5));
+        destination.add(portal);
     }
 
     private Vec3 direction() {

@@ -4,7 +4,6 @@ import android.opengl.GLES20;
 import android.opengl.GLException;
 
 import com.example.game3d_opengl.game.terrain.track_elements.portal.assets.PortalAsset;
-import com.example.game3d_opengl.game.terrain.track_elements.portal.assets.PortalAssetData;
 import com.example.game3d_opengl.game.terrain.track_elements.portal.assets.PortalAssets;
 import com.example.game3d_opengl.game.terrain.track_elements.portal.rendering.PortalSphereDrawArgs;
 import com.example.game3d_opengl.game.terrain.track_elements.portal.rendering.PortalSphereMesh3D;
@@ -20,15 +19,8 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 final class PortalVisual implements GPUResourceOwner {
     private static final FColor DEFAULT_LIGHT_COLOR = FColor.CLR(1f, 1f, 1f, 1f);
     private static final Vector3D WORLD_UP = new Vector3D(0f, 1f, 0f);
-    private static final Object SHARED_MESH_LOCK = new Object();
-    private static final long RELOAD_DEBOUNCE_NANOS = 100_000_000L;
-
-    private static PortalSphereMesh3D sharedFillMesh = null;
-    private static PortalWireframeMesh3D sharedWireframeMesh = null;
-    private static Class<?> sharedAssetClass = null;
-    private static boolean sharedMeshesCleaned = false;
-    private static long lastSharedReloadNanos = 0L;
-
+    private final PortalRenderResources resources;
+    private final boolean ownsResources;
     private final PortalSphereMesh3D fillMesh;
     private final PortalWireframeMesh3D wireframeMesh;
     private final PortalSphereDrawArgs shellArgs = new PortalSphereDrawArgs();
@@ -37,18 +29,35 @@ final class PortalVisual implements GPUResourceOwner {
 
     private Vector3D center = new Vector3D(0f, 0f, 0f);
     private Vector3D lookDirection = new Vector3D(0f, 0f, -1f);
-    private float baseOuterRadius = 0.5f * PortalConfig.DEFAULT_WIDTH_WORLD;
+    private Vector3D upDirection = WORLD_UP;
+    private float outerHalfWidth = 0.5f * PortalConfig.DEFAULT_WIDTH_WORLD;
+    private float outerHalfHeight = 0.5f * PortalConfig.DEFAULT_WIDTH_WORLD;
+    private float styleAccent;
     private float animSeconds = 0f;
     private final float[] baseRotationMatrix = new float[9];
     private final float[] primarySpinRotationMatrix = new float[9];
     private final float[] secondarySpinRotationMatrix = new float[9];
     private final float[] composedSpinRotationMatrix = new float[9];
     private final float[] rotationMatrix = new float[9];
+    private final float[] scaleScratch = new float[3];
 
     PortalVisual(PortalAsset asset) {
-        PortalAsset chosenAsset = asset != null ? asset : PortalAssets.createPortalAsset();
-        this.fillMesh = acquireSharedFillMesh(chosenAsset);
-        this.wireframeMesh = acquireSharedWireframeMesh(chosenAsset);
+        this(new PortalRenderResources(
+                asset != null ? asset : PortalAssets.createPortalAsset()), true);
+    }
+
+    PortalVisual(PortalRenderResources resources) {
+        this(resources, false);
+    }
+
+    private PortalVisual(PortalRenderResources resources, boolean ownsResources) {
+        if (resources == null) {
+            throw new IllegalArgumentException("resources == null");
+        }
+        this.resources = resources;
+        this.ownsResources = ownsResources;
+        this.fillMesh = resources.fillMesh();
+        this.wireframeMesh = resources.wireframeMesh();
         setIdentityMat3(baseRotationMatrix);
         setIdentityMat3(primarySpinRotationMatrix);
         setIdentityMat3(secondarySpinRotationMatrix);
@@ -60,23 +69,39 @@ final class PortalVisual implements GPUResourceOwner {
         if (center != null) this.center = center;
     }
 
+    void setOuterDimensions(float width, float height) {
+        outerHalfWidth = Math.max(0.02f, width * 0.5f);
+        outerHalfHeight = Math.max(0.02f, height * 0.5f);
+    }
+
+    /** Compatibility hook for the quarantined legacy portal objects. */
     void setBaseOuterRadius(float radius) {
-        this.baseOuterRadius = Math.max(0.02f, radius);
+        float safe = Math.max(0.02f, radius);
+        outerHalfWidth = safe;
+        outerHalfHeight = safe;
     }
 
     void setLookDirection(Vector3D lookDir) {
-        if (lookDir == null) {
+        if (lookDir == null || lookDir.sqlen() < 1e-8f) {
             return;
         }
-        Vector3D h = new Vector3D(lookDir.x, 0f, lookDir.z);
-        if (h.sqlen() < 1e-8f) {
-            return;
+        this.lookDirection = lookDir.withLen(1f);
+    }
+
+    void setUpDirection(Vector3D upDir) {
+        if (upDir != null && upDir.sqlen() >= 1e-8f) {
+            upDirection = upDir.withLen(1f);
         }
-        this.lookDirection = h.withLen(1f);
+    }
+
+    void setVisualStyle(String visualStyleId) {
+        // BEACON is the parity-locked production style. Unknown future style IDs retain the same
+        // geometry but receive a small deterministic accent instead of being silently ignored.
+        styleAccent = styleAccent(visualStyleId);
     }
 
     float getMaxExpectedOuterRadius() {
-        return baseOuterRadius;
+        return Math.max(outerHalfWidth, outerHalfHeight);
     }
 
     void update(float dtMillis) {
@@ -141,6 +166,14 @@ final class PortalVisual implements GPUResourceOwner {
     }
 
     private void computeBaseRotation() {
+        writeBaseRotation(lookDirection, upDirection, baseRotationMatrix);
+    }
+
+    static void writeBaseRotation(
+            Vector3D lookDirection, Vector3D upDirection, float[] out) {
+        if (out == null || out.length < 9) {
+            throw new IllegalArgumentException("out must contain 9 floats");
+        }
         Vector3D yAxis = lookDirection;
         if (yAxis.sqlen() < 1e-8f) {
             yAxis = new Vector3D(0f, 0f, -1f);
@@ -148,31 +181,36 @@ final class PortalVisual implements GPUResourceOwner {
             yAxis = yAxis.withLen(1f);
         }
 
-        // Keep portal horizontal: world-up is fixed, so no pitch/roll toward terrain.
-        Vector3D xAxis = yAxis.crossProduct(WORLD_UP);
+        Vector3D requestedUp = upDirection == null ? WORLD_UP : upDirection;
+        Vector3D zAxis = requestedUp.sub(
+                yAxis.withLen(requestedUp.dotProduct(yAxis)));
+        if (zAxis.sqlen() < 1e-8f) {
+            Vector3D fallback = Math.abs(yAxis.y) < 0.9f
+                    ? WORLD_UP : new Vector3D(0f, 0f, 1f);
+            zAxis = fallback.sub(
+                    yAxis.withLen(fallback.dotProduct(yAxis)));
+        }
+        zAxis = zAxis.withLen(1f);
+        Vector3D xAxis = yAxis.crossProduct(zAxis);
         if (xAxis.sqlen() < 1e-8f) {
             xAxis = new Vector3D(1f, 0f, 0f);
         } else {
             xAxis = xAxis.withLen(1f);
         }
-        Vector3D zAxis = xAxis.crossProduct(yAxis);
-        if (zAxis.sqlen() < 1e-8f) {
-            zAxis = WORLD_UP;
-        } else {
-            zAxis = zAxis.withLen(1f);
-        }
 
         // Column-major basis: local X->xAxis, local Y->look direction, local Z->up-ish axis.
-        baseRotationMatrix[0] = xAxis.x; baseRotationMatrix[1] = xAxis.y; baseRotationMatrix[2] = xAxis.z;
-        baseRotationMatrix[3] = yAxis.x; baseRotationMatrix[4] = yAxis.y; baseRotationMatrix[5] = yAxis.z;
-        baseRotationMatrix[6] = zAxis.x; baseRotationMatrix[7] = zAxis.y; baseRotationMatrix[8] = zAxis.z;
+        out[0] = xAxis.x; out[1] = xAxis.y; out[2] = xAxis.z;
+        out[3] = yAxis.x; out[4] = yAxis.y; out[5] = yAxis.z;
+        out[6] = zAxis.x; out[7] = zAxis.y; out[8] = zAxis.z;
     }
 
     private void configureShellArgs(float[] vp) {
-        configureCommonFillArgs(shellArgs, vp, baseOuterRadius);
+        configureCommonFillArgs(shellArgs, vp, 1f);
         FColor theme = PortalLightingEnvironment.getColorTheme();
         if (theme == null) theme = FColor.CLR(0.8f, 0f, 0f, 1f);
-        FColor shellBase = mixWithWhite(theme, PortalConfig.SHELL_WHITE_MIX, PortalConfig.SHELL_ALPHA);
+        FColor shellBase = mixWithWhite(theme,
+                PortalConfig.SHELL_WHITE_MIX + styleAccent,
+                PortalConfig.SHELL_ALPHA);
         shellArgs.colorA = shellBase;
         shellArgs.colorB = scaleColor(shellBase, PortalConfig.SHELL_DARK_FACE_FACTOR, PortalConfig.SHELL_ALPHA);
         shellArgs.ambient = PortalConfig.SHELL_AMBIENT;
@@ -182,7 +220,7 @@ final class PortalVisual implements GPUResourceOwner {
     }
 
     private void configureCoreArgs(float[] vp) {
-        configureCommonFillArgs(coreArgs, vp, baseOuterRadius * PortalConfig.CORE_RADIUS_FACTOR);
+        configureCommonFillArgs(coreArgs, vp, PortalConfig.CORE_RADIUS_FACTOR);
         FColor theme = PortalLightingEnvironment.getColorTheme();
         if (theme == null) theme = FColor.CLR(0.8f, 0f, 0f, 1f);
         FColor coreBase = scaleColor(
@@ -203,7 +241,7 @@ final class PortalVisual implements GPUResourceOwner {
         wireframeArgs.centerX = center.x;
         wireframeArgs.centerY = center.y;
         wireframeArgs.centerZ = center.z;
-        wireframeArgs.radius = baseOuterRadius;
+        setScale(wireframeArgs, 1f);
         wireframeArgs.rotation = rotationMatrix;
         FColor theme = PortalLightingEnvironment.getColorTheme();
         if (theme == null) theme = FColor.CLR(0.8f, 0f, 0f, 1f);
@@ -214,12 +252,12 @@ final class PortalVisual implements GPUResourceOwner {
         );
     }
 
-    private void configureCommonFillArgs(PortalSphereDrawArgs args, float[] vp, float radius) {
+    private void configureCommonFillArgs(PortalSphereDrawArgs args, float[] vp, float factor) {
         args.vp = vp;
         args.centerX = center.x;
         args.centerY = center.y;
         args.centerZ = center.z;
-        args.radius = radius;
+        setScale(args, factor);
         args.rotation = rotationMatrix;
 
         Vector3D lightPos = PortalLightingEnvironment.getLightPos();
@@ -236,6 +274,47 @@ final class PortalVisual implements GPUResourceOwner {
         args.cameraX = cameraPos.x;
         args.cameraY = cameraPos.y;
         args.cameraZ = cameraPos.z;
+    }
+
+    private void setScale(PortalSphereDrawArgs args, float factor) {
+        writeVisualScale(
+                outerHalfWidth * 2f, outerHalfHeight * 2f,
+                factor, scaleScratch);
+        args.scaleX = scaleScratch[0];
+        args.scaleY = scaleScratch[1];
+        args.scaleZ = scaleScratch[2];
+    }
+
+    private void setScale(PortalWireframeDrawArgs args, float factor) {
+        writeVisualScale(
+                outerHalfWidth * 2f, outerHalfHeight * 2f,
+                factor, scaleScratch);
+        args.scaleX = scaleScratch[0];
+        args.scaleY = scaleScratch[1];
+        args.scaleZ = scaleScratch[2];
+    }
+
+    static void writeVisualScale(
+            float width, float height, float factor, float[] out) {
+        if (out == null || out.length < 3) {
+            throw new IllegalArgumentException("out must contain 3 floats");
+        }
+        float halfWidth = Math.max(0.02f, width * 0.5f);
+        float halfHeight = Math.max(0.02f, height * 0.5f);
+        out[0] = halfWidth * factor;
+        out[1] = Math.min(halfWidth, halfHeight) * factor;
+        out[2] = halfHeight * factor;
+    }
+
+    private static float unitHash(String value) {
+        int hash = value == null ? 0 : value.hashCode();
+        hash ^= hash >>> 16;
+        return (hash & 0xffff) / 65535f;
+    }
+
+    static float styleAccent(String visualStyleId) {
+        return "BEACON".equals(visualStyleId)
+                ? 0f : 0.08f * unitHash(visualStyleId);
     }
 
     // ---- GL state helpers ----
@@ -259,106 +338,16 @@ final class PortalVisual implements GPUResourceOwner {
 
     @Override
     public void cleanupGPUResourcesRecursively() {
-        cleanupSharedGpuResources();
-    }
-
-    static void cleanupSharedGpuResources() {
-        synchronized (SHARED_MESH_LOCK) {
-            if (sharedMeshesCleaned) return;
-            if (sharedFillMesh != null) {
-                sharedFillMesh.cleanupGPUResourcesRecursively();
-            }
-            if (sharedWireframeMesh != null) {
-                sharedWireframeMesh.cleanupGPUResourcesRecursively();
-            }
-            sharedMeshesCleaned = true;
+        if (ownsResources) {
+            resources.cleanupGPUResourcesRecursively();
         }
     }
 
     @Override
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
-        reloadSharedGpuResources();
-    }
-
-    static void reloadSharedGpuResources() {
-        synchronized (SHARED_MESH_LOCK) {
-            if (sharedFillMesh == null && sharedWireframeMesh == null) return;
-            long now = System.nanoTime();
-            if (!sharedMeshesCleaned && (now - lastSharedReloadNanos) < RELOAD_DEBOUNCE_NANOS) return;
-            if (sharedFillMesh != null) {
-                sharedFillMesh.reloadGPUResourcesRecursivelyOnContextLoss();
-            }
-            if (sharedWireframeMesh != null) {
-                sharedWireframeMesh.reloadGPUResourcesRecursivelyOnContextLoss();
-            }
-            sharedMeshesCleaned = false;
-            lastSharedReloadNanos = now;
+        if (ownsResources) {
+            resources.reloadGPUResourcesRecursivelyOnContextLoss();
         }
-    }
-
-    static void warmUpSharedGpuResources() {
-        PortalAsset asset = PortalAssets.createPortalAsset();
-        acquireSharedFillMesh(asset);
-        acquireSharedWireframeMesh(asset);
-    }
-
-    static boolean sharedGpuResourcesReady() {
-        synchronized (SHARED_MESH_LOCK) {
-            return sharedFillMesh != null && !sharedMeshesCleaned;
-        }
-    }
-
-    static void markSharedGpuResourcesDirty() {
-        synchronized (SHARED_MESH_LOCK) {
-            if (sharedFillMesh != null) {
-                sharedMeshesCleaned = true;
-            }
-        }
-    }
-
-    private static PortalSphereMesh3D acquireSharedFillMesh(PortalAsset asset) {
-        synchronized (SHARED_MESH_LOCK) {
-            Class<?> assetClass = asset.getClass();
-            if (sharedFillMesh == null || sharedAssetClass != assetClass) {
-                PortalAssetData meshData = asset.buildMeshData();
-                sharedFillMesh = new PortalSphereMesh3D.Builder()
-                        .verts(meshData.verts)
-                        .normals(meshData.normals)
-                        .faceGroups(meshData.faceGroups)
-                        .faces(deepCopyFaces(meshData.faces))
-                        .buildObject();
-                sharedWireframeMesh = meshData.edges.length == 0
-                        ? null
-                        : new PortalWireframeMesh3D.Builder()
-                        .verts(meshData.verts)
-                        .edges(deepCopyFaces(meshData.edges))
-                        .halfPx(0.5f * PortalConfig.WIREFRAME_PIXEL_WIDTH)
-                        .buildObject();
-                sharedAssetClass = assetClass;
-                sharedMeshesCleaned = false;
-            } else if (sharedMeshesCleaned) {
-                sharedFillMesh.reloadGPUResourcesRecursivelyOnContextLoss();
-                if (sharedWireframeMesh != null) {
-                    sharedWireframeMesh.reloadGPUResourcesRecursivelyOnContextLoss();
-                }
-                sharedMeshesCleaned = false;
-                lastSharedReloadNanos = System.nanoTime();
-            }
-            return sharedFillMesh;
-        }
-    }
-
-    private static PortalWireframeMesh3D acquireSharedWireframeMesh(PortalAsset asset) {
-        acquireSharedFillMesh(asset);
-        synchronized (SHARED_MESH_LOCK) {
-            return sharedWireframeMesh;
-        }
-    }
-
-    private static int[][] deepCopyFaces(int[][] src) {
-        int[][] out = new int[src.length][];
-        for (int i = 0; i < src.length; ++i) out[i] = src[i].clone();
-        return out;
     }
 
     private static void setIdentityMat3(float[] m) {

@@ -1,5 +1,7 @@
 package com.example.game3d.core.terrain;
 
+import com.example.game3d.core.terrain.addon.Addon;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -38,7 +40,7 @@ public final class TerrainCommit {
             }
         });
         Set<Long> segmentIds = new HashSet<Long>();
-        Set<Long> featureIds = new HashSet<Long>();
+        Set<Long> addonIds = new HashSet<Long>();
         for (TerrainSegment segment : sorted) {
             if (segment == null
                     || segment.id < retireBeforeSegmentId
@@ -48,10 +50,10 @@ public final class TerrainCommit {
             if (!segmentIds.add(segment.id)) {
                 throw new IllegalArgumentException("Duplicate segment id " + segment.id);
             }
-            for (TerrainFeatureSpec feature : segment.features) {
-                if (!featureIds.add(feature.id)) {
+            for (Addon addon : segment.addons) {
+                if (!addonIds.add(addon.id())) {
                     throw new IllegalArgumentException(
-                            "Duplicate feature id in commit " + feature.id);
+                            "Duplicate addon id in commit " + addon.id());
                 }
             }
         }

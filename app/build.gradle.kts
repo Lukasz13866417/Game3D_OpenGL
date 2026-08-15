@@ -39,7 +39,11 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDirs("src/main/java")
-            assets.srcDirs("src/main/assets", "../wheel-mesh-lab/exports")
+            assets.srcDirs(
+                "src/main/assets",
+                "../wheel-mesh-lab/exports",
+                "../terrain-content/published",
+            )
         }
         getByName("test").java.srcDirs("src/test/java")
         getByName("androidTest").java.srcDirs("src/androidTest/java")
@@ -51,6 +55,8 @@ android {
 dependencies {
 
     implementation(project(":game-core"))
+    implementation(project(":terrain-authoring"))
+    implementation(project(":terrain-io"))
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.benchmark.common)
@@ -93,4 +99,8 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
             }
         }
     })
+}
+
+tasks.named("preBuild") {
+    dependsOn(rootProject.tasks.named("validateTerrainContent"))
 }

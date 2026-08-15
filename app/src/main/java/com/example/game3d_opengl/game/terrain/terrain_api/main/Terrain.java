@@ -25,6 +25,8 @@ import com.example.game3d_opengl.game.player.player_character.Player;
 import com.example.game3d_opengl.game.pooling.PooledSlotLease;
 import com.example.game3d_opengl.game.WorldActor;
 import com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers;
+import com.example.game3d_opengl.game.terrain.track_elements.potion.PotionBatchInstance;
+import com.example.game3d_opengl.game.terrain.track_elements.spike.SpikeBatchInstance;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 import com.example.game3d_opengl.game.terrain.terrain_api.grid.symbolic.GridCreatorWrapper;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.tilemanager.TileManager;
@@ -51,7 +53,11 @@ import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.execbuffer
  * 2. Commands are stored in a buffer
  * 3. Commands are executed in chunks to control frame time
  * 4. This allows for complex terrain generation without blocking the main thread
+ *
+ * @deprecated Retained only for Android diagnostic stages and legacy algorithm tests. Production
+ * gameplay streams immutable core records through {@code GameplayTerrainStream}.
  */
+@Deprecated
 public class Terrain implements WorldActor {
     private static final int DEFAULT_QUEUE_CAPACITY = 100_000;
     private static final int INTERACTION_TILE_WINDOW_BEHIND = 8;
@@ -230,7 +236,7 @@ public class Terrain implements WorldActor {
         for (Addon addon : addons) {
             addon.reloadGPUResourcesRecursivelyOnContextLoss();
         }
-        GameplayElementBatchRenderers.reloadDefaultGPUResourcesOnContextLoss();
+        LegacyGameplayElementRenderers.reloadOnContextLoss();
     }
 
     /**
@@ -645,14 +651,21 @@ public class Terrain implements WorldActor {
         tileManager.draw(colorTheme, vp, lightSource);
         if (includeAddons) {
             GameplayElementBatchRenderers addonBatchRenderers =
-                    GameplayElementBatchRenderers.getDefaultOrNull();
+                    LegacyGameplayElementRenderers.getOrNull();
             if (addonBatchRenderers != null) {
                 addonBatchRenderers.beginFrame();
             }
             for (int i = 0; i < getAddonCount(); ++i) {
                 Addon addon = getAddon(i);
-                if (addonBatchRenderers != null && addonBatchRenderers.submit(addon)) {
-                    continue;
+                if (addonBatchRenderers != null) {
+                    if (addon instanceof PotionBatchInstance) {
+                        addonBatchRenderers.submit((PotionBatchInstance) addon);
+                        continue;
+                    }
+                    if (addon instanceof SpikeBatchInstance) {
+                        addonBatchRenderers.submit((SpikeBatchInstance) addon);
+                        continue;
+                    }
                 }
                 addon.draw(vp);
             }

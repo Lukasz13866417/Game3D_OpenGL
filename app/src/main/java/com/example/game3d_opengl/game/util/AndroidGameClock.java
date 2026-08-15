@@ -29,4 +29,17 @@ public final class AndroidGameClock {
         }
         return event.getEventTime() * NANOS_PER_MILLISECOND;
     }
+
+    public static long historicalEventTimeNanos(MotionEvent event, int historyPosition) {
+        if (event == null) {
+            throw new IllegalArgumentException("event == null");
+        }
+        if (historyPosition < 0 || historyPosition >= event.getHistorySize()) {
+            throw new IllegalArgumentException("Invalid history position " + historyPosition);
+        }
+        if (Build.VERSION.SDK_INT >= 34) {
+            return event.getHistoricalEventTimeNanos(historyPosition);
+        }
+        return event.getHistoricalEventTime(historyPosition) * NANOS_PER_MILLISECOND;
+    }
 }

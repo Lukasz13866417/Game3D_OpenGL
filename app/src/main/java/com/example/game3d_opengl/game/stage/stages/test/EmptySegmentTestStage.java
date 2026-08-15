@@ -46,8 +46,8 @@ public class EmptySegmentTestStage extends Stage {
         
         // Load player assets (needed for DeathSpike and Potion)
         PlayerAssets.LOAD_PLAYER_ASSETS(context.getAssets());
-        com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers
-                .ensureDefaultLoaded(context.getAssets());
+        com.example.game3d_opengl.game.terrain.terrain_api.main.LegacyGameplayElementRenderers
+                .ensureLoaded(context.getAssets());
         
         // Create terrain with empty segment test structure
         terrain = new Terrain(50, 10, 
@@ -132,4 +132,4 @@ public class EmptySegmentTestStage extends Stage {
     protected void onTouchMove(float x1, float y1, float x2, float y2) {
         // Nothing special needed for this test
     }
-} 
+}

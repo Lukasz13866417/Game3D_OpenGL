@@ -9,6 +9,7 @@ always advances at 120 Hz; `--ticks` and `--duration-ms` only select how long to
 ./gradlew :simulator:run --args="run spike_avoidance --trace contacts --out build/traces/spike.ndjson"
 ./gradlew :simulator:run --args="run ground_jump --ticks 2 --trace full --out build/traces/full.ndjson"
 ./gradlew :simulator:run --args="run generated_gameplay_stream --trace summary --out build/traces/generated.ndjson"
+./gradlew :simulator:run --args="run published_catalog_level --trace summary --out build/traces/catalog.ndjson"
 ./gradlew :simulator:run --args="diff build/traces/left.ndjson build/traces/right.ndjson"
 python3 tools/visualize_simulation.py build/traces/spike.ndjson
 ```
@@ -21,9 +22,10 @@ tools/regenerate_simulation_visuals.sh
 ```
 
 `summary` records state, normalized input, jump-rule decisions, feature events, deterministic
-state hashes, resolved within-tick motion segments, and authoritative spin segments. Schema 8
-records both sensitivity-scaled input deltas and the raw physical deltas used to classify gesture
-paths. It also records the canonical terrain revision/digest, initial segment records, and exact
+state hashes, resolved within-tick motion segments, and authoritative spin segments. Schema 10
+classifies each movement's jump contribution from its raw physical deltas and records the
+held-charge grace and decay tuning. It also records the
+canonical terrain revision/digest, initial segment records, and exact
 ordered terrain commits applied before each fixed tick. Every gameplay event has an
 authoritative world position, simulation time, and within-tick fraction without mixing solver
 probe endpoints into the gameplay path. It also records the exact signed axle delta (including
@@ -46,10 +48,15 @@ rewind 20
 quit
 ```
 
-Hand-authored scenarios use `TrackBuilder`. Streaming scenarios and Android gameplay use
-`StreamingTerrainGenerator`. Both produce the same immutable `TerrainSnapshot` plus ordered
-`TerrainCommit` stream; the simulator, gameplay physics, and OpenGL presentation therefore consume
-the same terrain records without an Android/legacy conversion layer.
+Hand-authored scenarios use `TrackBuilder`. Streaming scenarios and Android gameplay use the same
+structure-backed `GameplayTerrainStream` from `:terrain-authoring`. Both produce the immutable
+`TerrainSnapshot` plus ordered `TerrainCommit` stream; simulator physics and OpenGL presentation
+therefore consume identical terrain records without an Android/legacy conversion layer. The old
+`StreamingTerrainGenerator` remains only as a parity oracle until the device-soak cleanup gate.
+`published_catalog_level` loads the same runtime catalog artifact packaged into Android and the
+simulator, and deliberately selects a custom entry when the catalog has one. Override it with
+`-Dgame3d.terrainCatalog=/absolute/path/runtime-catalog.json` when validating an artifact outside
+the packaged build resource.
 
 ## Side-view visualization
 
@@ -58,13 +65,13 @@ triangles, the 120 Hz player-center path, spike/feather features, material-color
 and exact event markers. Jump diamonds are labeled with the winning jump rule; landing, bounce,
 collection, and death markers explain otherwise ambiguous arcs and terminal paths. Vector input
 glyphs identify touch-down, upward charge swipes, downward swipes, and touch-up without relying on
-font emoji. Schema-8 upward swipes that accumulate charge but fail either physical X guard are
-shown in orange as `BLOCKED`; their tooltip includes scaled/raw deltas, peak X excursion, upward Y,
-and the eligibility result. Dashed state overlays show the intervals where the landing-jump buffer or held-impact
+font emoji. Upward movements that are not vertical enough to contribute are shown in orange as
+`BLOCKED`; their tooltip includes scaled/raw deltas, cumulative X/upward diagnostics, and whether
+the latest movement contributed. Dashed state overlays show the intervals where the landing-jump buffer or held-impact
 brake is armed. A shield/lock marks `LANDING_JUMP_ARMED`; a downward arrow stopped by a bar marks
 `BOUNCE_SUPPRESSED`, so a deliberately absorbed hard landing cannot be mistaken for a missing
 bounce marker. Schema-5+
-motion segments construct the trajectory; events only decorate that resolved path. Schema-8 traces
+motion segments construct the trajectory; events only decorate that resolved path. Schema-8+ traces
 show commits extending the displayed terrain at the exact frame boundary where simulation received
 them.
 Attempted solver

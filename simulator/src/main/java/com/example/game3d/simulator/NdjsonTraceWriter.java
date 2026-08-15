@@ -12,11 +12,13 @@ import com.example.game3d.core.simulation.SimulationEvent;
 import com.example.game3d.core.simulation.SpinSegment;
 import com.example.game3d.core.simulation.StepObserver;
 import com.example.game3d.core.simulation.StepRecord;
-import com.example.game3d.core.terrain.TerrainTriangle;
-import com.example.game3d.core.terrain.TerrainFeature;
 import com.example.game3d.core.terrain.TerrainCommit;
-import com.example.game3d.core.terrain.TerrainFeatureSpec;
 import com.example.game3d.core.terrain.TerrainSegment;
+import com.example.game3d.core.terrain.TerrainTriangle;
+import com.example.game3d.core.terrain.addon.Addon;
+import com.example.game3d.core.terrain.addon.DeathSpike;
+import com.example.game3d.core.terrain.addon.Portal;
+import com.example.game3d.core.terrain.addon.Potion;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -50,7 +52,7 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
                 ? scenario.terrainSnapshot.deterministicDigest
                 : scenario.terrain.deterministicDigest();
         StringBuilder header = new StringBuilder(8192);
-        header.append("{\"type\":\"header\",\"schema\":9,\"scenario\":\"")
+        header.append("{\"type\":\"header\",\"schema\":10,\"scenario\":\"")
                 .append(escape(scenario.name)).append("\",\"description\":\"")
                 .append(escape(scenario.description)).append("\",\"fixedHz\":")
                 .append(PhysicsConfig.FIXED_HZ)
@@ -62,10 +64,12 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
                         * PhysicsConfig.FIXED_DT_NANOS / 1_000_000.0))
                 .append(",\"jumpCooldownMillis\":")
                 .append(number(config.jumpCooldownNanos / 1_000_000.0))
-                .append(",\"maxJumpChargeXScreenHeights\":")
-                .append(number(config.maxJumpChargeXScreenHeights))
                 .append(",\"maxJumpChargeXToYRatio\":")
                 .append(number(config.maxJumpChargeXToYRatio))
+                .append(",\"heldGestureChargeGraceMillis\":")
+                .append(number(config.heldGestureChargeGraceNanos / 1_000_000.0))
+                .append(",\"heldGestureChargeDecayMillis\":")
+                .append(number(config.heldGestureChargeDecayNanos / 1_000_000.0))
                 .append(",\"cylinderRadius\":").append(number(config.cylinderRadius))
                 .append(",\"cylinderHalfLength\":")
                 .append(number(config.cylinderHalfLength))
@@ -84,12 +88,12 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
                     .append(",\"retireBeforeSegmentId\":")
                     .append(scenario.terrainSnapshot.retireBeforeSegmentId)
                     .append(",\"featureIdHighWatermark\":")
-                    .append(scenario.terrainSnapshot.featureIdHighWatermark);
+                    .append(scenario.terrainSnapshot.addonIdHighWatermark);
             appendSegmentArray(
                     header, "terrainSegments", scenario.terrainSnapshot.segments);
             appendCanonicalFeatureArray(header, scenario.terrainSnapshot.segments);
         } else {
-            appendFeatureArray(header, scenario.terrain.features());
+            appendFeatureArray(header, scenario.terrain.addons());
         }
         appendTriangleArray(header, "terrainTriangles", initialTriangles);
         header.append('}');
@@ -180,6 +184,8 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
                 .append(",\"gestureMaxAbsRawDeltaX\":")
                 .append(number(player.gestureMaxAbsRawDeltaX))
                 .append(",\"jumpChargePathEligible\":")
+                .append(player.jumpChargePathEligible)
+                .append(",\"lastSwipeChargeEligible\":")
                 .append(player.jumpChargePathEligible)
                 .append(",\"airJumpCharges\":").append(player.airJumpCharges)
                 .append(",\"grounded\":").append(player.grounded)
@@ -320,7 +326,7 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
             appendVec(json, triangle.normal);
             json.append(",\"material\":\"").append(triangle.material.name())
                     .append("\",\"surfaceKind\":\"")
-                    .append(triangle.surface.kind.name())
+                    .append(triangle.surface.kind.jsonTag)
                     .append("\",\"motorSpeedMultiplier\":")
                     .append(number(triangle.surface.motorSpeedMultiplier))
                     .append(",\"ownerSegmentId\":")
@@ -330,23 +336,28 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
         json.append(']');
     }
 
-    private static void appendFeatureArray(StringBuilder json, List<TerrainFeature> features) {
+    private static void appendFeatureArray(StringBuilder json, List<Addon> features) {
         json.append(",\"terrainFeatures\":[");
         for (int i = 0; i < features.size(); i++) {
             if (i > 0) json.append(',');
-            TerrainFeature feature = features.get(i);
-            json.append("{\"id\":").append(feature.id)
-                    .append(",\"kind\":\"").append(feature.kind.name())
-                    .append("\",\"center\":");
-            appendVec(json, feature.center);
-            if (feature instanceof TerrainFeature.Spike) {
-                TerrainFeature.Spike spike = (TerrainFeature.Spike) feature;
-                json.append(",\"radius\":").append(number(spike.radius))
-                        .append(",\"height\":").append(number(spike.height));
-            } else if (feature instanceof TerrainFeature.Feather) {
-                TerrainFeature.Feather feather = (TerrainFeature.Feather) feature;
+            Addon feature = features.get(i);
+            json.append("{\"id\":").append(feature.id());
+            if (feature instanceof DeathSpike) {
+                DeathSpike spike = (DeathSpike) feature;
+                json.append(",\"kind\":\"SPIKE\",\"center\":");
+                appendVec(json, spike.collisionBaseCenter);
+                json.append(",\"radius\":").append(number(spike.collisionRadius))
+                        .append(",\"height\":").append(number(spike.collisionHeight));
+            } else if (feature instanceof Potion) {
+                Potion feather = (Potion) feature;
+                json.append(",\"kind\":\"FEATHER\",\"center\":");
+                appendVec(json, feather.center);
                 json.append(",\"triggerRadius\":")
                         .append(number(feather.triggerRadius));
+            } else if (feature instanceof Portal) {
+                Portal portal = (Portal) feature;
+                json.append(",\"kind\":\"PORTAL\",\"center\":");
+                appendVec(json, portal.center);
             }
             json.append('}');
         }
@@ -450,13 +461,13 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
         if (scenario.usesCanonicalTerrain()) {
             int count = 0;
             for (TerrainSegment segment : scenario.terrainSnapshot.segments) {
-                count += segment.features.size();
+                count += segment.addons.size();
             }
             return count;
         }
         int count = 0;
         for (com.example.game3d.core.terrain.TerrainPatch patch : scenario.terrain.patches()) {
-            count += patch.features.size();
+            count += patch.addons.size();
         }
         return count;
     }
@@ -516,7 +527,7 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
                 .append(",\"connectedToPrevious\":")
                 .append(segment.connectedToPrevious)
                 .append(",\"surfaceKind\":\"")
-                .append(segment.surface.kind.name())
+                .append(segment.surface.kind.jsonTag)
                 .append("\",\"motorSpeedMultiplier\":")
                 .append(number(segment.surface.motorSpeedMultiplier))
                 .append(",\"appearance\":[");
@@ -528,11 +539,11 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
         json.append(',');
         appendAppearance(json, segment.farRightAppearance);
         json.append("],\"features\":[");
-        for (int i = 0; i < segment.features.size(); i++) {
+        for (int i = 0; i < segment.addons.size(); i++) {
             if (i > 0) {
                 json.append(',');
             }
-            appendCanonicalFeature(json, segment.features.get(i));
+            appendCanonicalFeature(json, segment.addons.get(i));
         }
         json.append("]}");
     }
@@ -550,7 +561,7 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
         json.append(",\"terrainFeatures\":[");
         boolean first = true;
         for (TerrainSegment segment : segments) {
-            for (TerrainFeatureSpec feature : segment.features) {
+            for (Addon feature : segment.addons) {
                 if (!first) {
                     json.append(',');
                 }
@@ -562,32 +573,30 @@ final class NdjsonTraceWriter implements StepObserver, TerrainCommitObserver {
     }
 
     private static void appendCanonicalFeature(
-            StringBuilder json, TerrainFeatureSpec feature) {
-        json.append("{\"id\":").append(feature.id)
+            StringBuilder json, Addon feature) {
+        json.append("{\"id\":").append(feature.id())
                 .append(",\"ownerSegmentId\":")
-                .append(feature.ownerSegmentId);
-        if (feature instanceof TerrainFeatureSpec.Spike) {
-            TerrainFeatureSpec.Spike spike = (TerrainFeatureSpec.Spike) feature;
+                .append(feature.ownerSegmentId());
+        if (feature instanceof DeathSpike) {
+            DeathSpike spike = (DeathSpike) feature;
             json.append(",\"kind\":\"SPIKE\",\"center\":");
             appendVec(json, spike.collisionBaseCenter);
             json.append(",\"radius\":").append(number(spike.collisionRadius))
                     .append(",\"height\":").append(number(spike.collisionHeight))
                     .append(",\"apex\":");
             appendVec(json, spike.apex);
-        } else if (feature instanceof TerrainFeatureSpec.AirJumpCollectible) {
-            TerrainFeatureSpec.AirJumpCollectible collectible =
-                    (TerrainFeatureSpec.AirJumpCollectible) feature;
+        } else if (feature instanceof Potion) {
+            Potion collectible = (Potion) feature;
             json.append(",\"kind\":\"FEATHER\",\"center\":");
             appendVec(json, collectible.center);
             json.append(",\"triggerRadius\":")
                     .append(number(collectible.triggerRadius))
                     .append(",\"visualKind\":\"")
-                    .append(escape(collectible.visualKind)).append('"');
-        } else if (feature instanceof TerrainFeatureSpec.Portal) {
-            TerrainFeatureSpec.Portal portal =
-                    (TerrainFeatureSpec.Portal) feature;
+                    .append(escape(collectible.visualStyleId)).append('"');
+        } else if (feature instanceof Portal) {
+            Portal portal = (Portal) feature;
             json.append(",\"kind\":\"PORTAL\",\"role\":\"")
-                    .append(portal.role.name())
+                    .append(portal.role.jsonTag)
                     .append("\",\"pairId\":").append(portal.pairId)
                     .append(",\"center\":");
             appendVec(json, portal.center);

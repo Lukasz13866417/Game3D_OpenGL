@@ -1,5 +1,7 @@
 package com.example.game3d.core.terrain;
 
+import com.example.game3d.core.terrain.addon.Addon;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -11,12 +13,12 @@ import java.util.TreeMap;
 public final class TerrainState {
     private final TreeMap<Long, TerrainSegment> segments =
             new TreeMap<Long, TerrainSegment>();
-    private final HashMap<Long, Long> featureOwners = new HashMap<Long, Long>();
-    private final HashSet<Long> retiredFeatureIds = new HashSet<Long>();
+    private final HashMap<Long, Long> addonOwners = new HashMap<Long, Long>();
+    private final HashSet<Long> retiredAddonIds = new HashSet<Long>();
     private long revision;
     private long committedThroughSegmentId = -1L;
     private long retireBeforeSegmentId;
-    private long featureIdHighWatermark = -1L;
+    private long addonIdHighWatermark = -1L;
 
     public TerrainState() {
     }
@@ -30,15 +32,15 @@ public final class TerrainState {
             throw new IllegalArgumentException("snapshot == null");
         }
         segments.clear();
-        featureOwners.clear();
-        retiredFeatureIds.clear();
+        addonOwners.clear();
+        retiredAddonIds.clear();
         revision = snapshot.revision;
         committedThroughSegmentId = snapshot.committedThroughSegmentId;
         retireBeforeSegmentId = snapshot.retireBeforeSegmentId;
-        featureIdHighWatermark = snapshot.featureIdHighWatermark;
+        addonIdHighWatermark = snapshot.addonIdHighWatermark;
         for (TerrainSegment segment : snapshot.segments) {
             segments.put(segment.id, segment);
-            addFeatureOwners(segment, featureOwners);
+            addAddonOwners(segment, addonOwners);
         }
     }
 
@@ -60,44 +62,55 @@ public final class TerrainState {
         }
 
         HashMap<Long, Long> prospectiveOwners =
-                new HashMap<Long, Long>(featureOwners);
+                new HashMap<Long, Long>(addonOwners);
         Set<Long> newlyRetired = new HashSet<Long>();
         for (Map.Entry<Long, TerrainSegment> entry :
                 segments.headMap(commit.retireBeforeSegmentId, false).entrySet()) {
-            removeFeatureOwners(entry.getValue(), prospectiveOwners);
-            for (TerrainFeatureSpec feature : entry.getValue().features) {
-                newlyRetired.add(feature.id);
+            removeAddonOwners(entry.getValue(), prospectiveOwners);
+            for (Addon addon : entry.getValue().addons) {
+                newlyRetired.add(addon.id());
             }
         }
         for (TerrainSegment segment : commit.segmentUpserts) {
             TerrainSegment old = segments.get(segment.id);
             if (old != null) {
-                removeFeatureOwners(old, prospectiveOwners);
-                for (TerrainFeatureSpec oldFeature : old.features) {
-                    if (!containsFeature(segment, oldFeature.id)) {
-                        newlyRetired.add(oldFeature.id);
+                removeAddonOwners(old, prospectiveOwners);
+                for (Addon oldAddon : old.addons) {
+                    if (!containsAddon(segment, oldAddon.id())) {
+                        newlyRetired.add(oldAddon.id());
                     }
                 }
             }
-            for (TerrainFeatureSpec feature : segment.features) {
-                Long originalOwner = featureOwners.get(feature.id);
-                if (originalOwner == null
-                        && feature.id <= featureIdHighWatermark) {
+            for (Addon addon : segment.addons) {
+                Long originalOwner = addonOwners.get(addon.id());
+                if (originalOwner != null
+                        && originalOwner.longValue() != addon.ownerSegmentId()) {
                     throw new IllegalArgumentException(
-                            "Feature id is not newer than high-watermark "
-                                    + feature.id);
+                            "Addon id cannot move from segment " + originalOwner
+                                    + " to " + addon.ownerSegmentId());
                 }
-                if (retiredFeatureIds.contains(feature.id)
-                        || newlyRetired.contains(feature.id)) {
+                Addon originalAddon = originalAddon(addon.id(), originalOwner);
+                if (originalAddon != null && originalAddon.kind != addon.kind) {
                     throw new IllegalArgumentException(
-                            "Retired feature id reused " + feature.id);
+                            "Addon id cannot change kind from " + originalAddon.kind
+                                    + " to " + addon.kind);
+                }
+                if (originalOwner == null
+                        && addon.id() <= addonIdHighWatermark) {
+                    throw new IllegalArgumentException(
+                            "Addon id is not newer than high-watermark " + addon.id());
+                }
+                if (retiredAddonIds.contains(addon.id())
+                        || newlyRetired.contains(addon.id())) {
+                    throw new IllegalArgumentException(
+                            "Retired addon id reused " + addon.id());
                 }
                 Long previousOwner = prospectiveOwners.put(
-                        feature.id, feature.ownerSegmentId);
+                        addon.id(), addon.ownerSegmentId());
                 if (previousOwner != null
-                        && previousOwner.longValue() != feature.ownerSegmentId) {
+                        && previousOwner.longValue() != addon.ownerSegmentId()) {
                     throw new IllegalArgumentException(
-                            "Feature id already owned by segment " + previousOwner);
+                            "Addon id already owned by segment " + previousOwner);
                 }
             }
         }
@@ -122,26 +135,25 @@ public final class TerrainState {
                 .iterator();
         while (retiredSegments.hasNext()) {
             TerrainSegment removed = retiredSegments.next();
-            removeFeatureOwners(removed, featureOwners);
-            for (TerrainFeatureSpec feature : removed.features) {
-                retiredFeatureIds.add(feature.id);
+            removeAddonOwners(removed, addonOwners);
+            for (Addon addon : removed.addons) {
+                retiredAddonIds.add(addon.id());
             }
             retiredSegments.remove();
         }
         for (TerrainSegment segment : commit.segmentUpserts) {
             TerrainSegment old = segments.put(segment.id, segment);
             if (old != null) {
-                removeFeatureOwners(old, featureOwners);
-                for (TerrainFeatureSpec oldFeature : old.features) {
-                    if (!containsFeature(segment, oldFeature.id)) {
-                        retiredFeatureIds.add(oldFeature.id);
+                removeAddonOwners(old, addonOwners);
+                for (Addon oldAddon : old.addons) {
+                    if (!containsAddon(segment, oldAddon.id())) {
+                        retiredAddonIds.add(oldAddon.id());
                     }
                 }
             }
-            addFeatureOwners(segment, featureOwners);
-            for (TerrainFeatureSpec feature : segment.features) {
-                featureIdHighWatermark = Math.max(
-                        featureIdHighWatermark, feature.id);
+            addAddonOwners(segment, addonOwners);
+            for (Addon addon : segment.addons) {
+                addonIdHighWatermark = Math.max(addonIdHighWatermark, addon.id());
             }
         }
         revision = commit.revision;
@@ -152,7 +164,7 @@ public final class TerrainState {
     public TerrainSnapshot snapshot() {
         return new TerrainSnapshot(
                 revision, committedThroughSegmentId, retireBeforeSegmentId,
-                featureIdHighWatermark, segments.values());
+                addonIdHighWatermark, segments.values());
     }
 
     public TerrainSegment segment(long id) {
@@ -179,35 +191,53 @@ public final class TerrainState {
         return retireBeforeSegmentId;
     }
 
-    public long featureIdHighWatermark() {
-        return featureIdHighWatermark;
+    public long addonIdHighWatermark() {
+        return addonIdHighWatermark;
     }
 
-    private static boolean containsFeature(TerrainSegment segment, long featureId) {
-        for (TerrainFeatureSpec feature : segment.features) {
-            if (feature.id == featureId) {
+    private static boolean containsAddon(TerrainSegment segment, long addonId) {
+        for (Addon addon : segment.addons) {
+            if (addon.id() == addonId) {
                 return true;
             }
         }
         return false;
     }
 
-    private static void addFeatureOwners(
+    private Addon originalAddon(long addonId, Long ownerSegmentId) {
+        if (ownerSegmentId == null) {
+            return null;
+        }
+        TerrainSegment owner = segments.get(ownerSegmentId);
+        if (owner == null) {
+            throw new IllegalStateException(
+                    "Addon owner index refers to missing segment " + ownerSegmentId);
+        }
+        for (Addon addon : owner.addons) {
+            if (addon.id() == addonId) {
+                return addon;
+            }
+        }
+        throw new IllegalStateException(
+                "Addon owner index refers to missing addon " + addonId);
+    }
+
+    private static void addAddonOwners(
             TerrainSegment segment, Map<Long, Long> owners) {
-        for (TerrainFeatureSpec feature : segment.features) {
-            Long previous = owners.put(feature.id, feature.ownerSegmentId);
-            if (previous != null && previous.longValue() != feature.ownerSegmentId) {
-                throw new IllegalArgumentException("Duplicate feature id " + feature.id);
+        for (Addon addon : segment.addons) {
+            Long previous = owners.put(addon.id(), addon.ownerSegmentId());
+            if (previous != null && previous.longValue() != addon.ownerSegmentId()) {
+                throw new IllegalArgumentException("Duplicate addon id " + addon.id());
             }
         }
     }
 
-    private static void removeFeatureOwners(
+    private static void removeAddonOwners(
             TerrainSegment segment, Map<Long, Long> owners) {
-        for (TerrainFeatureSpec feature : segment.features) {
-            Long owner = owners.get(feature.id);
+        for (Addon addon : segment.addons) {
+            Long owner = owners.get(addon.id());
             if (owner != null && owner.longValue() == segment.id) {
-                owners.remove(feature.id);
+                owners.remove(addon.id());
             }
         }
     }

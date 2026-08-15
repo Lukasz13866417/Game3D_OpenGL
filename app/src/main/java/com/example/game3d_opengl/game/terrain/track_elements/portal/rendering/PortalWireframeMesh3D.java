@@ -17,11 +17,11 @@ public final class PortalWireframeMesh3D
                 PortalWireframeShaderPair<VertexLayout.EdgeABLayout>,
                 VertexLayout.EdgeABLayout> {
 
-    private static final int[] VIEWPORT_TMP = new int[4];
     private static final float DEPTH_BIAS_NDC = -2e-4f;
 
     private final PortalWireframeShaderArgs.VS vs = new PortalWireframeShaderArgs.VS();
     private final PortalWireframeShaderArgs.FS fs = new PortalWireframeShaderArgs.FS();
+    private final int[] viewportTmp = new int[4];
     private final float halfPx;
 
     private PortalWireframeMesh3D(Builder b) {
@@ -46,11 +46,13 @@ public final class PortalWireframeMesh3D
         vs.centerX = args.centerX;
         vs.centerY = args.centerY;
         vs.centerZ = args.centerZ;
-        vs.radius = args.radius;
+        vs.scaleX = args.scaleX;
+        vs.scaleY = args.scaleY;
+        vs.scaleZ = args.scaleZ;
         vs.rotation = args.rotation;
-        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, VIEWPORT_TMP, 0);
-        vs.viewportW = Math.max(1, VIEWPORT_TMP[2]);
-        vs.viewportH = Math.max(1, VIEWPORT_TMP[3]);
+        GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, viewportTmp, 0);
+        vs.viewportW = Math.max(1, viewportTmp[2]);
+        vs.viewportH = Math.max(1, viewportTmp[3]);
         vs.halfPx = halfPx;
         vs.depthBiasNDC = DEPTH_BIAS_NDC;
 
@@ -74,7 +76,9 @@ public final class PortalWireframeMesh3D
 
         @Override
         public void checkValid() {
-            shader(PortalWireframeShaderPair.getSharedShader());
+            if (shader == null) {
+                shader(PortalWireframeShaderPair.createContextShader());
+            }
             if (verts == null) {
                 throw new IllegalStateException("verts == null");
             }

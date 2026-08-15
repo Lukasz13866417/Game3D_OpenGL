@@ -3,9 +3,8 @@ package com.example.game3d_opengl.game.stage.stages.main;
 import android.content.res.AssetManager;
 
 import com.example.game3d_opengl.game.player.player_character.PlayerAssets;
-import com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers;
-import com.example.game3d_opengl.game.terrain.track_elements.portal.CanonicalPortalVisual;
-import com.example.game3d_opengl.game.terrain.track_elements.potion.Potion;
+import com.example.game3d_opengl.game.terrain.presentation.TerrainRendererRegistry;
+import com.example.game3d_opengl.game.terrain.track_elements.potion.PotionRenderResources;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,7 +33,7 @@ public final class GameplayDiskAssetPreloader {
         inFlightTask = EXECUTOR.submit(() -> {
             try {
                 PlayerAssets.preparePlayerAssetsFromDisk(assetManager);
-                Potion.preparePotionAssetsFromDisk(assetManager);
+                PotionRenderResources.prepareFromDisk(assetManager);
             } catch (Throwable t) {
                 synchronized (GameplayDiskAssetPreloader.class) {
                     failure = t;
@@ -46,37 +45,40 @@ public final class GameplayDiskAssetPreloader {
 
     public static synchronized boolean isDiskReady() {
         return PlayerAssets.hasPreparedOrLoadedAssets()
-                && Potion.hasPreparedOrLoadedAssets()
+                && PotionRenderResources.isPrepared()
                 && failure == null;
     }
 
-    public static synchronized boolean isGpuWarmupComplete() {
+    public static synchronized boolean isGpuWarmupComplete(
+            TerrainRendererRegistry terrainRenderers) {
         return PlayerAssets.isGpuReady()
-                && GameplayElementBatchRenderers.isDefaultGpuReady()
-                && CanonicalPortalVisual.areSharedGpuAssetsReady();
+                && terrainRenderers != null
+                && terrainRenderers.isReady();
     }
 
-    public static synchronized boolean warmUpOneGpuAsset(AssetManager assetManager) {
+    public static synchronized boolean warmUpOneGpuAsset(
+            AssetManager assetManager,
+            TerrainRendererRegistry terrainRenderers) {
         if (!isDiskReady()) {
             return false;
         }
         if (!PlayerAssets.isGpuReady()) {
             PlayerAssets.LOAD_PLAYER_ASSETS(assetManager);
-            return isGpuWarmupComplete();
+            return isGpuWarmupComplete(terrainRenderers);
         }
-        if (!GameplayElementBatchRenderers.isDefaultGpuReady()) {
-            GameplayElementBatchRenderers.ensureDefaultLoaded(assetManager);
-            return isGpuWarmupComplete();
+        if (terrainRenderers == null) {
+            throw new IllegalArgumentException("terrainRenderers == null");
         }
-        if (!CanonicalPortalVisual.areSharedGpuAssetsReady()) {
-            CanonicalPortalVisual.warmUpSharedGpuAssets();
-            return isGpuWarmupComplete();
+        if (!terrainRenderers.isReady()) {
+            terrainRenderers.ensureLoaded(assetManager);
+            return isGpuWarmupComplete(terrainRenderers);
         }
         return true;
     }
 
-    public static synchronized boolean isReady() {
-        return isDiskReady() && isGpuWarmupComplete();
+    public static synchronized boolean isReady(
+            TerrainRendererRegistry terrainRenderers) {
+        return isDiskReady() && isGpuWarmupComplete(terrainRenderers);
     }
 
     public static synchronized void throwIfFailed() {

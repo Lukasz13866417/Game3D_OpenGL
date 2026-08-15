@@ -13,6 +13,8 @@ import com.example.game3d_opengl.game.terrain.terrain_structures.levels.mid.Rect
 import com.example.game3d_opengl.game.terrain.track_elements.portal.PortalConfig;
 import com.example.game3d_opengl.game.util.GameRandom;
 
+/** @deprecated Production selection uses {@code GameplayLevelCatalog}. */
+@Deprecated
 public final class GameplayLevelFactory {
     private static final int INTRO_EMPTY_ROWS = 80;
     private static final int INTRO_SPARSE_SPIKE_ROWS = 80;

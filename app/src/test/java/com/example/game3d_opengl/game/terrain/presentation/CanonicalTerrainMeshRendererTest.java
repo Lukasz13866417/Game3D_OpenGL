@@ -671,7 +671,7 @@ public final class CanonicalTerrainMeshRendererTest {
                 source.nearRightAppearance,
                 source.farLeftAppearance,
                 source.farRightAppearance,
-                source.features);
+                source.addons);
     }
 
     private static TerrainSegment withSolidity(
@@ -689,7 +689,7 @@ public final class CanonicalTerrainMeshRendererTest {
                 source.nearRightAppearance,
                 source.farLeftAppearance,
                 source.farRightAppearance,
-                source.features);
+                source.addons);
     }
 
     private static CanonicalTerrainMeshRenderer meshWith(

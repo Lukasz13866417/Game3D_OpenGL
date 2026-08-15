@@ -5,7 +5,6 @@ import static com.example.game3d_opengl.game.util.GameMath.rayTriangleDistance;
 import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 
 import com.example.game3d_opengl.game.player.player_character.PlayerConfig;
-import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
 import com.example.game3d_opengl.game.util.GameMath.MutableVec3;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
@@ -26,7 +25,7 @@ public final class FrameStartPlayerState {
     private Vector3D lastMove = V3(0, 0, 0);
     private float fallSpeed = 0f;
     private float activeHorizontalSpeed;
-    private Tile tileBelow = null;
+    private PlayerSupportSurface tileBelow = null;
     private int collisionTriangleIndex = -1;
     private float collisionProbeDistance = Float.POSITIVE_INFINITY;
     private float nearestGroundDistance = Float.POSITIVE_INFINITY;
@@ -83,11 +82,11 @@ public final class FrameStartPlayerState {
         this.activeHorizontalSpeed = Math.max(0f, activeHorizontalSpeed);
     }
 
-    public Tile getTileBelow() {
+    public PlayerSupportSurface getTileBelow() {
         return tileBelow;
     }
 
-    public void setTileBelow(Tile tileBelow) {
+    public void setTileBelow(PlayerSupportSurface tileBelow) {
         this.tileBelow = tileBelow;
         if (tileBelow != null) {
             nearestTileId = Math.max(nearestTileId, tileBelow.getID());
@@ -193,7 +192,8 @@ public final class FrameStartPlayerState {
         nearbySpikeCount = 0;
     }
 
-    public int probeCollisionTriangleIndex(Tile tileBelow, float verticalTravel) {
+    public int probeCollisionTriangleIndex(
+            PlayerSupportSurface tileBelow, float verticalTravel) {
         collisionProbeDistance = Float.POSITIVE_INFINITY;
         if (tileBelow == null || position == null) return -1;
         float travel = Math.max(0f, verticalTravel);

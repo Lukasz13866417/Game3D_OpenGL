@@ -121,7 +121,7 @@ public class ScenarioOutcomeTest {
     }
 
     @Test
-    public void jumpChargeRequiresBothPhysicalHorizontalPathGuards() {
+    public void jumpChargeUsesEachMovementsVerticalRatio() {
         RunSummary accepted = run("jump_charge_x_boundary_accept");
         EventOccurrence jump = accepted.only(SimulationEvent.Type.JUMP);
 
@@ -136,11 +136,11 @@ public class ScenarioOutcomeTest {
         assertEquals(0.0, ratioRejected.finalState.gestureCharge, 0.0);
         assertTrue(ratioRejected.finalState.grounded);
 
-        RunSummary absoluteRejected = run("jump_charge_x_absolute_reject");
-        assertCompletedAlive(absoluteRejected);
-        assertEquals(0, absoluteRejected.count(SimulationEvent.Type.JUMP));
-        assertEquals(0.0, absoluteRejected.finalState.gestureCharge, 0.0);
-        assertTrue(absoluteRejected.finalState.grounded);
+        RunSummary largeAccepted = run("jump_charge_x_large_accept");
+        EventOccurrence largeJump = largeAccepted.only(SimulationEvent.Type.JUMP);
+        assertCompletedAlive(largeAccepted);
+        assertEquals(JumpRuleId.GROUNDED_RELEASED, largeJump.decision.rule);
+        assertTrue(largeJump.after.velocity.y > 0.0);
     }
 
     @Test

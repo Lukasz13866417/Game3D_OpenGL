@@ -8,6 +8,8 @@ import com.example.game3d_opengl.game.terrain.track_elements.portal.assets.Porta
 import com.example.game3d_opengl.game.terrain.track_elements.portal.assets.PortalAssets;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
+/** @deprecated Mutable compatibility addon for the legacy terrain diagnostics. */
+@Deprecated
 public final class Portal extends Addon {
     private Vector3D entranceCenter;
     private float width;
@@ -114,9 +116,7 @@ public final class Portal extends Addon {
 
     @Override
     public void accept(Player player) {
-        if (player != null) {
-            player.interactWith(this);
-        }
+        // Legacy portals were visual-only.
     }
 
     @Override

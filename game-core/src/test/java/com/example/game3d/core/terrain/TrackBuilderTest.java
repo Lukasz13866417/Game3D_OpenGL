@@ -1,5 +1,7 @@
 package com.example.game3d.core.terrain;
 
+import com.example.game3d.core.terrain.addon.Addon;
+
 import org.junit.Test;
 
 import java.util.HashSet;
@@ -25,7 +27,7 @@ public class TrackBuilderTest {
             assertTrue(triangle.normal.y > 0.0);
             assertTrue(ids.add(triangle.id));
         }
-        assertTrue(terrain.patches().get(0).features.isEmpty());
+        assertTrue(terrain.patches().get(0).addons.isEmpty());
     }
 
     @Test
@@ -40,9 +42,9 @@ public class TrackBuilderTest {
         long previous = -1L;
         int featureCount = 0;
         for (TerrainPatch patch : terrain.patches()) {
-            for (TerrainFeature feature : patch.features) {
-                assertTrue(feature.id > previous);
-                previous = feature.id;
+            for (Addon addon : patch.addons) {
+                assertTrue(addon.id() > previous);
+                previous = addon.id();
                 featureCount++;
             }
         }

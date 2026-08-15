@@ -1,6 +1,7 @@
 package com.example.game3d.core.terrain;
 
 import com.example.game3d.core.math.Aabb;
+import com.example.game3d.core.terrain.addon.Addon;
 
 import java.util.List;
 
@@ -17,5 +18,5 @@ public interface CollisionTerrain {
 
     void queryTriangles(Aabb bounds, List<TerrainTriangle> destination);
 
-    void queryFeatures(Aabb bounds, List<TerrainFeature> destination);
+    void queryAddons(Aabb bounds, List<Addon> destination);
 }

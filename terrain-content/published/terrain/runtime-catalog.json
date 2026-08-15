@@ -1,0 +1,60 @@
+{
+  "formatVersion": 1,
+  "sourceCatalogId": "gameplay-main",
+  "entries": [
+    {
+      "id": "stairs_curve_line",
+      "digest": "30b40542567b52f988ef6b25b20c4f431028b1275f54843718533cd2142afe38",
+      "content": {
+        "contentType": "JAVA_PROVIDER",
+        "formatVersion": 1,
+        "providerId": "stairs_curve_line"
+      }
+    },
+    {
+      "id": "curve_stairs",
+      "digest": "e39c3c4a31c465abf15af0f3ad9edbd74152494baba5518be8aff94f7adac8a8",
+      "content": {
+        "contentType": "JAVA_PROVIDER",
+        "formatVersion": 1,
+        "providerId": "curve_stairs"
+      }
+    },
+    {
+      "id": "boost_ramp",
+      "digest": "2a2a8f5a0099eec32587c3c02eef42bce222f9bf4513a1f7a036e89bb5910492",
+      "content": {
+        "contentType": "JAVA_PROVIDER",
+        "formatVersion": 1,
+        "providerId": "boost_ramp"
+      }
+    },
+    {
+      "id": "double_curve_boost",
+      "digest": "e22b5512e6b81f66877e4c4f350e08c84fdfac14d7cc21950eb7db8852266b19",
+      "content": {
+        "contentType": "JAVA_PROVIDER",
+        "formatVersion": 1,
+        "providerId": "double_curve_boost"
+      }
+    },
+    {
+      "id": "long_stair_arc",
+      "digest": "bd5629492f571060988c790555f02c4243c4f77aade8f1a8cf9a6963c603fe90",
+      "content": {
+        "contentType": "JAVA_PROVIDER",
+        "formatVersion": 1,
+        "providerId": "long_stair_arc"
+      }
+    },
+    {
+      "id": "rect_curve_sprint",
+      "digest": "886e75fa96b32479076cff28ad67773fac37ecacef90020071307c063ebad53d",
+      "content": {
+        "contentType": "JAVA_PROVIDER",
+        "formatVersion": 1,
+        "providerId": "rect_curve_sprint"
+      }
+    }
+  ]
+}

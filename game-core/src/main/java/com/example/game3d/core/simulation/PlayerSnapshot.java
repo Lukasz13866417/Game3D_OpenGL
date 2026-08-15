@@ -22,15 +22,15 @@ public final class PlayerSnapshot {
     /** Internal motor controller rim speed retained for gameplay-trajectory compatibility. */
     public final double driveSurfaceSpeed;
     public final double gestureCharge;
-    /** Charge accumulated by upward motion before applying physical path-direction guards. */
+    /** Legacy held-gesture diagnostic mirroring accepted charge until classifier reset. */
     public final double gestureChargePotential;
-    /** Current physical finger displacement from this held gesture phase's X origin. */
+    /** Current physical finger displacement from this held gesture's X origin. */
     public final double gestureRawDeltaX;
-    /** Cumulative physical upward finger travel during the held gesture phase. */
+    /** Cumulative physical upward finger travel during the held gesture. */
     public final double gestureRawUpwardDistance;
-    /** Peak physical sideways excursion during the held gesture phase. */
+    /** Peak physical sideways excursion during the held gesture. */
     public final double gestureMaxAbsRawDeltaX;
-    /** Whether both absolute-X and X-to-upward-Y guards currently permit visible charge. */
+    /** Whether the most recently processed swipe packet contributed jump charge. */
     public final boolean jumpChargePathEligible;
     public final int airJumpCharges;
     public final boolean grounded;

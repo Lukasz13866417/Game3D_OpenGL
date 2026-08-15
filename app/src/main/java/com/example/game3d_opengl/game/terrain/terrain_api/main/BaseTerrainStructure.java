@@ -1,5 +1,10 @@
 package com.example.game3d_opengl.game.terrain.terrain_api.main;
 
+/**
+ * @deprecated Compatibility copy for Android diagnostic stages. Use
+ * {@link com.example.game3d.authoring.BaseTerrainStructure} for production and editor content.
+ */
+@Deprecated
 public abstract class BaseTerrainStructure<GridBrushType extends Terrain.BaseGridBrush> {
     protected final int tilesToMake;
     private int debugChildCounter = 0;

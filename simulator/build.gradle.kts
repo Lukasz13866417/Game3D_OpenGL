@@ -13,7 +13,21 @@ application {
 
 dependencies {
     implementation(project(":game-core"))
+    implementation(project(":terrain-authoring"))
+    implementation(project(":terrain-io"))
     testImplementation(rootProject.libs.junit)
+}
+
+sourceSets {
+    named("main") {
+        // Package the exact last-good runtime artifact that Android receives as an asset.
+        // An explicit -Dgame3d.terrainCatalog path can still override it for validation.
+        resources.srcDir(rootProject.layout.projectDirectory.dir("terrain-content/published"))
+    }
+}
+
+tasks.named("processResources") {
+    dependsOn(rootProject.tasks.named("validateTerrainContent"))
 }
 
 tasks.withType<JavaCompile>().configureEach {

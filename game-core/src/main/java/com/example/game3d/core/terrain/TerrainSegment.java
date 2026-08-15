@@ -1,6 +1,7 @@
 package com.example.game3d.core.terrain;
 
 import com.example.game3d.core.math.Vec3;
+import com.example.game3d.core.terrain.addon.Addon;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,7 +24,7 @@ public final class TerrainSegment {
     public final TerrainVertexAppearance nearRightAppearance;
     public final TerrainVertexAppearance farLeftAppearance;
     public final TerrainVertexAppearance farRightAppearance;
-    public final List<TerrainFeatureSpec> features;
+    public final List<Addon> addons;
 
     public TerrainSegment(
             long id,
@@ -38,7 +39,7 @@ public final class TerrainSegment {
             TerrainVertexAppearance nearRightAppearance,
             TerrainVertexAppearance farLeftAppearance,
             TerrainVertexAppearance farRightAppearance,
-            List<TerrainFeatureSpec> features) {
+            List<Addon> addons) {
         if (id < 0L || id > (Long.MAX_VALUE - 1L) / 2L) {
             throw new IllegalArgumentException("Invalid segment id " + id);
         }
@@ -55,23 +56,22 @@ public final class TerrainSegment {
             validateTriangle(id * 2L, nearLeft, nearRight, farRight);
             validateTriangle(id * 2L + 1L, nearLeft, farRight, farLeft);
         }
-        ArrayList<TerrainFeatureSpec> sorted = new ArrayList<TerrainFeatureSpec>(
-                features == null
-                        ? Collections.<TerrainFeatureSpec>emptyList() : features);
-        Collections.sort(sorted, new Comparator<TerrainFeatureSpec>() {
+        ArrayList<Addon> sorted = new ArrayList<Addon>(
+                addons == null ? Collections.<Addon>emptyList() : addons);
+        Collections.sort(sorted, new Comparator<Addon>() {
             @Override
-            public int compare(TerrainFeatureSpec left, TerrainFeatureSpec right) {
-                return Long.compare(left.id, right.id);
+            public int compare(Addon left, Addon right) {
+                return Long.compare(left.id(), right.id());
             }
         });
-        Set<Long> featureIds = new HashSet<Long>();
-        for (TerrainFeatureSpec feature : sorted) {
-            if (feature == null || feature.ownerSegmentId != id) {
+        Set<Long> addonIds = new HashSet<Long>();
+        for (Addon addon : sorted) {
+            if (addon == null || !addon.isSealed() || addon.ownerSegmentId() != id) {
                 throw new IllegalArgumentException(
-                        "Feature must be non-null and owned by segment " + id);
+                        "Addon must be sealed and owned by segment " + id);
             }
-            if (!featureIds.add(feature.id)) {
-                throw new IllegalArgumentException("Duplicate feature id " + feature.id);
+            if (!addonIds.add(addon.id())) {
+                throw new IllegalArgumentException("Duplicate addon id " + addon.id());
             }
         }
         this.id = id;
@@ -86,7 +86,7 @@ public final class TerrainSegment {
         this.nearRightAppearance = nearRightAppearance;
         this.farLeftAppearance = farLeftAppearance;
         this.farRightAppearance = farRightAppearance;
-        this.features = Collections.unmodifiableList(sorted);
+        this.addons = Collections.unmodifiableList(sorted);
     }
 
     public List<TerrainTriangle> collisionTriangles() {
@@ -127,8 +127,8 @@ public final class TerrainSegment {
         hash = mixAppearance(hash, nearRightAppearance);
         hash = mixAppearance(hash, farLeftAppearance);
         hash = mixAppearance(hash, farRightAppearance);
-        for (TerrainFeatureSpec feature : features) {
-            hash = mix(hash, feature.deterministicDigest());
+        for (Addon addon : addons) {
+            hash = mix(hash, addon.deterministicDigest());
         }
         return hash;
     }

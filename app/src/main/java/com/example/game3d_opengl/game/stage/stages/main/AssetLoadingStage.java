@@ -3,12 +3,17 @@ package com.example.game3d_opengl.game.stage.stages.main;
 import android.content.Context;
 import android.content.res.AssetManager;
 
+import com.example.game3d.authoring.GameplayLevelCatalog;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.settings.SlowFrameStats;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.rendering.text.BitmapFont;
 import com.example.game3d_opengl.rendering.text.TextRenderer;
 import com.example.game3d_opengl.rendering.util3d.FColor;
+import com.example.game3d_opengl.game.terrain.presentation.TerrainRendererRegistry;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 public final class AssetLoadingStage extends Stage {
     private static final int FONT_PX = 54;
@@ -21,6 +26,8 @@ public final class AssetLoadingStage extends Stage {
     private boolean requestedVisualLoadingStage = false;
     private AssetManager assetManager;
     private PreparedGameplaySession preparedGameplaySession;
+    private FutureTask<GameplayLevelCatalog> catalogLoad;
+    private TerrainRendererRegistry terrainRenderers;
 
     public AssetLoadingStage(MyGLRenderer.StageManager stageManager) {
         super(stageManager);
@@ -49,10 +56,16 @@ public final class AssetLoadingStage extends Stage {
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         assetManager = context.getAssets();
+        terrainRenderers = stageManager.terrainRendererRegistry();
         uiScale = screenHeight / 1080f;
         requestedVisualLoadingStage = false;
         preparedGameplaySession = null;
         GameplayDiskAssetPreloader.startIfNeeded(assetManager);
+        catalogLoad = new FutureTask<>(
+                () -> PublishedTerrainCatalogAssets.loadOrBuiltIns(assetManager));
+        Thread catalogLoader = new Thread(catalogLoad, "terrain-catalog-loader");
+        catalogLoader.setDaemon(true);
+        catalogLoader.start();
 
         BitmapFont font = BitmapFont.loadShared(assetManager, FONT_PX);
         textRenderer = new TextRenderer(font);
@@ -79,12 +92,23 @@ public final class AssetLoadingStage extends Stage {
         if (!GameplayDiskAssetPreloader.isDiskReady()) {
             return;
         }
-        if (!GameplayDiskAssetPreloader.isGpuWarmupComplete()) {
-            GameplayDiskAssetPreloader.warmUpOneGpuAsset(assetManager);
+        if (!GameplayDiskAssetPreloader.isGpuWarmupComplete(terrainRenderers)) {
+            GameplayDiskAssetPreloader.warmUpOneGpuAsset(assetManager, terrainRenderers);
+            return;
+        }
+        if (catalogLoad == null || !catalogLoad.isDone()) {
             return;
         }
         if (preparedGameplaySession == null) {
-            preparedGameplaySession = PreparedGameplaySession.createInitialSession();
+            try {
+                preparedGameplaySession = PreparedGameplaySession.createInitialSession(
+                        catalogLoad.get());
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Terrain catalog loading was interrupted", interrupted);
+            } catch (ExecutionException failure) {
+                throw new IllegalStateException("Terrain catalog loading failed", failure.getCause());
+            }
         }
         if (!preparedGameplaySession.isSpawnPlayableReady()) {
             SlowFrameStats.markTerrainGenerating();
@@ -148,6 +172,11 @@ public final class AssetLoadingStage extends Stage {
         uiScale = 1f;
         requestedVisualLoadingStage = false;
         assetManager = null;
+        terrainRenderers = null;
         preparedGameplaySession = null;
+        if (catalogLoad != null) {
+            catalogLoad.cancel(true);
+            catalogLoad = null;
+        }
     }
 }

@@ -139,7 +139,7 @@ public final class AndroidSimulationController {
 
     /**
      * Enqueues sensitivity-scaled gameplay motion together with the unscaled physical finger
-     * path used to decide whether the gesture is sufficiently vertical to charge a jump.
+     * movement used to decide whether that packet is sufficiently vertical to charge a jump.
      */
     public synchronized boolean touchMoveDelta(
             float deltaX, float deltaY,

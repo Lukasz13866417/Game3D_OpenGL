@@ -53,7 +53,7 @@ public class IncrementalTerrainSimulationTest {
                 TerrainVertexAppearance.DEFAULT,
                 TerrainVertexAppearance.DEFAULT,
                 TerrainVertexAppearance.DEFAULT,
-                original.features);
+                original.addons);
         engine.applyTerrainCommit(new TerrainCommit(
                 1L, 2L, 0L, 0L, Collections.singletonList(moved)));
         assertFalse(engine.snapshot().grounded);

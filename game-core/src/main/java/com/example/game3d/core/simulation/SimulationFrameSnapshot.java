@@ -9,14 +9,14 @@ package com.example.game3d.core.simulation;
 public final class SimulationFrameSnapshot {
     public final PlayerSnapshot player;
     public final long terrainRevision;
-    public final FeatureActivitySnapshot featureActivity;
+    public final AddonActivitySnapshot addonActivity;
 
     SimulationFrameSnapshot(
             PlayerSnapshot player,
             long terrainRevision,
-            FeatureActivitySnapshot featureActivity) {
+            AddonActivitySnapshot addonActivity) {
         this.player = player;
         this.terrainRevision = terrainRevision;
-        this.featureActivity = featureActivity;
+        this.addonActivity = addonActivity;
     }
 }

@@ -4,6 +4,8 @@ import com.example.game3d_opengl.game.terrain.terrain_api.main.AdvancedTerrainSt
 import com.example.game3d_opengl.game.terrain.terrain_api.main.BaseTerrainStructure;
 import com.example.game3d_opengl.game.terrain.terrain_api.main.Terrain;
 
+/** @deprecated Production level sequences live in {@code :terrain-authoring}. */
+@Deprecated
 public abstract class TerrainLevelSequence extends AdvancedTerrainStructure {
     private final String debugName;
     private final BaseTerrainStructure<?>[] sections;

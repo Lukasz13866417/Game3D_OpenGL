@@ -591,6 +591,82 @@ class VisualizeSimulationTest(unittest.TestCase):
         self.assertIn("max |raw X|=0.050000", svg)
         self.assertIn("path eligible=false", svg)
 
+    def test_schema_ten_classifies_each_upward_movement_independently(self) -> None:
+        header = {
+            "schema": 10,
+            "scenario": "per_movement_charge",
+            "fixedHz": 120,
+            "dtNanos": 8_333_333,
+            "maxJumpChargeXToYRatio": 1.2,
+            "terrainFeatures": [],
+        }
+        ticks = [
+            {
+                "tick": 1,
+                "before": {
+                    "timeNanos": 0,
+                    "absolutePosition": [0.0, 0.5, 0.0],
+                    "gestureCharge": 0.0,
+                },
+                "after": {
+                    "timeNanos": 8_333_333,
+                    "absolutePosition": [0.0, 0.5, -0.1],
+                    "gestureCharge": 0.26,
+                    "gestureChargePotential": 0.26,
+                    "gestureMaxAbsRawDeltaX": 0.05,
+                    "gestureRawUpwardDistance": 0.08,
+                    # The last packet was blocked, but the first one still contributed.
+                    "jumpChargePathEligible": False,
+                    "dead": False,
+                },
+                "inputs": [
+                    {
+                        "type": "SWIPE",
+                        "timeNanos": 1_000_000,
+                        "dxScreenHeights": 0.0,
+                        "dyScreenHeights": -0.04,
+                        "rawDxScreenHeights": 0.0,
+                        "rawDyScreenHeights": -0.04,
+                    },
+                    {
+                        "type": "SWIPE",
+                        "timeNanos": 2_000_000,
+                        "dxScreenHeights": 0.05,
+                        "dyScreenHeights": -0.04,
+                        "rawDxScreenHeights": 0.05,
+                        "rawDyScreenHeights": -0.04,
+                    },
+                ],
+                "events": [],
+            }
+        ]
+        triangles = [
+            {
+                "a": [-2.0, 0.0, 1.0],
+                "b": [2.0, 0.0, 1.0],
+                "c": [2.0, 0.0, -2.0],
+                "material": "NORMAL",
+            }
+        ]
+
+        svg = build_svg(
+            header,
+            ticks,
+            triangles,
+            width=900,
+            height=600,
+            horizontal_mode="z",
+            vertical_mode="y",
+            focus_traveled=True,
+            show_samples=False,
+            title=None,
+        )
+
+        self.assertEqual(1, svg.count('data-charge-status="accepted"'))
+        self.assertEqual(1, svg.count('data-charge-status="blocked"'))
+        self.assertIn("movement contributed=true", svg)
+        self.assertIn("movement contributed=false", svg)
+
 
 if __name__ == "__main__":
     unittest.main()

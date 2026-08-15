@@ -3,14 +3,24 @@ package com.example.game3d.simulator;
 import com.example.game3d.core.input.PlayerInputEvent;
 import com.example.game3d.core.math.Vec3;
 import com.example.game3d.core.simulation.PhysicsConfig;
-import com.example.game3d.core.terrain.StreamingTerrainGenerator;
+import com.example.game3d.authoring.GameplayTerrainStream;
+import com.example.game3d.authoring.GameplayLevelCatalog;
+import com.example.game3d.authoring.TrackProfile;
 import com.example.game3d.core.terrain.SurfaceMaterial;
 import com.example.game3d.core.terrain.TerrainCommit;
 import com.example.game3d.core.terrain.TerrainSegment;
 import com.example.game3d.core.terrain.TerrainSnapshot;
 import com.example.game3d.core.terrain.TerrainWorld;
 import com.example.game3d.core.terrain.TrackBuilder;
+import com.example.game3d.terrain.io.publish.PublishedGameplayCatalogLoader;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -19,15 +29,26 @@ import java.util.Map;
 
 /** Deterministic scenarios built from the same canonical terrain contracts as gameplay. */
 public final class ScenarioRegistry {
+    private static final String TERRAIN_CATALOG_PROPERTY = "game3d.terrainCatalog";
+    static final String PACKAGED_TERRAIN_CATALOG = "/terrain/runtime-catalog.json";
     private final Map<String, Scenario> scenarios = new LinkedHashMap<String, Scenario>();
     private final PhysicsConfig config = new PhysicsConfig();
+    private final GameplayLevelCatalog gameplayCatalog;
 
     public ScenarioRegistry() {
+        this(loadPublishedCatalogOrBuiltIns());
+    }
+
+    ScenarioRegistry(GameplayLevelCatalog gameplayCatalog) {
+        if (gameplayCatalog == null) {
+            throw new IllegalArgumentException("gameplayCatalog == null");
+        }
+        this.gameplayCatalog = gameplayCatalog;
         register(flatRest());
         register(groundJump());
         register(jumpChargeXBoundaryAccept());
         register(jumpChargeXRatioReject());
-        register(jumpChargeXAbsoluteReject());
+        register(jumpChargeLargeXAccept());
         register(slopeAndBoost());
         register(gapRecovery());
         register(spikeAvoidance());
@@ -44,6 +65,7 @@ public final class ScenarioRegistry {
         register(openLift());
         register(streamingCommit());
         register(generatedGameplayStream());
+        register(publishedCatalogLevel());
     }
 
     public Scenario require(String name) {
@@ -84,30 +106,30 @@ public final class ScenarioRegistry {
     }
 
     private Scenario jumpChargeXBoundaryAccept() {
-        return jumpChargeXGuardScenario(
+        return jumpChargeMovementScenario(
                 "jump_charge_x_boundary_accept",
-                "A near-boundary diagonal swipe passes both physical X charge guards",
+                "A near-boundary movement is vertical enough to contribute jump charge",
                 0.059,
                 -0.050);
     }
 
     private Scenario jumpChargeXRatioReject() {
-        return jumpChargeXGuardScenario(
+        return jumpChargeMovementScenario(
                 "jump_charge_x_ratio_reject",
-                "A short diagonal swipe stays below the absolute X cap but fails the X/Y ratio",
+                "A diagonal movement outside the vertical ratio contributes no jump charge",
                 0.050,
                 -0.040);
     }
 
-    private Scenario jumpChargeXAbsoluteReject() {
-        return jumpChargeXGuardScenario(
-                "jump_charge_x_absolute_reject",
-                "A vertically dominant swipe passes the X/Y ratio but exceeds the absolute X cap",
+    private Scenario jumpChargeLargeXAccept() {
+        return jumpChargeMovementScenario(
+                "jump_charge_x_large_accept",
+                "A large movement contributes because its per-movement direction is vertical enough",
                 0.061,
                 -0.060);
     }
 
-    private Scenario jumpChargeXGuardScenario(
+    private Scenario jumpChargeMovementScenario(
             String name, String description, double deltaX, double deltaY) {
         TrackBuilder terrain = new TrackBuilder(20.0).straight(80.0);
         ArrayList<PlayerInputEvent> inputs = new ArrayList<PlayerInputEvent>();
@@ -310,8 +332,10 @@ public final class ScenarioRegistry {
      */
     private Scenario generatedGameplayStream() {
         Vec3 terrainStart = new Vec3(0.0, -3.5, -0.5);
-        StreamingTerrainGenerator generator =
-                new StreamingTerrainGenerator(3.2, 1.4, terrainStart);
+        GameplayTerrainStream generator =
+                new GameplayTerrainStream(
+                        TrackProfile.gameplayDefault(), terrainStart, 0L,
+                        gameplayCatalog);
         generator.enqueueIntroSegments();
         generator.generateChunks(48);
         TerrainSnapshot initial = generator.snapshot();
@@ -339,6 +363,80 @@ public final class ScenarioRegistry {
                 500,
                 Collections.<PlayerInputEvent>emptyList(),
                 commits);
+    }
+
+    /**
+     * Materializes one entry from the exact immutable catalog loaded by this simulator process.
+     * When a published extension is present, the first custom entry is selected deliberately so
+     * desktop validation exercises more than the built-in fallback prefix.
+     */
+    private Scenario publishedCatalogLevel() {
+        long ordinal = catalogExerciseOrdinal(gameplayCatalog);
+        Vec3 terrainStart = new Vec3(0.0, -3.5, -0.5);
+        GameplayTerrainStream generator = new GameplayTerrainStream(
+                TrackProfile.gameplayDefault(), terrainStart, 0L, gameplayCatalog);
+        generator.enqueueGameplayLevel((int) ordinal);
+        generator.generateChunks(-1);
+        TerrainSnapshot snapshot = generator.snapshot();
+        generator.close();
+
+        TerrainWorld compatibilityWorld = new TrackBuilder(3.2)
+                .lift(-3.5)
+                .straight(Math.max(14.0, snapshot.segments.size() * 1.4))
+                .build();
+        return new Scenario(
+                "published_catalog_level",
+                "A level selected from the same published catalog consumed by Android",
+                compatibilityWorld,
+                snapshot,
+                new Vec3(0.0, -0.5, -0.5),
+                Vec3.ZERO,
+                0.0,
+                0,
+                120,
+                Collections.<PlayerInputEvent>emptyList(),
+                Collections.<Long, List<TerrainCommit>>emptyMap());
+    }
+
+    private static long catalogExerciseOrdinal(GameplayLevelCatalog catalog) {
+        if (catalog.entries().size() <= GameplayLevelCatalog.builtIns().entries().size()) {
+            return 0L;
+        }
+        String firstPublishedId = catalog.entries()
+                .get(GameplayLevelCatalog.builtIns().entries().size()).stableId();
+        for (long ordinal = 0L; ordinal < 1_000_000L; ordinal++) {
+            if (firstPublishedId.equals(catalog.select(ordinal).stableId())) {
+                return ordinal;
+            }
+        }
+        throw new IllegalStateException(
+                "Published catalog entry cannot be selected: " + firstPublishedId);
+    }
+
+    private static GameplayLevelCatalog loadPublishedCatalogOrBuiltIns() {
+        String configuredPath = System.getProperty(TERRAIN_CATALOG_PROPERTY);
+        if (configuredPath != null && !configuredPath.trim().isEmpty()) {
+            Path path = Paths.get(configuredPath);
+            if (!Files.isRegularFile(path)) {
+                return GameplayLevelCatalog.builtIns();
+            }
+            try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+                return new PublishedGameplayCatalogLoader().loadOrBuiltIns(reader);
+            } catch (Exception invalid) {
+                return GameplayLevelCatalog.builtIns();
+            }
+        }
+
+        InputStream packaged = ScenarioRegistry.class.getResourceAsStream(
+                PACKAGED_TERRAIN_CATALOG);
+        if (packaged == null) {
+            return GameplayLevelCatalog.builtIns();
+        }
+        try (Reader reader = new InputStreamReader(packaged, StandardCharsets.UTF_8)) {
+            return new PublishedGameplayCatalogLoader().loadOrBuiltIns(reader);
+        } catch (Exception invalid) {
+            return GameplayLevelCatalog.builtIns();
+        }
     }
 
     private static List<PlayerInputEvent> chargedRelease(long startMillis, double horizontal) {

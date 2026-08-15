@@ -15,7 +15,7 @@ scenarios=(
   ground_jump
   jump_charge_x_boundary_accept
   jump_charge_x_ratio_reject
-  jump_charge_x_absolute_reject
+  jump_charge_x_large_accept
   slope_boost
   gap_recovery
   spike_avoidance

@@ -5,6 +5,7 @@ import android.opengl.GLSurfaceView;
 import android.view.Display;
 import android.view.MotionEvent;
 
+import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.util.AndroidGameClock;
 
 import javax.microedition.khronos.egl.EGL10;
@@ -133,14 +134,26 @@ public class MyGLSurfaceView extends GLSurfaceView {
                     clearActivePointer();
                     break;
                 }
-                float moveX = event.getX(moveIndex);
-                float moveY = event.getY(moveIndex);
-                if (!renderer.getCurrentStage().isInitialized()) break;
-                if (moveX == lastX && moveY == lastY) break;
-                renderer.getCurrentStage().enqueueTouchMove(
-                        lastX, lastY, moveX, moveY, eventTimeNanos);
-                lastX = moveX;
-                lastY = moveY;
+                Stage moveStage = renderer.getCurrentStage();
+                if (!moveStage.isInitialized()) break;
+                // Android may batch several sampled points into one ACTION_MOVE. Preserve the
+                // actual path so a horizontal turn followed by an upward jump gesture is not
+                // collapsed into one misleading diagonal delta.
+                for (int historyPosition = 0;
+                     historyPosition < event.getHistorySize();
+                     historyPosition++) {
+                    enqueueMoveIfChanged(
+                            moveStage,
+                            event.getHistoricalX(moveIndex, historyPosition),
+                            event.getHistoricalY(moveIndex, historyPosition),
+                            AndroidGameClock.historicalEventTimeNanos(
+                                    event, historyPosition));
+                }
+                enqueueMoveIfChanged(
+                        moveStage,
+                        event.getX(moveIndex),
+                        event.getY(moveIndex),
+                        eventTimeNanos);
                 break;
             case MotionEvent.ACTION_DOWN:
                 int downIndex = event.getActionIndex();
@@ -156,6 +169,11 @@ public class MyGLSurfaceView extends GLSurfaceView {
                             downX, downY, eventTimeNanos);
                 }
                 break;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                // A secondary pointer event can also carry a newer sample for the primary
+                // pointer. Preserve that primary movement without changing gesture ownership.
+                enqueueActivePointerSample(event, eventTimeNanos);
+                break;
             case MotionEvent.ACTION_POINTER_UP:
                 int pointerUpIndex = event.getActionIndex();
                 if (event.getPointerId(pointerUpIndex) == activePointerId) {
@@ -163,10 +181,18 @@ public class MyGLSurfaceView extends GLSurfaceView {
                     float pointerUpY = event.getY(pointerUpIndex);
                     if (activePointerWasDispatched
                             && renderer.getCurrentStage().isInitialized()) {
-                        renderer.getCurrentStage().enqueueTouchUp(
+                        Stage pointerUpStage = renderer.getCurrentStage();
+                        enqueueMoveIfChanged(
+                                pointerUpStage,
+                                pointerUpX,
+                                pointerUpY,
+                                eventTimeNanos);
+                        pointerUpStage.enqueueTouchUp(
                                 pointerUpX, pointerUpY, eventTimeNanos);
                     }
                     clearActivePointer();
+                } else {
+                    enqueueActivePointerSample(event, eventTimeNanos);
                 }
                 break;
             case MotionEvent.ACTION_UP:
@@ -174,10 +200,11 @@ public class MyGLSurfaceView extends GLSurfaceView {
                 if (event.getPointerId(upIndex) == activePointerId
                         && activePointerWasDispatched
                         && renderer.getCurrentStage().isInitialized()) {
-                    renderer.getCurrentStage().enqueueTouchUp(
-                            event.getX(upIndex),
-                            event.getY(upIndex),
-                            eventTimeNanos);
+                    Stage upStage = renderer.getCurrentStage();
+                    float upX = event.getX(upIndex);
+                    float upY = event.getY(upIndex);
+                    enqueueMoveIfChanged(upStage, upX, upY, eventTimeNanos);
+                    upStage.enqueueTouchUp(upX, upY, eventTimeNanos);
                 }
                 clearActivePointer();
                 break;
@@ -191,6 +218,29 @@ public class MyGLSurfaceView extends GLSurfaceView {
                 break;
         }
         return true;
+    }
+
+    private void enqueueMoveIfChanged(
+            Stage stage, float x, float y, long timeNanos) {
+        if (x == lastX && y == lastY) {
+            return;
+        }
+        stage.enqueueTouchMove(lastX, lastY, x, y, timeNanos);
+        lastX = x;
+        lastY = y;
+    }
+
+    private void enqueueActivePointerSample(MotionEvent event, long timeNanos) {
+        if (activePointerId == INVALID_POINTER_ID || !activePointerWasDispatched) {
+            return;
+        }
+        int pointerIndex = event.findPointerIndex(activePointerId);
+        Stage stage = renderer.getCurrentStage();
+        if (pointerIndex < 0 || !stage.isInitialized()) {
+            return;
+        }
+        enqueueMoveIfChanged(
+                stage, event.getX(pointerIndex), event.getY(pointerIndex), timeNanos);
     }
 
     private void clearActivePointer() {

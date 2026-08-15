@@ -1,0 +1,43 @@
+{
+  "documentType": "catalog",
+  "formatVersion": 1,
+  "id": "gameplay-main",
+  "entries": [
+    {
+      "id": "stairs_curve_line",
+      "kind": "JAVA_PROVIDER",
+      "location": "stairs_curve_line",
+      "enabled": true
+    },
+    {
+      "id": "curve_stairs",
+      "kind": "JAVA_PROVIDER",
+      "location": "curve_stairs",
+      "enabled": true
+    },
+    {
+      "id": "boost_ramp",
+      "kind": "JAVA_PROVIDER",
+      "location": "boost_ramp",
+      "enabled": true
+    },
+    {
+      "id": "double_curve_boost",
+      "kind": "JAVA_PROVIDER",
+      "location": "double_curve_boost",
+      "enabled": true
+    },
+    {
+      "id": "long_stair_arc",
+      "kind": "JAVA_PROVIDER",
+      "location": "long_stair_arc",
+      "enabled": true
+    },
+    {
+      "id": "rect_curve_sprint",
+      "kind": "JAVA_PROVIDER",
+      "location": "rect_curve_sprint",
+      "enabled": true
+    }
+  ]
+}

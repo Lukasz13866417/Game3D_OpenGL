@@ -7,7 +7,6 @@ import com.example.game3d.core.terrain.TerrainCommit;
 import com.example.game3d.core.terrain.TerrainSegment;
 import com.example.game3d.core.terrain.TerrainVertexAppearance;
 import com.example.game3d_opengl.game.LightSource;
-import com.example.game3d_opengl.game.terrain.terrain_api.terrainutil.TerrainRibbonShaderPair;
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.infill.InfillShaderArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -50,6 +49,7 @@ final class CanonicalTerrainMeshRenderer implements GPUResourceOwner {
 
     private final InfillShaderArgs.VS vsArgs = new InfillShaderArgs.VS();
     private final InfillShaderArgs.FS fsArgs = new InfillShaderArgs.FS();
+    private final TerrainRibbonShaderPair shader;
     private final TreeMap<Long, Integer> segmentSlots =
             new TreeMap<Long, Integer>();
     /** Includes gaps because immediate canonical adjacency is part of the smoothing decision. */
@@ -111,6 +111,11 @@ final class CanonicalTerrainMeshRenderer implements GPUResourceOwner {
     private int incrementallyUpdatedSegmentCount;
 
     CanonicalTerrainMeshRenderer() {
+        this(null);
+    }
+
+    CanonicalTerrainMeshRenderer(TerrainRibbonShaderPair shader) {
+        this.shader = shader;
         ensureSlotCapacity(INITIAL_SLOT_CAPACITY);
     }
 
@@ -307,7 +312,10 @@ final class CanonicalTerrainMeshRenderer implements GPUResourceOwner {
             fsArgs.lightColor = DEFAULT_LIGHT_COLOR;
         }
 
-        TerrainRibbonShaderPair shader = TerrainRibbonShaderPair.sharedShader;
+        if (shader == null) {
+            throw new IllegalStateException(
+                    "Canonical terrain mesh has no GL-context shader");
+        }
         shader.setAsCurrentProgram();
         shader.enableAndPointVertexAttribs();
 
@@ -381,7 +389,6 @@ final class CanonicalTerrainMeshRenderer implements GPUResourceOwner {
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
         vboId = 0;
         blendedIndexBufferId = 0;
-        TerrainRibbonShaderPair.sharedShader.reloadProgram();
         gpuStorageDirty = true;
         blendedIndexGpuStorageDirty = true;
         uploadedTriangleCount = -1;

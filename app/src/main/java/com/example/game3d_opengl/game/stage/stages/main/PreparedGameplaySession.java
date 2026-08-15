@@ -6,19 +6,19 @@ import com.example.game3d_opengl.game.LightSource;
 import com.example.game3d_opengl.game.player.player_character.Player;
 import com.example.game3d_opengl.game.player.player_character.PlayerConfig;
 import com.example.game3d.core.math.Vec3;
-import com.example.game3d.core.terrain.StreamingTerrainGenerator;
 import com.example.game3d.core.terrain.TerrainCollisionIndex;
 import com.example.game3d.core.terrain.TerrainOutput;
 import com.example.game3d.core.terrain.TerrainSnapshot;
+import com.example.game3d.authoring.GameplayLevelCatalog;
+import com.example.game3d.authoring.GameplayTerrainStream;
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
 
 public final class PreparedGameplaySession implements GPUResourceOwner {
-    private static final float SEG_WIDTH = 3.2f;
-    private static final float SEG_LENGTH = 1.4f;
+    static final int TERRAIN_PREPARATION_COMMAND_BUDGET = 256;
     private static final int INITIAL_LEVEL_COUNT = 4;
 
     private Player player;
-    private final StreamingTerrainGenerator terrain;
+    private final GameplayTerrainStream terrain;
     private TerrainOutput terrainOutput;
     private final LightSource lightSource;
     private final int nextRandomLevelIndex;
@@ -30,7 +30,7 @@ public final class PreparedGameplaySession implements GPUResourceOwner {
 
     private PreparedGameplaySession(
             Player player,
-            StreamingTerrainGenerator terrain,
+            GameplayTerrainStream terrain,
             TerrainOutput terrainOutput,
             LightSource lightSource,
             int nextRandomLevelIndex
@@ -52,15 +52,24 @@ public final class PreparedGameplaySession implements GPUResourceOwner {
     }
 
     public static PreparedGameplaySession createInitialSession() {
+        return createInitialSession(GameplayLevelCatalog.builtIns());
+    }
+
+    public static PreparedGameplaySession createInitialSession(
+            GameplayLevelCatalog catalog) {
+        if (catalog == null) {
+            throw new IllegalArgumentException("catalog == null");
+        }
         LightSource lightSource = new LightSource(CLR(1f, 1f, 1f, 1f));
-        StreamingTerrainGenerator terrain =
-                new StreamingTerrainGenerator(
-                SEG_WIDTH,
-                SEG_LENGTH,
-                new Vec3(
-                        Player.initialPositionX(),
-                        Player.initialPositionY() - 3f,
-                        Player.initialPositionZ()));
+        GameplayTerrainStream terrain =
+                new GameplayTerrainStream(
+                        com.example.game3d.authoring.TrackProfile.gameplayDefault(),
+                        new Vec3(
+                                Player.initialPositionX(),
+                                Player.initialPositionY() - 3f,
+                                Player.initialPositionZ()),
+                        0L,
+                        catalog);
         TerrainOutput terrainOutput = terrain;
         int nextRandomLevelIndex = 0;
         terrain.enqueueIntroSegments();
@@ -79,7 +88,7 @@ public final class PreparedGameplaySession implements GPUResourceOwner {
         return player;
     }
 
-    public StreamingTerrainGenerator getTerrainGenerator() {
+    public GameplayTerrainStream getTerrainGenerator() {
         return terrain;
     }
 
@@ -108,7 +117,7 @@ public final class PreparedGameplaySession implements GPUResourceOwner {
 
     public void generateTerrainChunks(int chunkBudget) {
         if (terrain != null) {
-            terrain.generateChunks(chunkBudget);
+            terrain.generate(TERRAIN_PREPARATION_COMMAND_BUDGET, chunkBudget);
         }
     }
 

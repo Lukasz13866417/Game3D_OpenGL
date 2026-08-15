@@ -2,6 +2,7 @@ package com.example.game3d.core.terrain;
 
 import com.example.game3d.core.math.Aabb;
 import com.example.game3d.core.math.Vec3;
+import com.example.game3d.core.terrain.addon.Addon;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,15 +25,15 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
     private final TerrainState state;
     private final HashMap<Long, TerrainTriangle> trianglesById =
             new HashMap<Long, TerrainTriangle>();
-    private final HashMap<Long, TerrainFeature> featuresById =
-            new HashMap<Long, TerrainFeature>();
+    private final HashMap<Long, Addon> addonsById =
+            new HashMap<Long, Addon>();
     private final HashMap<Long, ArrayList<TerrainTriangle>> triangleGrid =
             new HashMap<Long, ArrayList<TerrainTriangle>>();
-    private final HashMap<Long, ArrayList<TerrainFeature>> featureGrid =
-            new HashMap<Long, ArrayList<TerrainFeature>>();
+    private final HashMap<Long, ArrayList<Addon>> addonGrid =
+            new HashMap<Long, ArrayList<Addon>>();
     private final HashMap<Long, long[]> triangleCells =
             new HashMap<Long, long[]>();
-    private final HashMap<Long, long[]> featureCells =
+    private final HashMap<Long, long[]> addonCells =
             new HashMap<Long, long[]>();
     private final HashMap<Long, EdgeKey[]> triangleEdges =
             new HashMap<Long, EdgeKey[]>();
@@ -123,8 +124,8 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
         return triangle == null ? Long.MIN_VALUE : triangle.collisionFingerprint();
     }
 
-    public boolean containsFeature(long featureId) {
-        return featuresById.containsKey(featureId);
+    public boolean containsAddon(long addonId) {
+        return addonsById.containsKey(addonId);
     }
 
     @Override
@@ -188,7 +189,7 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
     }
 
     @Override
-    public void queryFeatures(Aabb bounds, List<TerrainFeature> destination) {
+    public void queryAddons(Aabb bounds, List<Addon> destination) {
         destination.clear();
         int minCellX = cell(bounds.min.x);
         int maxCellX = cell(bounds.max.x);
@@ -196,16 +197,16 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
         int maxCellZ = cell(bounds.max.z);
         for (int cellX = minCellX; cellX <= maxCellX; cellX++) {
             for (int cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
-                List<TerrainFeature> bucket = featureGrid.get(key(cellX, cellZ));
+                List<Addon> bucket = addonGrid.get(key(cellX, cellZ));
                 if (bucket == null) {
                     continue;
                 }
                 for (int i = 0; i < bucket.size(); i++) {
-                    TerrainFeature feature = bucket.get(i);
-                    if (feature.bounds.intersects(bounds)) {
-                        int index = findFeature(destination, feature.id);
+                    Addon addon = bucket.get(i);
+                    if (addon.broadPhaseBounds().intersects(bounds)) {
+                        int index = findAddon(destination, addon.id());
                         if (index < 0) {
-                            destination.add(-index - 1, feature);
+                            destination.add(-index - 1, addon);
                         }
                     }
                 }
@@ -222,34 +223,17 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
             triangles.add(triangle);
             triangleCellLists.add(cellsFor(triangle.bounds));
         }
-        ArrayList<TerrainFeature> features = new ArrayList<TerrainFeature>();
-        ArrayList<long[]> featureCellLists = new ArrayList<long[]>();
-        for (TerrainFeatureSpec spec : segment.features) {
-            TerrainFeature feature = toCollisionFeature(spec);
-            if (feature != null) {
-                features.add(feature);
-                featureCellLists.add(cellsFor(feature.bounds));
+        ArrayList<Addon> addons = new ArrayList<Addon>();
+        ArrayList<long[]> addonCellLists = new ArrayList<long[]>();
+        for (Addon addon : segment.addons) {
+            if (addon.contactPhase() == Addon.ContactPhase.NONE) {
+                continue;
             }
+            addons.add(addon);
+            addonCellLists.add(cellsFor(addon.broadPhaseBounds()));
         }
         return new PreparedSegment(
-                segment, triangles, triangleCellLists, features, featureCellLists);
-    }
-
-    private static TerrainFeature toCollisionFeature(TerrainFeatureSpec spec) {
-        if (spec instanceof TerrainFeatureSpec.Spike) {
-            TerrainFeatureSpec.Spike spike = (TerrainFeatureSpec.Spike) spec;
-            return new TerrainFeature.Spike(
-                    spike.id, spike.ownerSegmentId, spike.collisionBaseCenter,
-                    spike.collisionRadius, spike.collisionHeight);
-        }
-        if (spec instanceof TerrainFeatureSpec.AirJumpCollectible) {
-            TerrainFeatureSpec.AirJumpCollectible collectible =
-                    (TerrainFeatureSpec.AirJumpCollectible) spec;
-            return new TerrainFeature.Feather(
-                    collectible.id, collectible.ownerSegmentId,
-                    collectible.center, collectible.triggerRadius);
-        }
-        return null;
+                segment, triangles, triangleCellLists, addons, addonCellLists);
     }
 
     private void addPrepared(PreparedSegment prepared) {
@@ -274,14 +258,14 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
             collisionBoundaryMasks.put(triangle.id, 0b111);
             sharedEdgeNeighbors.put(triangle.id, new HashSet<Long>());
         }
-        for (int i = 0; i < prepared.features.size(); i++) {
-            TerrainFeature feature = prepared.features.get(i);
-            if (featuresById.put(feature.id, feature) != null) {
-                throw new IllegalStateException("Duplicate collision feature id " + feature.id);
+        for (int i = 0; i < prepared.addons.size(); i++) {
+            Addon addon = prepared.addons.get(i);
+            if (addonsById.put(addon.id(), addon) != null) {
+                throw new IllegalStateException("Duplicate collision addon id " + addon.id());
             }
-            long[] cells = prepared.featureCells.get(i);
-            featureCells.put(feature.id, cells);
-            addFeatureToGrid(feature, cells);
+            long[] cells = prepared.addonCells.get(i);
+            addonCells.put(addon.id(), cells);
+            addAddonToGrid(addon, cells);
         }
     }
 
@@ -290,8 +274,8 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
             removeTriangle(segment.id * 2L);
             removeTriangle(segment.id * 2L + 1L);
         }
-        for (TerrainFeatureSpec feature : segment.features) {
-            removeFeature(feature.id);
+        for (Addon addon : segment.addons) {
+            removeAddon(addon.id());
         }
     }
 
@@ -332,18 +316,18 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
         collisionBoundaryMasks.remove(triangleId);
     }
 
-    private void removeFeature(long featureId) {
-        TerrainFeature feature = featuresById.remove(featureId);
-        if (feature == null) {
+    private void removeAddon(long addonId) {
+        Addon addon = addonsById.remove(addonId);
+        if (addon == null) {
             return;
         }
-        long[] cells = featureCells.remove(featureId);
+        long[] cells = addonCells.remove(addonId);
         if (cells != null) {
             for (long cellKey : cells) {
-                ArrayList<TerrainFeature> bucket = featureGrid.get(cellKey);
-                removeFeatureById(bucket, featureId);
+                ArrayList<Addon> bucket = addonGrid.get(cellKey);
+                removeAddonById(bucket, addonId);
                 if (bucket != null && bucket.isEmpty()) {
-                    featureGrid.remove(cellKey);
+                    addonGrid.remove(cellKey);
                 }
             }
         }
@@ -491,15 +475,15 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
         }
     }
 
-    private void addFeatureToGrid(TerrainFeature feature, long[] cells) {
+    private void addAddonToGrid(Addon addon, long[] cells) {
         for (long cellKey : cells) {
-            ArrayList<TerrainFeature> bucket = featureGrid.get(cellKey);
+            ArrayList<Addon> bucket = addonGrid.get(cellKey);
             if (bucket == null) {
-                bucket = new ArrayList<TerrainFeature>();
-                featureGrid.put(cellKey, bucket);
+                bucket = new ArrayList<Addon>();
+                addonGrid.put(cellKey, bucket);
             }
-            int position = findFeature(bucket, feature.id);
-            bucket.add(position < 0 ? -position - 1 : position, feature);
+            int position = findAddon(bucket, addon.id());
+            bucket.add(position < 0 ? -position - 1 : position, addon);
         }
     }
 
@@ -565,12 +549,12 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
         }
     }
 
-    private static void removeFeatureById(
-            List<TerrainFeature> values, long featureId) {
+    private static void removeAddonById(
+            List<Addon> values, long addonId) {
         if (values == null) {
             return;
         }
-        int position = findFeature(values, featureId);
+        int position = findAddon(values, addonId);
         if (position >= 0) {
             values.remove(position);
         }
@@ -593,12 +577,12 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
         return -low - 1;
     }
 
-    private static int findFeature(List<TerrainFeature> sorted, long id) {
+    private static int findAddon(List<Addon> sorted, long id) {
         int low = 0;
         int high = sorted.size() - 1;
         while (low <= high) {
             int middle = (low + high) >>> 1;
-            long middleId = sorted.get(middle).id;
+            long middleId = sorted.get(middle).id();
             if (middleId < id) {
                 low = middle + 1;
             } else if (middleId > id) {
@@ -631,20 +615,20 @@ public final class TerrainCollisionIndex implements CollisionTerrain {
         final TerrainSegment segment;
         final List<TerrainTriangle> triangles;
         final List<long[]> triangleCells;
-        final List<TerrainFeature> features;
-        final List<long[]> featureCells;
+        final List<Addon> addons;
+        final List<long[]> addonCells;
 
         PreparedSegment(
                 TerrainSegment segment,
                 List<TerrainTriangle> triangles,
                 List<long[]> triangleCells,
-                List<TerrainFeature> features,
-                List<long[]> featureCells) {
+                List<Addon> addons,
+                List<long[]> addonCells) {
             this.segment = segment;
             this.triangles = triangles;
             this.triangleCells = triangleCells;
-            this.features = features;
-            this.featureCells = featureCells;
+            this.addons = addons;
+            this.addonCells = addonCells;
         }
     }
 

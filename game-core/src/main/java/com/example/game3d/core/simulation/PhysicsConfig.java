@@ -8,6 +8,10 @@ public strictfp final class PhysicsConfig {
     public static final long FIXED_DT_NANOS = 1_000_000_000L / FIXED_HZ;
     /** Minimum time after one jump before another jump may execute. */
     public static final long DEFAULT_JUMP_COOLDOWN_NANOS = 100_000_000L;
+    /** Time after accepted upward input before held jump charge begins to fade. */
+    public static final long DEFAULT_HELD_GESTURE_CHARGE_GRACE_NANOS = 100_000_000L;
+    /** Time for a full held jump-charge bar to decay after the grace period. */
+    public static final long DEFAULT_HELD_GESTURE_CHARGE_DECAY_NANOS = 400_000_000L;
     public static final double DEFAULT_GRAVITY = 70.0;
     public static final double DEFAULT_JUMP_HEIGHT_MULTIPLIER = 1.15;
     public static final double DEFAULT_BOUNCE_HEIGHT_MULTIPLIER = 1.33;
@@ -30,9 +34,9 @@ public strictfp final class PhysicsConfig {
             0.120 * 1.05 * 0.5;
     /** Gesture-charge units gained per upward swipe of one screen height. */
     public static final double DEFAULT_SWIPE_CHARGE_PER_SCREEN_HEIGHT = 6.5;
-    /** Maximum physical sideways excursion of one jump-charge gesture phase. */
+    /** Legacy whole-path X cap retained for configuration compatibility; no longer applied. */
     public static final double DEFAULT_MAX_JUMP_CHARGE_X_SCREEN_HEIGHTS = 0.06;
-    /** Maximum physical horizontal excursion per unit of upward travel. */
+    /** Maximum raw horizontal movement per unit of raw upward movement in one packet. */
     public static final double DEFAULT_MAX_JUMP_CHARGE_X_TO_Y_RATIO = 1.20;
     /**
      * Minimum normalized gesture charge that makes a jump eligible.
@@ -69,13 +73,15 @@ public strictfp final class PhysicsConfig {
     public final double swipeCancelPerScreenHeight;
     /** Per-packet vertical dominance retained for downward impact-brake intent. */
     public final double swipeVerticalDominance;
-    /** Absolute physical horizontal-excursion limit for charging a jump. */
+    /** Legacy whole-path X cap retained for configuration compatibility; no longer applied. */
     public final double maxJumpChargeXScreenHeights;
-    /** Physical horizontal-excursion/upward-travel limit for charging a jump. */
+    /** Per-packet raw horizontal/upward movement ratio for charging a jump. */
     public final double maxJumpChargeXToYRatio;
     /** Eligibility milestone in the normalized {@code [0, 1]} gesture-charge domain. */
     public final double jumpChargeThreshold;
     public final double facingRadiansPerScreenHeight;
+    public final long heldGestureChargeGraceNanos;
+    public final long heldGestureChargeDecayNanos;
     public final long airborneChargeFreezeNanos;
     public final long airborneChargeDecayNanos;
     public final long jumpCooldownNanos;
@@ -214,6 +220,10 @@ public strictfp final class PhysicsConfig {
                 "jumpChargeThreshold");
         this.facingRadiansPerScreenHeight =
                 positive(facingRadiansPerScreenHeight, "facingRadiansPerScreenHeight");
+        this.heldGestureChargeGraceNanos =
+                DEFAULT_HELD_GESTURE_CHARGE_GRACE_NANOS;
+        this.heldGestureChargeDecayNanos =
+                DEFAULT_HELD_GESTURE_CHARGE_DECAY_NANOS;
         if (airborneChargeFreezeNanos < 0L || airborneChargeDecayNanos <= 0L) {
             throw new IllegalArgumentException("Charge timing must be valid");
         }

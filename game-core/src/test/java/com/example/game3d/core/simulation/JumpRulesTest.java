@@ -133,6 +133,40 @@ public class JumpRulesTest {
     }
 
     @Test
+    public void heldLandingArmExpiresWhenHeldChargeDecaysBelowThreshold() {
+        SimulationEngine engine = new SimulationEngine(flatTerrain(), config,
+                new Vec3(0.0, 0.95, 1.0), new Vec3(0.0, -1.0, 0.0),
+                0, StepObserver.NONE);
+        double initialCharge = config.jumpChargeThreshold + 0.02;
+        double upwardSwipe = -initialCharge / config.swipeChargePerScreenHeight;
+        StepResult armed = engine.step(input(
+                PlayerInputEvent.down(0L, 1),
+                PlayerInputEvent.swipe(0L, 2, 0.0, upwardSwipe)));
+
+        assertTrue(armed.snapshot.landingJumpArmed);
+        assertFalse(hasEvent(armed, SimulationEvent.Type.JUMP));
+
+        boolean expired = false;
+        StepResult landed = null;
+        for (int i = 0; i < 60; i++) {
+            StepResult result = engine.step(FixedStepInput.EMPTY);
+            if (result.snapshot.gestureCharge < config.jumpChargeThreshold) {
+                expired = true;
+                assertFalse(result.snapshot.landingJumpArmed);
+            }
+            assertFalse(hasEvent(result, SimulationEvent.Type.JUMP));
+            if (hasEvent(result, SimulationEvent.Type.LAND)) {
+                landed = result;
+                break;
+            }
+        }
+
+        assertTrue("held charge did not expire before contact", expired);
+        assertNotNull("fixture never reached resting support", landed);
+        assertTrue(landed.snapshot.grounded);
+    }
+
+    @Test
     public void airborneReleaseWithoutChargeAndSafeLandingClearsImmediately() {
         SimulationEngine engine = new SimulationEngine(
                 new TerrainWorld(Collections.emptyList()), config,

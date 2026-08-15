@@ -80,12 +80,13 @@ public class AndroidSimulationControllerTest {
     }
 
     @Test
-    public void rawAbsoluteHorizontalLimitRejectsOtherwiseVerticalScaledInput() {
+    public void legacyAbsoluteHorizontalLimitDoesNotRejectVerticalEnoughInput() {
         AndroidSimulationController controller = controller(1000);
 
         enqueueRawSwipe(controller, 0f, -100f, 61f, -100f);
 
-        assertEquals(0.0, controller.currentSnapshot().gestureCharge, 0.0);
+        assertTrue(controller.currentSnapshot().gestureCharge
+                >= new PhysicsConfig().jumpChargeThreshold);
     }
 
     @Test

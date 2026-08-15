@@ -141,6 +141,14 @@ public abstract class ShaderPair<VS extends ShaderArgValues, FS extends ShaderAr
 
     @Override
     public void cleanupGPUResourcesRecursively() {
-        // Programs are managed by GL; nothing to cleanup explicitly here
+        // Compatibility shaders may still be shared by multiple owners. Context-owned shader
+        // types override this method and call deleteOwnedProgram().
+    }
+
+    protected final void deleteOwnedProgram() {
+        if (programHandle != 0 && GLES20.glIsProgram(programHandle)) {
+            GLES20.glDeleteProgram(programHandle);
+        }
+        programHandle = 0;
     }
 }

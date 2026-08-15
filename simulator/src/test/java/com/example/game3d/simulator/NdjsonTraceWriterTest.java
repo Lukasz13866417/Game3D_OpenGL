@@ -34,7 +34,7 @@ public class NdjsonTraceWriterTest {
         assertEquals(first.contents, second.contents);
         assertEquals(61, first.lines.length);
         String header = first.lines[0];
-        assertTrue(header.startsWith("{\"type\":\"header\",\"schema\":9,"));
+        assertTrue(header.startsWith("{\"type\":\"header\",\"schema\":10,"));
         assertTrue(header.endsWith("}"));
         assertTrue(header.contains("\"scenario\":\"feather_collection\""));
         assertTrue(header.contains("\"fixedHz\":120"));
@@ -43,8 +43,9 @@ public class NdjsonTraceWriterTest {
                 + PhysicsConfig.FIXED_HZ / 6));
         assertTrue(header.contains("\"landingBufferMillis\":166.666660000"));
         assertTrue(header.contains("\"jumpCooldownMillis\":100.000000000"));
-        assertTrue(header.contains("\"maxJumpChargeXScreenHeights\":0.060000000"));
         assertTrue(header.contains("\"maxJumpChargeXToYRatio\":1.200000000"));
+        assertTrue(header.contains("\"heldGestureChargeGraceMillis\":100.000000000"));
+        assertTrue(header.contains("\"heldGestureChargeDecayMillis\":400.000000000"));
         assertTrue(header.contains("\"cylinderRadius\":"));
         assertTrue(header.contains("\"spinConvention\":\"right-hand"));
         assertTrue(header.contains("\"triangleCount\":4"));
@@ -78,6 +79,7 @@ public class NdjsonTraceWriterTest {
             assertTrue(tick.contains("\"gestureChargePotential\":"));
             assertTrue(tick.contains("\"gestureMaxAbsRawDeltaX\":"));
             assertTrue(tick.contains("\"jumpChargePathEligible\":"));
+            assertTrue(tick.contains("\"lastSwipeChargeEligible\":"));
             assertFalse(tick.contains("\"queriedTriangles\":"));
             assertFalse(tick.contains("\"contacts\":"));
             assertFalse(tick.contains("\"cylinder\":"));
@@ -99,7 +101,7 @@ public class NdjsonTraceWriterTest {
     }
 
     @Test
-    public void schemaNineInputsRetainRawPhysicalGestureDeltas() {
+    public void schemaTenInputsRetainRawPhysicalGestureDeltas() {
         TraceCapture trace = capture(
                 new ScenarioRegistry().require("ground_jump"),
                 TraceLevel.SUMMARY,

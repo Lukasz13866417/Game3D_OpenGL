@@ -5,6 +5,7 @@ import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3;
 import android.opengl.GLES20;
 
 import com.example.game3d_opengl.game.LightSource;
+import com.example.game3d_opengl.game.terrain.presentation.TerrainRibbonShaderPair;
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.infill.InfillShaderArgs;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -211,6 +212,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
 
     // ---- GPU resources -------------------------------------------------------
     private int vboId = 0;
+    private TerrainRibbonShaderPair shader;
     private FloatBuffer vertexBuffer = null;
     private int vertexCapacity = 0; // in vertices, not floats
     private final int[] drawFirst;
@@ -409,7 +411,7 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
         );
 
         // Bind shader and attributes
-        TerrainRibbonShaderPair shader = TerrainRibbonShaderPair.sharedShader;
+        TerrainRibbonShaderPair shader = terrainShader();
         shader.setAsCurrentProgram();
         shader.enableAndPointVertexAttribs();
 
@@ -464,17 +466,29 @@ public class TerrainLandscapeRenderer implements GPUResourceOwner {
             GLES20.glDeleteBuffers(1, ids, 0);
             vboId = 0;
         }
+        if (shader != null) {
+            shader.cleanupGPUResourcesRecursively();
+        }
     }
 
     @Override
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
-        // Recreate program and VBO
-        TerrainRibbonShaderPair.sharedShader.reloadProgram();
+        // Recreate this quarantined renderer's program and VBO.
+        if (shader != null) {
+            shader.reloadGPUResourcesRecursivelyOnContextLoss();
+        }
         if (vboId == 0 && vertexCapacity > 0) {
             int[] ids = new int[1];
             GLES20.glGenBuffers(1, ids, 0);
             vboId = ids[0];
         }
+    }
+
+    private TerrainRibbonShaderPair terrainShader() {
+        if (shader == null) {
+            shader = TerrainRibbonShaderPair.createDefault();
+        }
+        return shader;
     }
 
     // ---- Helpers -------------------------------------------------------------

@@ -22,18 +22,11 @@ import com.example.game3d_opengl.game.util.AndroidGameClock;
 import com.example.game3d_opengl.game.stage.stages.main.AssetLoadingStage;
 import com.example.game3d_opengl.game.stage.stages.main.GameplayStage;
 import com.example.game3d_opengl.game.stage.stages.main.PreparedGameplaySession;
-import com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers;
-import com.example.game3d_opengl.game.terrain.track_elements.portal.CanonicalPortalVisual;
+import com.example.game3d_opengl.game.terrain.presentation.TerrainRendererRegistry;
 import com.example.game3d_opengl.game.stage.stages.main.LoadingStage;
 import com.example.game3d_opengl.game.stage.stages.main.MenuStage;
 import com.example.game3d_opengl.game.stage.stages.main.SettingsStage;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
-import com.example.game3d_opengl.game.stage.stages.test.AddonPlacementTestStage;
-import com.example.game3d_opengl.game.stage.stages.test.TestGridRowsStage;
-import com.example.game3d_opengl.game.stage.stages.test.TestGridRowsStageWithAddons;
-import com.example.game3d_opengl.game.stage.stages.test.TestTerrainStage;
-import com.example.game3d_opengl.game.stage.stages.test.TestTerrainStageSimulated;
-import com.example.game3d_opengl.game.stage.stages.test.TestTileManagerStage;
 import com.example.game3d_opengl.game.util.GameVersion;
 import com.example.game3d_opengl.rendering.ScreenInfo;
 
@@ -74,6 +67,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private long pacingMaxVsyncAgeNanos;
     private long pacingMaxSequenceGap;
     private final StageManager stageManager;
+    private final TerrainRendererRegistry terrainRendererRegistry;
     // Stage transition requested by UI thread, applied next frame on GL thread
     private volatile PendingStageTransition pendingTransition = null;
     private final ArrayDeque<Stage> stageStack = new ArrayDeque<>();
@@ -131,6 +125,10 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             requestTransition(PendingStageTransition.Type.POP, null);
         }
 
+        public TerrainRendererRegistry terrainRendererRegistry() {
+            return terrainRendererRegistry;
+        }
+
         private void requestTransition(PendingStageTransition.Type type, Stage stage) {
             pendingTransition = new PendingStageTransition(type, stage);
         }
@@ -140,20 +138,15 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         this.androidContext = androidContext;
         GameVersion.initialize(androidContext);
         GameSettingsPersistence.initialize(androidContext);
+        this.terrainRendererRegistry = new TerrainRendererRegistry();
         this.stageManager = new StageManager();
         this.menuStage = new MenuStage(stageManager);
         this.assetLoadingStage = new AssetLoadingStage(stageManager);
         this.settingsStage = new SettingsStage(stageManager);
-        Stage initialStage = //new TestTerrainStageSimulated(stageManager);
-                             //new TestTerrainStage(stageManager);
-                             //new TestTileManagerStage(stageManager);
-                             //new TestGridRowsStage(stageManager);
-                             //new TestGridRowsStageWithAddons(stageManager);
-                             //new AddonPlacementTestStage(stageManager);
-                             //new GameplayStage(stageManager, PreparedGameplaySession.createInitialSession());
-                             menuStage;
-                             //new TestWireframeStage(stageManager);
-                             //new IconTestStage(stageManager);
+        // Legacy terrain diagnostics remain quarantined under stages.test. Keeping the production
+        // renderer free of references to them prevents an accidental return to the mutable terrain
+        // pipeline; a diagnostic can still be selected in a dedicated debug entry point.
+        Stage initialStage = menuStage;
         stageStack.push(initialStage);
     }
 
@@ -172,8 +165,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         lastDrawStartNanos = -1L;
         lastCallbackCpuNanos = 0L;
         PlayerAssets.markLoadedGPUResourcesDirty();
-        GameplayElementBatchRenderers.markDefaultGpuResourcesDirty();
-        CanonicalPortalVisual.markSharedGpuAssetsDirty();
+        terrainRendererRegistry.reloadGPUResourcesRecursivelyOnContextLoss();
         for (Stage stage : stageStack) {
             if (stage != null && stage.isInitialized()) {
                 stage.reloadGPUResourcesRecursivelyOnContextLoss();

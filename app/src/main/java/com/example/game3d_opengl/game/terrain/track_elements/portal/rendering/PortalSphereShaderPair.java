@@ -10,9 +10,7 @@ public final class PortalSphereShaderPair
         <L extends VertexLayout.HasPosition & VertexLayout.HasNormals & VertexLayout.HasFaceGroups>
         extends MeshShaderPair<PortalSphereShaderArgs.VS, PortalSphereShaderArgs.FS, L> {
 
-    private static PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout> sharedShader = null;
-
-    private int uVP, uCenter, uRadius, uRotation;
+    private int uVP, uCenter, uScale, uRotation;
     private int uColorA, uColorB;
     private int uLightPos, uLightColor, uCameraPos;
     private int uAmbient, uDiffuse, uSpecular, uShininess;
@@ -22,19 +20,13 @@ public final class PortalSphereShaderPair
         super(programHandle, vs, fs);
     }
 
-    public static PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout> getSharedShader() {
-        if (sharedShader == null) {
-            sharedShader = createDefault();
-        }
-        return sharedShader;
-    }
-
-    private static PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout> createDefault() {
+    /** Creates a shader program for the caller's current GL context. */
+    public static PortalSphereShaderPair<VertexLayout.PositionNormalFaceGroupLayout> createContextShader() {
         String vs =
                 "#version 300 es\n" +
                 "uniform mat4 uVPMatrix;\n" +
                 "uniform vec3 uCenter;\n" +
-                "uniform float uRadius;\n" +
+                "uniform vec3 uScale;\n" +
                 "uniform mat3 uRotation;\n" +
                 "in vec3 aPosition;\n" +
                 "in vec3 aNormal;\n" +
@@ -43,9 +35,9 @@ public final class PortalSphereShaderPair
                 "out vec3 vWorldNormal;\n" +
                 "out float vFaceGroup;\n" +
                 "void main(){\n" +
-                "  vec3 rotated = uRotation * aPosition;\n" +
-                "  vWorldPos = uCenter + rotated * uRadius;\n" +
-                "  vWorldNormal = normalize(uRotation * aNormal);\n" +
+                "  vec3 rotated = uRotation * (aPosition * uScale);\n" +
+                "  vWorldPos = uCenter + rotated;\n" +
+                "  vWorldNormal = normalize(uRotation * (aNormal / uScale));\n" +
                 "  vFaceGroup = aFaceGroup;\n" +
                 "  gl_Position = uVPMatrix * vec4(vWorldPos, 1.0);\n" +
                 "}";
@@ -102,7 +94,7 @@ public final class PortalSphereShaderPair
         int p = getProgramHandle();
         uVP = GLES20.glGetUniformLocation(p, "uVPMatrix");
         uCenter = GLES20.glGetUniformLocation(p, "uCenter");
-        uRadius = GLES20.glGetUniformLocation(p, "uRadius");
+        uScale = GLES20.glGetUniformLocation(p, "uScale");
         uRotation = GLES20.glGetUniformLocation(p, "uRotation");
         uColorA = GLES20.glGetUniformLocation(p, "uColorA");
         uColorB = GLES20.glGetUniformLocation(p, "uColorB");
@@ -123,7 +115,7 @@ public final class PortalSphereShaderPair
                                             PortalSphereShaderArgs.FS f) {
         GLES20.glUniformMatrix4fv(uVP, 1, false, v.vp, 0);
         GLES20.glUniform3f(uCenter, v.centerX, v.centerY, v.centerZ);
-        GLES20.glUniform1f(uRadius, v.radius);
+        GLES20.glUniform3f(uScale, v.scaleX, v.scaleY, v.scaleZ);
         GLES20.glUniformMatrix3fv(uRotation, 1, false, v.rotation, 0);
 
         GLES20.glUniform4fv(uColorA, 1, f.colorA.rgba, 0);
@@ -135,6 +127,11 @@ public final class PortalSphereShaderPair
         GLES20.glUniform1f(uDiffuse, f.diffuse);
         GLES20.glUniform1f(uSpecular, f.specular);
         GLES20.glUniform1f(uShininess, f.shininess);
+    }
+
+    @Override
+    public void cleanupGPUResourcesRecursively() {
+        deleteOwnedProgram();
     }
 
     public static final class Builder

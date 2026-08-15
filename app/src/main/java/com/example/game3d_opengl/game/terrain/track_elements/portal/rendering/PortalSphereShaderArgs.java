@@ -7,7 +7,7 @@ public final class PortalSphereShaderArgs {
     public static final class VS extends ShaderArgValues {
         public float[] vp;
         public float centerX, centerY, centerZ;
-        public float radius;
+        public float scaleX, scaleY, scaleZ;
         public float[] rotation; // 9-element column-major mat3
     }
 

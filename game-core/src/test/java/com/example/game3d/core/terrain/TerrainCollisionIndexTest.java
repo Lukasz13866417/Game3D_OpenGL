@@ -2,6 +2,10 @@ package com.example.game3d.core.terrain;
 
 import com.example.game3d.core.math.Aabb;
 import com.example.game3d.core.math.Vec3;
+import com.example.game3d.core.terrain.addon.Addon;
+import com.example.game3d.core.terrain.addon.AddonFootprint;
+import com.example.game3d.core.terrain.addon.DeathSpike;
+import com.example.game3d.core.terrain.addon.Potion;
 
 import org.junit.Test;
 
@@ -147,7 +151,7 @@ public class TerrainCollisionIndexTest {
     }
 
     @Test
-    public void bootstrapPreservesRetiredFeatureIdHighWatermark() {
+    public void bootstrapPreservesRetiredAddonIdHighWatermark() {
         TerrainSegment original = withCollectible(
                 segment(0L, 0.0, 4.0, SurfaceProperties.NORMAL), 10L);
         TerrainCollisionIndex first = new TerrainCollisionIndex(
@@ -158,7 +162,7 @@ public class TerrainCollisionIndexTest {
                 Collections.<TerrainSegment>emptyList()));
         TerrainSnapshot midRunBootstrap = first.snapshot();
 
-        assertEquals(10L, midRunBootstrap.featureIdHighWatermark);
+        assertEquals(10L, midRunBootstrap.addonIdHighWatermark);
         TerrainCollisionIndex restored =
                 new TerrainCollisionIndex(midRunBootstrap);
         TerrainSegment illegalReuse = withCollectible(
@@ -172,6 +176,46 @@ public class TerrainCollisionIndexTest {
             return;
         }
         throw new AssertionError("Expected retired feature ID reuse rejection");
+    }
+
+    @Test
+    public void existingAddonIdCannotMoveToAnotherOwner() {
+        TerrainSegment original = withCollectible(
+                segment(0L, 0.0, 4.0, SurfaceProperties.NORMAL), 1L);
+        TerrainCollisionIndex index = new TerrainCollisionIndex(
+                new TerrainSnapshot(0L, 0L, 0L, Collections.singletonList(original)));
+        TerrainSegment emptied = segment(0L, 0.0, 4.0, SurfaceProperties.NORMAL);
+        TerrainSegment relocated = withCollectible(
+                segment(1L, 4.0, 8.0, SurfaceProperties.NORMAL), 1L);
+
+        try {
+            index.apply(new TerrainCommit(
+                    0L, 1L, 1L, 0L, Arrays.asList(emptied, relocated)));
+        } catch (IllegalArgumentException expected) {
+            assertEquals(0L, index.revision());
+            assertEquals(0L, index.snapshot().committedThroughSegmentId);
+            return;
+        }
+        throw new AssertionError("Expected addon relocation rejection");
+    }
+
+    @Test
+    public void existingAddonIdCannotChangeKind() {
+        TerrainSegment original = withCollectible(
+                segment(0L, 0.0, 4.0, SurfaceProperties.NORMAL), 1L);
+        TerrainCollisionIndex index = new TerrainCollisionIndex(
+                new TerrainSnapshot(0L, 0L, 0L, Collections.singletonList(original)));
+        TerrainSegment replacement = withSpike(
+                segment(0L, 0.0, 4.0, SurfaceProperties.NORMAL), 1L);
+
+        try {
+            index.apply(new TerrainCommit(
+                    0L, 1L, 0L, 0L, Collections.singletonList(replacement)));
+        } catch (IllegalArgumentException expected) {
+            assertEquals(0L, index.revision());
+            return;
+        }
+        throw new AssertionError("Expected addon kind replacement rejection");
     }
 
     private static TerrainSegment segment(
@@ -194,18 +238,15 @@ public class TerrainCollisionIndexTest {
                 TerrainVertexAppearance.DEFAULT,
                 TerrainVertexAppearance.DEFAULT,
                 TerrainVertexAppearance.DEFAULT,
-                Collections.<TerrainFeatureSpec>emptyList());
+                Collections.<Addon>emptyList());
     }
 
     private static TerrainSegment withCollectible(
-            TerrainSegment segment, long featureId) {
-        TerrainFeatureSpec feature =
-                new TerrainFeatureSpec.AirJumpCollectible(
-                        featureId,
-                        segment.id,
-                        segment.nearLeft.add(new Vec3(1.0, 0.25, -1.0)),
-                        0.25,
-                        "TEST");
+            TerrainSegment segment, long addonId) {
+        Vec3 center = segment.nearLeft.add(new Vec3(1.0, 0.25, -1.0));
+        Potion addon = new Potion(center, 0.25, "TEST");
+        addon.place(addonId, segment.id,
+                AddonFootprint.around(center, 0.25, 0.25, 0.25));
         return new TerrainSegment(
                 segment.id,
                 segment.nearLeft,
@@ -219,6 +260,35 @@ public class TerrainCollisionIndexTest {
                 segment.nearRightAppearance,
                 segment.farLeftAppearance,
                 segment.farRightAppearance,
-                Collections.singletonList(feature));
+                Collections.<Addon>singletonList(addon));
+    }
+
+    private static TerrainSegment withSpike(
+            TerrainSegment segment, long addonId) {
+        Vec3 center = segment.nearLeft.add(new Vec3(1.0, 0.0, -1.0));
+        Vec3 nearLeft = center.add(new Vec3(-0.2, 0.0, 0.2));
+        Vec3 nearRight = center.add(new Vec3(0.2, 0.0, 0.2));
+        Vec3 farLeft = center.add(new Vec3(-0.2, 0.0, -0.2));
+        Vec3 farRight = center.add(new Vec3(0.2, 0.0, -0.2));
+        DeathSpike addon = new DeathSpike(
+                nearLeft, nearRight, farLeft, farRight,
+                center.add(new Vec3(0.0, 0.8, 0.0)), Vec3.UP, 0.0,
+                center, 0.2, 0.8);
+        addon.place(addonId, segment.id,
+                AddonFootprint.quadrilateral(nearLeft, nearRight, farLeft, farRight));
+        return new TerrainSegment(
+                segment.id,
+                segment.nearLeft,
+                segment.nearRight,
+                segment.farLeft,
+                segment.farRight,
+                segment.solid,
+                segment.connectedToPrevious,
+                segment.surface,
+                segment.nearLeftAppearance,
+                segment.nearRightAppearance,
+                segment.farLeftAppearance,
+                segment.farRightAppearance,
+                Collections.<Addon>singletonList(addon));
     }
 }

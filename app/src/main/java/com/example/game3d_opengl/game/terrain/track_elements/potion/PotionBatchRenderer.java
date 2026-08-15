@@ -29,7 +29,10 @@ public final class PotionBatchRenderer implements GPUResourceOwner {
         public void encode(PotionBatchInstance potion, FloatBuffer target) {
             potion.writePotionModelMatrix(modelScratch);
             target.put(modelScratch);
-            FColor c = Potion.POTION_FILL_COLOR;
+            FColor c = potion.potionFillColor();
+            if (c == null) {
+                c = PotionRenderResources.FILL_COLOR;
+            }
             target.put(c.r()).put(c.g()).put(c.b()).put(c.a());
         }
     }
@@ -55,12 +58,6 @@ public final class PotionBatchRenderer implements GPUResourceOwner {
         lastBatchInstanceCount = 0;
     }
 
-    public void add(Potion potion) {
-        if (potion != null) {
-            visiblePotions.add(potion);
-        }
-    }
-
     public void add(PotionBatchInstance potion) {
         if (potion != null) {
             visiblePotions.add(potion);
@@ -78,7 +75,7 @@ public final class PotionBatchRenderer implements GPUResourceOwner {
         visiblePotions.clear();
     }
 
-    public void drawSingle(float[] vpMatrix, Potion potion) {
+    public void drawSingle(float[] vpMatrix, PotionBatchInstance potion) {
         if (potion == null) {
             return;
         }

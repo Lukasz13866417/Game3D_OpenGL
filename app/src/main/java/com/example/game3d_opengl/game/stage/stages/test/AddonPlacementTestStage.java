@@ -89,8 +89,8 @@ public class AddonPlacementTestStage extends Stage {
     @Override
     protected void initScene(Context context, int screenWidth, int screenHeight) {
         this.camera = new Camera();
-        com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers
-                .ensureDefaultLoaded(context.getAssets());
+        com.example.game3d_opengl.game.terrain.terrain_api.main.LegacyGameplayElementRenderers
+                .ensureLoaded(context.getAssets());
         // initial camera setup (no rotation); roll will be applied via VP matrix during draw
         camera.set(
                 camX, camY, camZ,

@@ -8,10 +8,19 @@ package com.example.game3d.core.terrain;
  */
 public final class SurfaceProperties {
     public enum Kind {
-        NORMAL,
-        BOOST_RAMP,
-        BOOST_RAMP_LAUNCH,
-        LEGACY_BOOST
+        NORMAL(0, "NORMAL"),
+        BOOST_RAMP(1, "BOOST_RAMP"),
+        BOOST_RAMP_LAUNCH(2, "BOOST_RAMP_LAUNCH"),
+        LEGACY_BOOST(3, "LEGACY_BOOST");
+
+        /** Stable persisted/digest identity; declaration order is deliberately irrelevant. */
+        public final int stableCode;
+        public final String jsonTag;
+
+        Kind(int stableCode, String jsonTag) {
+            this.stableCode = stableCode;
+            this.jsonTag = jsonTag;
+        }
     }
 
     public static final SurfaceProperties NORMAL =
@@ -41,7 +50,7 @@ public final class SurfaceProperties {
 
     public long deterministicFingerprint() {
         long hash = 0xcbf29ce484222325L;
-        hash = mix(hash, kind.ordinal());
+        hash = mix(hash, kind.stableCode);
         return mix(hash, Double.doubleToLongBits(motorSpeedMultiplier));
     }
 

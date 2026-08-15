@@ -1,20 +1,16 @@
 package com.example.game3d_opengl.game.terrain.track_elements.potion;
 
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
-import static com.example.game3d_opengl.game.util.GameMath.getNormal;
 
-import android.content.res.AssetManager;
 import android.opengl.Matrix;
 
 import com.example.game3d_opengl.game.player.player_character.Player;
 import com.example.game3d_opengl.rendering.util3d.FColor;
-import com.example.game3d_opengl.rendering.util3d.ModelCreator;
-import com.example.game3d_opengl.rendering.util3d.PreparedModelData;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
 
-import java.io.IOException;
-
+/** @deprecated Mutable compatibility addon for the legacy terrain diagnostics. */
+@Deprecated
 public class Potion extends Addon
         implements PotionBatchInstance {
 
@@ -25,68 +21,17 @@ public class Potion extends Addon
     public static FColor POTION_FILL_COLOR = CLR(0.8f,0,0.8f,1);
     public static FColor POTION_EDGE_COLOR = CLR(1,1,1,1);
     
-    private static PotionBatchRenderer defaultBatchRenderer;
-    private static PreparedModelData preparedPotionModel;
-
-    private PotionBatchRenderer batchRenderer;
     private float objX;
     private float objY;
     private float objZ;
     private float objYaw;
-
-    public static synchronized void preparePotionAssetsFromDisk(AssetManager assetManager) {
-        if (defaultBatchRenderer != null || preparedPotionModel != null) {
-            return;
-        }
-        if (assetManager == null) {
-            throw new IllegalArgumentException("AssetManager cannot be null");
-        }
-        
-        ModelCreator modelCreator = new ModelCreator(assetManager);
-        try {
-            modelCreator.load("potion.obj");
-            modelCreator.centerVerts();
-            modelCreator.scaleX(POTION_MODEL_WIDTH);
-            modelCreator.scaleY(POTION_MODEL_HEIGHT);
-            modelCreator.scaleZ(POTION_MODEL_WIDTH);
-            preparedPotionModel = new PreparedModelData(
-                    modelCreator.getVerts(),
-                    modelCreator.getFaces(),
-                    modelCreator.hasNormals() ? modelCreator.getNormals() : null
-            );
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static synchronized boolean hasPreparedOrLoadedAssets() {
-        return defaultBatchRenderer != null || preparedPotionModel != null;
-    }
-
-    public static synchronized PotionBatchRenderer buildBatchRenderer(AssetManager assetManager) {
-        if (preparedPotionModel == null) {
-            preparePotionAssetsFromDisk(assetManager);
-        }
-        PotionBatchRenderer renderer = new PotionBatchRenderer(preparedPotionModel);
-        preparedPotionModel = null;
-        return renderer;
-    }
-
-    public static synchronized void installDefaultBatchRenderer(PotionBatchRenderer renderer) {
-        defaultBatchRenderer = renderer;
-    }
 
     public static Potion createPotion(){
         return new Potion();
     }
     
     private Potion(){
-        this(defaultBatchRenderer);
-    }
-
-    public Potion(PotionBatchRenderer batchRenderer) {
         super();
-        this.batchRenderer = batchRenderer;
     }
     
     @Override
@@ -125,10 +70,7 @@ public class Potion extends Addon
 
     @Override
     public void draw(float[] vpMatrix) {
-        PotionBatchRenderer renderer = resolveBatchRenderer();
-        if (renderer != null) {
-            renderer.drawSingle(vpMatrix, this);
-        }
+        // Legacy Terrain submits this instance through PotionBatchInstance.
     }
 
     @Override
@@ -161,17 +103,7 @@ public class Potion extends Addon
 
     @Override
     public void accept(Player player) {
-        player.interactWith(this);
-    }
-
-    public boolean usesBatchRenderer(PotionBatchRenderer renderer) {
-        if (renderer == null) {
-            return false;
-        }
-        if (batchRenderer == null) {
-            batchRenderer = defaultBatchRenderer;
-        }
-        return batchRenderer == renderer;
+        // Legacy potion behavior was intentionally a no-op.
     }
 
     void writeModelMatrix(float[] outModel) {
@@ -185,10 +117,9 @@ public class Potion extends Addon
         writeModelMatrix(outModel);
     }
 
-    private PotionBatchRenderer resolveBatchRenderer() {
-        if (batchRenderer == null) {
-            batchRenderer = defaultBatchRenderer;
-        }
-        return batchRenderer;
+    @Override
+    public FColor potionFillColor() {
+        return POTION_FILL_COLOR;
     }
+
 }

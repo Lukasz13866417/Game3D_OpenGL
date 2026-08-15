@@ -29,8 +29,8 @@ public class StreamingTerrainGeneratorTest {
         TerrainSnapshot actual = chunked.snapshot();
         assertEquals(expected.committedThroughSegmentId,
                 actual.committedThroughSegmentId);
-        assertEquals(expected.featureIdHighWatermark,
-                actual.featureIdHighWatermark);
+        assertEquals(expected.addonIdHighWatermark,
+                actual.addonIdHighWatermark);
         assertEquals(expected.deterministicDigest,
                 actual.deterministicDigest);
         assertEquals(expected.segments.size(), actual.segments.size());
@@ -91,7 +91,7 @@ public class StreamingTerrainGeneratorTest {
         for (TerrainSegment segment : generator.snapshot().segments) {
             boost |= segment.surface.kind
                     != SurfaceProperties.Kind.NORMAL;
-            feature |= !segment.features.isEmpty();
+            feature |= !segment.addons.isEmpty();
             disconnected |= !segment.connectedToPrevious;
         }
 

@@ -1,14 +1,12 @@
 package com.example.game3d_opengl.game.terrain.track_elements.spike;
 
-import static com.example.game3d_opengl.game.util.GameMath.getNormal;
-import static com.example.game3d_opengl.rendering.util3d.vector.Vector3D.V3S;
-
 import com.example.game3d_opengl.game.player.player_character.Player;
 import com.example.game3d_opengl.game.util.GameRandom;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.terrain.terrain_api.addon.Addon;
-import com.example.game3d_opengl.rendering.util3d.FColor;
 
+/** @deprecated Mutable compatibility addon for the legacy terrain diagnostics. */
+@Deprecated
 public class DeathSpike extends Addon
         implements SpikeBatchInstance {
     private static final float MIN_RANDOM_HEIGHT = 0.225f * 1.25f;
@@ -17,22 +15,10 @@ public class DeathSpike extends Addon
     private final float height;
     private final float baseOffset = 0.025f;
 
-    private static SpikeBatchRenderer defaultBatchRenderer;
-
-    private SpikeBatchRenderer batchRenderer;
     private SpikeInfillDrawArgs infillArgs;
 
-    public static void installDefaultBatchRenderer(SpikeBatchRenderer renderer) {
-        defaultBatchRenderer = renderer;
-    }
-
     private DeathSpike(float height) {
-        this(defaultBatchRenderer, height);
-    }
-
-    public DeathSpike(SpikeBatchRenderer batchRenderer, float height) {
         super();
-        this.batchRenderer = batchRenderer;
         this.height = height;
     }
     
@@ -94,10 +80,7 @@ public class DeathSpike extends Addon
 
     @Override
     public void draw(float[] vpMatrix) {
-        SpikeBatchRenderer renderer = resolveBatchRenderer();
-        if (infillArgs != null && renderer != null) {
-            renderer.drawSingle(vpMatrix, this);
-        }
+        // Legacy Terrain submits this instance through SpikeBatchInstance.
     }
 
     @Override
@@ -148,21 +131,16 @@ public class DeathSpike extends Addon
 
     @Override
     public void accept(Player player) {
-        player.interactWith(this);
+        if (player != null && infillArgs != null) {
+            player.recordLegacyDeathSpike(
+                    infillArgs.uApex[0],
+                    infillArgs.uApex[1],
+                    infillArgs.uApex[2]);
+        }
     }
 
     boolean hasBatchData() {
         return infillArgs != null;
-    }
-
-    public boolean usesBatchRenderer(SpikeBatchRenderer renderer) {
-        if (renderer == null) {
-            return false;
-        }
-        if (batchRenderer == null) {
-            batchRenderer = defaultBatchRenderer;
-        }
-        return batchRenderer == renderer;
     }
 
     SpikeInfillDrawArgs getBatchArgs() {
@@ -177,10 +155,4 @@ public class DeathSpike extends Addon
         return getBatchArgs();
     }
 
-    private SpikeBatchRenderer resolveBatchRenderer() {
-        if (batchRenderer == null) {
-            batchRenderer = defaultBatchRenderer;
-        }
-        return batchRenderer;
-    }
 }

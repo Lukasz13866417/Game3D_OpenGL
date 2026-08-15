@@ -25,7 +25,9 @@ public final class PortalSphereMesh3D
         vs.centerX = args.centerX;
         vs.centerY = args.centerY;
         vs.centerZ = args.centerZ;
-        vs.radius = args.radius;
+        vs.scaleX = args.scaleX;
+        vs.scaleY = args.scaleY;
+        vs.scaleZ = args.scaleZ;
         vs.rotation = args.rotation;
 
         fs.colorA = args.colorA;
@@ -68,7 +70,9 @@ public final class PortalSphereMesh3D
 
         @Override
         public void checkValid() {
-            shader(PortalSphereShaderPair.getSharedShader());
+            if (shader == null) {
+                shader(PortalSphereShaderPair.createContextShader());
+            }
             super.checkValid();
         }
 

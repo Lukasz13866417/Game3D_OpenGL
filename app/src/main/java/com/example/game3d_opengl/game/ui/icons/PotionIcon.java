@@ -1,9 +1,9 @@
 package com.example.game3d_opengl.game.ui.icons;
 
-import static com.example.game3d_opengl.game.terrain.track_elements.potion.Potion.POTION_EDGE_COLOR;
-import static com.example.game3d_opengl.game.terrain.track_elements.potion.Potion.POTION_FILL_COLOR;
-import static com.example.game3d_opengl.game.terrain.track_elements.potion.Potion.POTION_MODEL_HEIGHT;
-import static com.example.game3d_opengl.game.terrain.track_elements.potion.Potion.POTION_MODEL_WIDTH;
+import static com.example.game3d_opengl.game.terrain.track_elements.potion.PotionRenderResources.EDGE_COLOR;
+import static com.example.game3d_opengl.game.terrain.track_elements.potion.PotionRenderResources.FILL_COLOR;
+import static com.example.game3d_opengl.game.terrain.track_elements.potion.PotionRenderResources.MODEL_HEIGHT;
+import static com.example.game3d_opengl.game.terrain.track_elements.potion.PotionRenderResources.MODEL_WIDTH;
 import static com.example.game3d_opengl.game.ui.icons.UIConstants.ICON_DEFAULT_EDGE_WIDTH;
 import static com.example.game3d_opengl.game.util.GameMath.PI;
 import static com.example.game3d_opengl.rendering.util3d.FColor.CLR;
@@ -29,8 +29,8 @@ public class PotionIcon extends SpinningIcon {
     private static Vector3D[] POTION_ICON_VERTS = null;
     private static int[][] POTION_ICON_FACES = null;
 
-    private static final FColor POTION_ICON_FILL_COLOR = POTION_FILL_COLOR;
-    private static final FColor POTION_ICON_EDGE_COLOR = POTION_EDGE_COLOR;
+    private static final FColor POTION_ICON_FILL_COLOR = FILL_COLOR;
+    private static final FColor POTION_ICON_EDGE_COLOR = EDGE_COLOR;
 
     private static boolean assetsLoaded = false;
 
@@ -46,9 +46,9 @@ public class PotionIcon extends SpinningIcon {
         try {
             modelCreator.load("potion.obj");
             modelCreator.centerVerts();
-            modelCreator.scaleX(POTION_MODEL_WIDTH);
-            modelCreator.scaleY(POTION_MODEL_HEIGHT);
-            modelCreator.scaleZ(POTION_MODEL_WIDTH);
+            modelCreator.scaleX(MODEL_WIDTH);
+            modelCreator.scaleY(MODEL_HEIGHT);
+            modelCreator.scaleZ(MODEL_WIDTH);
 
             POTION_ICON_VERTS = modelCreator.getVerts();
             POTION_ICON_FACES = modelCreator.getFaces();

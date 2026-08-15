@@ -2,6 +2,9 @@ package com.example.game3d.core.terrain;
 
 import com.example.game3d.core.math.Aabb;
 import com.example.game3d.core.math.Vec3;
+import com.example.game3d.core.terrain.addon.Addon;
+import com.example.game3d.core.terrain.addon.DeathSpike;
+import com.example.game3d.core.terrain.addon.Potion;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,9 +21,9 @@ public final class TerrainWorld implements CollisionTerrain {
     private static final double GRID_CELL_SIZE = 4.0;
     private final List<TerrainPatch> patches;
     private final List<TerrainTriangle> triangles;
-    private final List<TerrainFeature> features;
+    private final List<Addon> addons;
     private final Map<Long, List<TerrainTriangle>> triangleGrid;
-    private final Map<Long, List<TerrainFeature>> featureGrid;
+    private final Map<Long, List<Addon>> addonGrid;
     private final Map<Long, TerrainTriangle> trianglesById;
     private final Map<Long, Long> triangleOwnerSegmentIds;
     private final Map<Long, Integer> collisionBoundaryMasks;
@@ -29,9 +32,9 @@ public final class TerrainWorld implements CollisionTerrain {
     public TerrainWorld(List<TerrainPatch> patches) {
         this.patches = Collections.unmodifiableList(new ArrayList<TerrainPatch>(patches));
         ArrayList<TerrainTriangle> allTriangles = new ArrayList<TerrainTriangle>();
-        ArrayList<TerrainFeature> allFeatures = new ArrayList<TerrainFeature>();
+        ArrayList<Addon> allAddons = new ArrayList<Addon>();
         Set<Long> triangleIds = new HashSet<Long>();
-        Set<Long> featureIds = new HashSet<Long>();
+        Set<Long> addonIds = new HashSet<Long>();
         for (TerrainPatch patch : patches) {
             for (TerrainTriangle triangle : patch.triangles) {
                 if (!triangleIds.add(triangle.id)) {
@@ -39,11 +42,11 @@ public final class TerrainWorld implements CollisionTerrain {
                 }
                 allTriangles.add(triangle);
             }
-            for (TerrainFeature feature : patch.features) {
-                if (!featureIds.add(feature.id)) {
-                    throw new IllegalArgumentException("Duplicate feature id " + feature.id);
+            for (Addon addon : patch.addons) {
+                if (!addonIds.add(addon.id())) {
+                    throw new IllegalArgumentException("Duplicate addon id " + addon.id());
                 }
-                allFeatures.add(feature);
+                allAddons.add(addon);
             }
         }
         Comparator<TerrainTriangle> triangleOrder =
@@ -53,17 +56,17 @@ public final class TerrainWorld implements CollisionTerrain {
                         return Long.compare(left.id, right.id);
                     }
                 };
-        Comparator<TerrainFeature> featureOrder =
-                new Comparator<TerrainFeature>() {
+        Comparator<Addon> addonOrder =
+                new Comparator<Addon>() {
                     @Override
-                    public int compare(TerrainFeature left, TerrainFeature right) {
-                        return Long.compare(left.id, right.id);
+                    public int compare(Addon left, Addon right) {
+                        return Long.compare(left.id(), right.id());
                     }
                 };
         Collections.sort(allTriangles, triangleOrder);
-        Collections.sort(allFeatures, featureOrder);
+        Collections.sort(allAddons, addonOrder);
         triangles = Collections.unmodifiableList(allTriangles);
-        features = Collections.unmodifiableList(allFeatures);
+        addons = Collections.unmodifiableList(allAddons);
         LinkedHashMap<Long, TerrainTriangle> byId =
                 new LinkedHashMap<Long, TerrainTriangle>();
         LinkedHashMap<Long, Long> owners =
@@ -79,7 +82,7 @@ public final class TerrainWorld implements CollisionTerrain {
         trianglesById = Collections.unmodifiableMap(byId);
         triangleOwnerSegmentIds = Collections.unmodifiableMap(owners);
         triangleGrid = buildTriangleGrid(allTriangles);
-        featureGrid = buildFeatureGrid(allFeatures);
+        addonGrid = buildAddonGrid(allAddons);
         collisionBoundaryMasks = buildCollisionBoundaryMasks(allTriangles);
         sharedEdgeNeighbors = buildSharedEdgeNeighbors(allTriangles);
     }
@@ -92,8 +95,8 @@ public final class TerrainWorld implements CollisionTerrain {
         return triangles;
     }
 
-    public List<TerrainFeature> features() {
-        return features;
+    public List<Addon> addons() {
+        return addons;
     }
 
     public boolean containsTriangle(long triangleId) {
@@ -149,23 +152,27 @@ public final class TerrainWorld implements CollisionTerrain {
             hash = mix(hash, Double.doubleToLongBits(triangle.c.x));
             hash = mix(hash, Double.doubleToLongBits(triangle.c.y));
             hash = mix(hash, Double.doubleToLongBits(triangle.c.z));
-            hash = mix(hash, triangle.surface.kind.ordinal());
+            hash = mix(hash, triangle.surface.kind.stableCode);
             hash = mix(hash,
                     Double.doubleToLongBits(triangle.surface.motorSpeedMultiplier));
         }
-        for (TerrainFeature feature : features) {
-            hash = mix(hash, feature.id);
-            hash = mix(hash, feature.kind.ordinal());
-            hash = mix(hash, Double.doubleToLongBits(feature.center.x));
-            hash = mix(hash, Double.doubleToLongBits(feature.center.y));
-            hash = mix(hash, Double.doubleToLongBits(feature.center.z));
-            if (feature instanceof TerrainFeature.Spike) {
-                TerrainFeature.Spike spike = (TerrainFeature.Spike) feature;
-                hash = mix(hash, Double.doubleToLongBits(spike.radius));
-                hash = mix(hash, Double.doubleToLongBits(spike.height));
-            } else if (feature instanceof TerrainFeature.Feather) {
-                TerrainFeature.Feather feather = (TerrainFeature.Feather) feature;
-                hash = mix(hash, Double.doubleToLongBits(feather.triggerRadius));
+        for (Addon addon : addons) {
+            hash = mix(hash, addon.id());
+            hash = mix(hash, addon.kind.stableCode);
+            Vec3 center;
+            if (addon instanceof DeathSpike) {
+                DeathSpike spike = (DeathSpike) addon;
+                center = spike.collisionBaseCenter;
+                hash = mixVec(hash, center);
+                hash = mix(hash, Double.doubleToLongBits(spike.collisionRadius));
+                hash = mix(hash, Double.doubleToLongBits(spike.collisionHeight));
+            } else if (addon instanceof Potion) {
+                Potion potion = (Potion) addon;
+                center = potion.center;
+                hash = mixVec(hash, center);
+                hash = mix(hash, Double.doubleToLongBits(potion.triggerRadius));
+            } else {
+                hash = mix(hash, addon.deterministicDigest());
             }
         }
         return hash;
@@ -209,20 +216,20 @@ public final class TerrainWorld implements CollisionTerrain {
         }
     }
 
-    public List<TerrainFeature> queryFeatures(Aabb bounds) {
-        ArrayList<TerrainFeature> result = new ArrayList<TerrainFeature>();
-        queryFeatures(bounds, result);
+    public List<Addon> queryAddons(Aabb bounds) {
+        ArrayList<Addon> result = new ArrayList<Addon>();
+        queryAddons(bounds, result);
         return result;
     }
 
     /**
-     * Replaces {@code destination} with the features intersecting {@code bounds}, ordered by
-     * stable feature ID. The caller retains ownership of the list and may reuse it as query
+     * Replaces {@code destination} with the addons intersecting {@code bounds}, ordered by
+     * stable addon ID. The caller retains ownership of the list and may reuse it as query
      * scratch to avoid per-query collection allocation. The destination must be mutable and
      * should provide efficient indexed access and insertion (normally an {@link ArrayList}); its
      * contents remain valid only until that list is reused.
      */
-    public void queryFeatures(Aabb bounds, List<TerrainFeature> destination) {
+    public void queryAddons(Aabb bounds, List<Addon> destination) {
         destination.clear();
         int minCellX = cell(bounds.min.x);
         int maxCellX = cell(bounds.max.x);
@@ -230,16 +237,16 @@ public final class TerrainWorld implements CollisionTerrain {
         int maxCellZ = cell(bounds.max.z);
         for (int cellX = minCellX; cellX <= maxCellX; cellX++) {
             for (int cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
-                List<TerrainFeature> bucket = featureGrid.get(key(cellX, cellZ));
+                List<Addon> bucket = addonGrid.get(key(cellX, cellZ));
                 if (bucket == null) {
                     continue;
                 }
                 for (int i = 0; i < bucket.size(); i++) {
-                    TerrainFeature feature = bucket.get(i);
-                    if (feature.bounds.intersects(bounds)) {
-                        int index = findFeature(destination, feature.id);
+                    Addon addon = bucket.get(i);
+                    if (addon.broadPhaseBounds().intersects(bounds)) {
+                        int index = findAddon(destination, addon.id());
                         if (index < 0) {
-                            destination.add(-index - 1, feature);
+                            destination.add(-index - 1, addon);
                         }
                     }
                 }
@@ -264,12 +271,12 @@ public final class TerrainWorld implements CollisionTerrain {
         return -low - 1;
     }
 
-    private static int findFeature(List<TerrainFeature> sorted, long id) {
+    private static int findAddon(List<Addon> sorted, long id) {
         int low = 0;
         int high = sorted.size() - 1;
         while (low <= high) {
             int middle = (low + high) >>> 1;
-            long middleId = sorted.get(middle).id;
+            long middleId = sorted.get(middle).id();
             if (middleId < id) {
                 low = middle + 1;
             } else if (middleId > id) {
@@ -312,30 +319,32 @@ public final class TerrainWorld implements CollisionTerrain {
         return Collections.unmodifiableMap(grid);
     }
 
-    private static Map<Long, List<TerrainFeature>> buildFeatureGrid(
-            List<TerrainFeature> source) {
-        HashMap<Long, List<TerrainFeature>> grid =
-                new HashMap<Long, List<TerrainFeature>>();
-        for (TerrainFeature feature : source) {
-            for (int x = cell(feature.bounds.min.x);
-                 x <= cell(feature.bounds.max.x); x++) {
-                for (int z = cell(feature.bounds.min.z);
-                     z <= cell(feature.bounds.max.z); z++) {
+    private static Map<Long, List<Addon>> buildAddonGrid(
+            List<Addon> source) {
+        HashMap<Long, List<Addon>> grid =
+                new HashMap<Long, List<Addon>>();
+        for (Addon addon : source) {
+            if (addon.contactPhase() == Addon.ContactPhase.NONE) {
+                continue;
+            }
+            Aabb bounds = addon.broadPhaseBounds();
+            for (int x = cell(bounds.min.x); x <= cell(bounds.max.x); x++) {
+                for (int z = cell(bounds.min.z); z <= cell(bounds.max.z); z++) {
                     long key = key(x, z);
-                    List<TerrainFeature> bucket = grid.get(key);
+                    List<Addon> bucket = grid.get(key);
                     if (bucket == null) {
-                        bucket = new ArrayList<TerrainFeature>();
+                        bucket = new ArrayList<Addon>();
                         grid.put(key, bucket);
                     }
-                    bucket.add(feature);
+                    bucket.add(addon);
                 }
             }
         }
-        for (Map.Entry<Long, List<TerrainFeature>> entry : grid.entrySet()) {
-            Collections.sort(entry.getValue(), new Comparator<TerrainFeature>() {
+        for (Map.Entry<Long, List<Addon>> entry : grid.entrySet()) {
+            Collections.sort(entry.getValue(), new Comparator<Addon>() {
                 @Override
-                public int compare(TerrainFeature left, TerrainFeature right) {
-                    return Long.compare(left.id, right.id);
+                public int compare(Addon left, Addon right) {
+                    return Long.compare(left.id(), right.id());
                 }
             });
             entry.setValue(Collections.unmodifiableList(entry.getValue()));
@@ -432,6 +441,12 @@ public final class TerrainWorld implements CollisionTerrain {
     private static long mix(long hash, long value) {
         hash ^= value;
         return hash * 0x100000001b3L;
+    }
+
+    private static long mixVec(long hash, Vec3 value) {
+        hash = mix(hash, Double.doubleToLongBits(value.x));
+        hash = mix(hash, Double.doubleToLongBits(value.y));
+        return mix(hash, Double.doubleToLongBits(value.z));
     }
 
     private static final class EdgeRef {

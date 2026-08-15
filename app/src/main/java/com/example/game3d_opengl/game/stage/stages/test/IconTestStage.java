@@ -4,7 +4,7 @@ import android.content.Context;
 
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
-import com.example.game3d_opengl.game.terrain.track_elements.potion.Potion;
+import com.example.game3d_opengl.game.terrain.track_elements.potion.PotionRenderResources;
 import com.example.game3d_opengl.game.ui.icons.PotionIcon;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.icon.RectOverlay;
@@ -56,9 +56,9 @@ public class IconTestStage extends Stage {
         spinningIcon = new SpinningIcon.SpinningBuilder()
                 .verts(PotionIcon.getLoadedVerts())
                 .faces(PotionIcon.getLoadedFaces())
-                .fillColor(Potion.POTION_FILL_COLOR)
-                .edgeColor(Potion.POTION_EDGE_COLOR)
-                .edgePixels(Potion.POTION_MODEL_LINE_THICKNESS)
+                .fillColor(PotionRenderResources.FILL_COLOR)
+                .edgeColor(PotionRenderResources.EDGE_COLOR)
+                .edgePixels(PotionRenderResources.MODEL_LINE_THICKNESS)
                 .marginPixels(2f, 2f)
                 .spinRateDegPerSec(60f)
                 .placementRect(placement)
@@ -98,5 +98,4 @@ public class IconTestStage extends Stage {
           if (spinningIcon != null) spinningIcon.cleanupGPUResourcesRecursively();
     }
 }
-
 

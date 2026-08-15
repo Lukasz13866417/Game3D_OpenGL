@@ -1,6 +1,10 @@
 package com.example.game3d.core.terrain;
 
 import com.example.game3d.core.math.Vec3;
+import com.example.game3d.core.terrain.addon.Addon;
+import com.example.game3d.core.terrain.addon.AddonFootprint;
+import com.example.game3d.core.terrain.addon.DeathSpike;
+import com.example.game3d.core.terrain.addon.Potion;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,7 +25,7 @@ public strictfp final class TrackBuilder {
     private Vec3 previousFarRight;
     private long nextPatchId = 1;
     private long nextTriangleId = 1;
-    private long nextFeatureId = 1;
+    private long nextAddonId = 1;
     private SurfaceMaterial material = SurfaceMaterial.NORMAL;
     private SurfaceProperties surface = SurfaceProperties.NORMAL;
     private boolean nextSegmentConnected;
@@ -112,22 +116,23 @@ public strictfp final class TrackBuilder {
                               double radius, double height) {
         Vec3 position = center.add(forward.multiply(forwardOffset))
                 .add(right.multiply(lateralOffset));
-        addFeature(new TerrainFeature.Spike(nextFeatureId++, position, radius, height));
-        long featureId = nextFeatureId - 1L;
         double half = radius;
-        addCanonicalFeature(new TerrainFeatureSpec.Spike(
-                featureId,
-                lastSegmentId(),
-                new Vec3(position.x - half, position.y, position.z + half),
-                new Vec3(position.x + half, position.y, position.z + half),
-                new Vec3(position.x - half, position.y, position.z - half),
-                new Vec3(position.x + half, position.y, position.z - half),
+        Vec3 nearLeft = new Vec3(position.x - half, position.y, position.z + half);
+        Vec3 nearRight = new Vec3(position.x + half, position.y, position.z + half);
+        Vec3 farLeft = new Vec3(position.x - half, position.y, position.z - half);
+        Vec3 farRight = new Vec3(position.x + half, position.y, position.z - half);
+        DeathSpike spike = new DeathSpike(
+                nearLeft, nearRight, farLeft, farRight,
                 position.add(Vec3.UP.multiply(height)),
                 Vec3.UP,
                 0.0,
                 position,
                 radius,
-                height));
+                height);
+        spike.place(nextAddonId++, lastSegmentId(),
+                AddonFootprint.quadrilateral(nearLeft, nearRight, farLeft, farRight));
+        addAddon(spike);
+        addCanonicalAddon(spike);
         return this;
     }
 
@@ -136,13 +141,11 @@ public strictfp final class TrackBuilder {
         Vec3 position = center.add(forward.multiply(forwardOffset))
                 .add(right.multiply(lateralOffset))
                 .add(Vec3.UP.multiply(height));
-        addFeature(new TerrainFeature.Feather(nextFeatureId++, position, triggerRadius));
-        addCanonicalFeature(new TerrainFeatureSpec.AirJumpCollectible(
-                nextFeatureId - 1L,
-                lastSegmentId(),
-                position,
-                triggerRadius,
-                "FEATHER"));
+        Potion potion = new Potion(position, triggerRadius, "FEATHER");
+        potion.place(nextAddonId++, lastSegmentId(), AddonFootprint.around(
+                position, triggerRadius, triggerRadius, triggerRadius));
+        addAddon(potion);
+        addCanonicalAddon(potion);
         return this;
     }
 
@@ -184,13 +187,13 @@ public strictfp final class TrackBuilder {
                 segment.farLeft,
                 quadMaterial));
         patches.add(new TerrainPatch(nextPatchId++, triangles,
-                Collections.<TerrainFeature>emptyList()));
+                Collections.<Addon>emptyList()));
     }
 
-    private void addFeature(TerrainFeature feature) {
+    private void addAddon(Addon addon) {
         patches.add(new TerrainPatch(nextPatchId++,
                 Collections.<TerrainTriangle>emptyList(),
-                Collections.singletonList(feature)));
+                Collections.singletonList(addon)));
     }
 
     private TerrainSegment publishCanonicalSegment(
@@ -228,7 +231,7 @@ public strictfp final class TrackBuilder {
                 TerrainVertexAppearance.DEFAULT,
                 TerrainVertexAppearance.DEFAULT,
                 TerrainVertexAppearance.DEFAULT,
-                Collections.<TerrainFeatureSpec>emptyList());
+                Collections.<Addon>emptyList());
         segments.add(segment);
         previousFarLeft = endLeft;
         previousFarRight = endRight;
@@ -236,15 +239,14 @@ public strictfp final class TrackBuilder {
         return segment;
     }
 
-    private void addCanonicalFeature(TerrainFeatureSpec feature) {
+    private void addCanonicalAddon(Addon addon) {
         if (segments.isEmpty()) {
-            throw new IllegalStateException("A feature requires an owning segment");
+            throw new IllegalStateException("An addon requires an owning segment");
         }
         int index = segments.size() - 1;
         TerrainSegment previous = segments.get(index);
-        ArrayList<TerrainFeatureSpec> features =
-                new ArrayList<TerrainFeatureSpec>(previous.features);
-        features.add(feature);
+        ArrayList<Addon> addons = new ArrayList<Addon>(previous.addons);
+        addons.add(addon);
         segments.set(index, new TerrainSegment(
                 previous.id,
                 previous.nearLeft,
@@ -258,12 +260,12 @@ public strictfp final class TrackBuilder {
                 previous.nearRightAppearance,
                 previous.farLeftAppearance,
                 previous.farRightAppearance,
-                features));
+                addons));
     }
 
     private long lastSegmentId() {
         if (segments.isEmpty()) {
-            throw new IllegalStateException("A feature requires an owning segment");
+            throw new IllegalStateException("An addon requires an owning segment");
         }
         return segments.get(segments.size() - 1).id;
     }

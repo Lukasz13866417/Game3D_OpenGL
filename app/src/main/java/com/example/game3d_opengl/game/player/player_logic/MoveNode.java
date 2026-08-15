@@ -2,7 +2,6 @@ package com.example.game3d_opengl.game.player.player_logic;
 
 import com.example.game3d_opengl.game.logic_abstraction.StateInfoNode;
 import com.example.game3d_opengl.game.player.player_character.PlayerConfig;
-import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
 public final class MoveNode extends StateInfoNode<MoveNode.Data> {
@@ -36,7 +35,7 @@ public final class MoveNode extends StateInfoNode<MoveNode.Data> {
         Vector3D lastMove = in.getLastMove();
         float fallSpeed = in.getFallSpeed();
         float activeHorizontalSpeed = in.getActiveHorizontalSpeed();
-        Tile tileBelow = in.getTileBelow();
+        PlayerSupportSurface tileBelow = in.getTileBelow();
         float dirX = dir != null ? dir.x : 0f;
         float dirY = dir != null ? dir.y : 0f;
         float dirZ = dir != null ? dir.z : 0f;
@@ -142,4 +141,3 @@ public final class MoveNode extends StateInfoNode<MoveNode.Data> {
                 + nz * tangent1x * dirY - nz * tangent1y * dirX) / det;
     }
 }
-

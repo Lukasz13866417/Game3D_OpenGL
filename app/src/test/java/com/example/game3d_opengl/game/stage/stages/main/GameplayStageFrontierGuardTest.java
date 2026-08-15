@@ -26,6 +26,8 @@ public class GameplayStageFrontierGuardTest {
     @Test
     public void emergencyTerrainCatchUpCannotRunAnUnboundedGlThreadBurst() {
         assertEquals(16, GameplayStage.COMMITTED_FRONTIER_EXTRA_GENERATION_BUDGET);
+        assertEquals(128, GameplayStage.TERRAIN_AUTHORING_COMMAND_BUDGET);
+        assertEquals(256, PreparedGameplaySession.TERRAIN_PREPARATION_COMMAND_BUDGET);
     }
 
     @Test

@@ -1,0 +1,17 @@
+# Production terrain semantic manifest, captured before the Addon/authoring refactor.
+#
+# snapshot is TerrainSnapshot.deterministicDigest. geometry is an FNV-1a fold, in
+# segment-id order, over every id, corner bit pattern, solid/connectivity flag,
+# surface fingerprint, and four corner appearances. addons is an FNV-1a fold,
+# in segment/addon-id order, over every complete addon deterministic digest.
+# Unsigned decimal is used for all digests.
+# profile: width=3.2 tileLength=1.4 start=(0.0,-3.5,-0.5)
+case=intro segments=160 solid=160 connected=159 normal=160 ramp=0 launch=0 spike=3 potion=0 portal=0 high=3 snapshot=643683088987965414 geometry=18027817117617719582 addons=16392405182536925867 firstNearLeft=(-1.6,-3.5,-0.5) lastFarRight=(1.6,-3.5,-224.5) portals=-
+case=level-0 template=3 segments=175 solid=175 connected=174 normal=168 ramp=6 launch=1 spike=4 potion=3 portal=0 high=7 snapshot=15119781461488779989 geometry=5717972212697516948 addons=6926402491659455378 firstNearLeft=(-1.6,-3.5,-0.5) lastFarRight=(41.512489,-1.034573,-240.936558) portals=-
+case=level-1 template=1 segments=432 solid=420 connected=411 normal=432 ramp=0 launch=0 spike=9 potion=0 portal=0 high=9 snapshot=15921012377482311856 geometry=13770361040251421496 addons=15688771148868345855 firstNearLeft=(-1.6,-3.5,-0.5) lastFarRight=(84.750001,-9.9,-595.267088) portals=-
+case=level-2 template=0 segments=373 solid=365 connected=358 normal=373 ramp=0 launch=0 spike=13 potion=6 portal=0 high=19 snapshot=9187469893688506245 geometry=3515154175595613666 addons=17782700321210366614 firstNearLeft=(-1.6,-3.5,-0.5) lastFarRight=(54.168090,-1.548332,-514.825492) portals=-
+case=level-4 template=4 segments=368 solid=360 connected=353 normal=368 ramp=0 launch=0 spike=11 potion=3 portal=0 high=14 snapshot=14086676161966172321 geometry=10695162773320346817 addons=16880475795322173056 firstNearLeft=(-1.6,-3.5,-0.5) lastFarRight=(61.184715,-5.107389,-508.884660) portals=-
+case=level-5 template=2 segments=140 solid=140 connected=139 normal=132 ramp=7 launch=1 spike=2 potion=3 portal=0 high=5 snapshot=2651752005035748053 geometry=9600143784509438698 addons=3402417050853222558 firstNearLeft=(-1.6,-3.5,-0.5) lastFarRight=(1.6,-2.185948,-196.402367) portals=-
+case=level-12 template=5 segments=307 solid=301 connected=295 normal=307 ramp=0 launch=0 spike=12 potion=6 portal=0 high=18 snapshot=17232866108530767187 geometry=12101413454742965577 addons=9314560739566753734 firstNearLeft=(-1.6,-3.5,-0.5) lastFarRight=(39.171022,-2.882950,-423.740269) portals=-
+case=level-9 template=0 portalMode=first segments=373 solid=365 connected=358 normal=373 ramp=0 launch=0 spike=13 potion=6 portal=2 high=21 snapshot=17183763513878446530 geometry=3515154175595613666 addons=13379139341459934671 firstNearLeft=(-1.6,-3.5,-0.5) lastFarRight=(54.168090,-1.548332,-514.825492) portals=8@205:1:EXIT,14@232:1:ENTRANCE
+case=level-28 template=0 portalMode=second segments=373 solid=365 connected=358 normal=373 ramp=0 launch=0 spike=13 potion=6 portal=2 high=21 snapshot=1231880803536659090 geometry=3515154175595613666 addons=16943943742246815431 firstNearLeft=(-1.6,-3.5,-0.5) lastFarRight=(54.168090,-1.548332,-514.825492) portals=15@302:1:EXIT,21@335:1:ENTRANCE

@@ -59,12 +59,6 @@ public final class SpikeBatchRenderer implements GPUResourceOwner {
         lastBatchInstanceCount = 0;
     }
 
-    public void add(DeathSpike spike) {
-        if (spike != null && spike.hasBatchData()) {
-            visibleSpikes.add(spike);
-        }
-    }
-
     public void add(SpikeBatchInstance spike) {
         if (spike != null && spike.spikeBatchArgs() != null) {
             visibleSpikes.add(spike);
@@ -82,8 +76,8 @@ public final class SpikeBatchRenderer implements GPUResourceOwner {
         visibleSpikes.clear();
     }
 
-    public void drawSingle(float[] vpMatrix, DeathSpike spike) {
-        if (spike == null || !spike.hasBatchData()) {
+    public void drawSingle(float[] vpMatrix, SpikeBatchInstance spike) {
+        if (spike == null || spike.spikeBatchArgs() == null) {
             return;
         }
         buildPass(vpMatrix);

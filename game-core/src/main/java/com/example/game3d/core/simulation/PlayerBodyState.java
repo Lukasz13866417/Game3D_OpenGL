@@ -20,14 +20,18 @@ strictfp final class PlayerBodyState {
     /** Signed right-hand angular velocity about {@link #axis()}; forward rolling is negative. */
     double angularVelocity;
     double gestureCharge;
-    /** Charge the current held gesture would have if its physical path passes both X guards. */
+    /** Legacy held-gesture diagnostic mirroring accepted charge until classifier reset. */
     double gestureChargePotential;
-    /** Signed physical X displacement accumulated during the current held gesture phase. */
+    /** Signed physical X displacement accumulated during the current held gesture. */
     double gestureRawDeltaX;
-    /** Total physical upward travel accumulated during the current held gesture phase. */
+    /** Total physical upward travel accumulated during the current held gesture. */
     double gestureRawUpwardDistance;
-    /** Largest absolute physical X displacement reached during the current gesture phase. */
+    /** Largest absolute physical X displacement reached during the current held gesture. */
     double gestureMaxAbsRawDeltaX;
+    /** Whether the most recent upward packet was vertical enough to contribute charge. */
+    boolean gestureLastSwipeChargeEligible;
+    /** Simulation time of the most recent accepted held upward contribution. */
+    long heldChargeLastContributionNanos = -1L;
     int airJumpCharges;
     boolean grounded;
     long supportTriangleId = -1L;
@@ -48,7 +52,7 @@ strictfp final class PlayerBodyState {
     double airborneReleaseCharge;
     /** Exact simulation time at which another jump may execute. */
     long jumpCooldownUntilNanos;
-    final Set<Long> collectedFeatures = new HashSet<Long>();
+    final Set<Long> inactiveAddonIds = new HashSet<Long>();
 
     PlayerBodyState(Vec3 position, Vec3 velocity, double initialAngularVelocity,
                     int initialAirJumpCharges) {
@@ -75,6 +79,8 @@ strictfp final class PlayerBodyState {
         copy.gestureRawDeltaX = gestureRawDeltaX;
         copy.gestureRawUpwardDistance = gestureRawUpwardDistance;
         copy.gestureMaxAbsRawDeltaX = gestureMaxAbsRawDeltaX;
+        copy.gestureLastSwipeChargeEligible = gestureLastSwipeChargeEligible;
+        copy.heldChargeLastContributionNanos = heldChargeLastContributionNanos;
         copy.grounded = grounded;
         copy.supportTriangleId = supportTriangleId;
         copy.supportSegmentId = supportSegmentId;
@@ -91,7 +97,7 @@ strictfp final class PlayerBodyState {
         copy.airborneReleaseNanos = airborneReleaseNanos;
         copy.airborneReleaseCharge = airborneReleaseCharge;
         copy.jumpCooldownUntilNanos = jumpCooldownUntilNanos;
-        copy.collectedFeatures.addAll(collectedFeatures);
+        copy.inactiveAddonIds.addAll(inactiveAddonIds);
         return copy;
     }
 

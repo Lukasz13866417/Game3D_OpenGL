@@ -1,5 +1,7 @@
 package com.example.game3d.core.terrain;
 
+import com.example.game3d.core.terrain.addon.Addon;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -13,7 +15,7 @@ public final class TerrainSnapshot {
     public final long revision;
     public final long committedThroughSegmentId;
     public final long retireBeforeSegmentId;
-    public final long featureIdHighWatermark;
+    public final long addonIdHighWatermark;
     public final List<TerrainSegment> segments;
     public final long deterministicDigest;
 
@@ -23,19 +25,19 @@ public final class TerrainSnapshot {
             long retireBeforeSegmentId,
             Collection<TerrainSegment> segments) {
         this(revision, committedThroughSegmentId, retireBeforeSegmentId,
-                deriveFeatureIdHighWatermark(segments), segments);
+                deriveAddonIdHighWatermark(segments), segments);
     }
 
     public TerrainSnapshot(
             long revision,
             long committedThroughSegmentId,
             long retireBeforeSegmentId,
-            long featureIdHighWatermark,
+            long addonIdHighWatermark,
             Collection<TerrainSegment> segments) {
         if (revision < 0L || committedThroughSegmentId < -1L
                 || retireBeforeSegmentId < 0L
                 || retireBeforeSegmentId > committedThroughSegmentId + 1L
-                || featureIdHighWatermark < -1L) {
+                || addonIdHighWatermark < -1L) {
             throw new IllegalArgumentException("Invalid terrain snapshot metadata");
         }
         ArrayList<TerrainSegment> sorted = new ArrayList<TerrainSegment>(
@@ -47,25 +49,25 @@ public final class TerrainSnapshot {
             }
         });
         Set<Long> segmentIds = new HashSet<Long>();
-        Set<Long> featureIds = new HashSet<Long>();
+        Set<Long> addonIds = new HashSet<Long>();
         long hash = 0xcbf29ce484222325L;
         hash = mix(hash, committedThroughSegmentId);
         hash = mix(hash, retireBeforeSegmentId);
-        hash = mix(hash, featureIdHighWatermark);
+        hash = mix(hash, addonIdHighWatermark);
         for (TerrainSegment segment : sorted) {
             if (segment == null || segment.id < retireBeforeSegmentId
                     || segment.id > committedThroughSegmentId
                     || !segmentIds.add(segment.id)) {
                 throw new IllegalArgumentException("Invalid segment in terrain snapshot");
             }
-            for (TerrainFeatureSpec feature : segment.features) {
-                if (feature.id > featureIdHighWatermark) {
+            for (Addon addon : segment.addons) {
+                if (addon.id() > addonIdHighWatermark) {
                     throw new IllegalArgumentException(
-                            "Feature id exceeds snapshot high-watermark");
+                            "Addon id exceeds snapshot high-watermark");
                 }
-                if (!featureIds.add(feature.id)) {
+                if (!addonIds.add(addon.id())) {
                     throw new IllegalArgumentException(
-                            "Duplicate feature id " + feature.id);
+                            "Duplicate addon id " + addon.id());
                 }
             }
             hash = mix(hash, segment.deterministicDigest());
@@ -73,7 +75,7 @@ public final class TerrainSnapshot {
         this.revision = revision;
         this.committedThroughSegmentId = committedThroughSegmentId;
         this.retireBeforeSegmentId = retireBeforeSegmentId;
-        this.featureIdHighWatermark = featureIdHighWatermark;
+        this.addonIdHighWatermark = addonIdHighWatermark;
         this.segments = Collections.unmodifiableList(sorted);
         this.deterministicDigest = hash;
     }
@@ -87,7 +89,7 @@ public final class TerrainSnapshot {
         return hash * 0x100000001b3L;
     }
 
-    private static long deriveFeatureIdHighWatermark(
+    private static long deriveAddonIdHighWatermark(
             Collection<TerrainSegment> segments) {
         long highest = -1L;
         if (segments == null) {
@@ -97,8 +99,8 @@ public final class TerrainSnapshot {
             if (segment == null) {
                 continue;
             }
-            for (TerrainFeatureSpec feature : segment.features) {
-                highest = Math.max(highest, feature.id);
+            for (Addon addon : segment.addons) {
+                highest = Math.max(highest, addon.id());
             }
         }
         return highest;

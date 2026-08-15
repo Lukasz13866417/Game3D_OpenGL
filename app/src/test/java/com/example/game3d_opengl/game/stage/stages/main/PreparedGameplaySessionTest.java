@@ -5,12 +5,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 
 import com.example.game3d.core.terrain.TerrainCollisionIndex;
 import com.example.game3d.core.terrain.TerrainOutput;
 import com.example.game3d.core.terrain.TerrainSegment;
 import com.example.game3d.core.terrain.TerrainSnapshot;
+import com.example.game3d.authoring.GameplayLevelCatalog;
 import com.example.game3d_opengl.game.player.player_character.PlayerConfig;
 
 import org.junit.Test;
@@ -18,6 +20,18 @@ import org.junit.Test;
 import java.util.concurrent.TimeUnit;
 
 public class PreparedGameplaySessionTest {
+    @Test
+    public void sessionRetainsTheExactImmutableCatalogForRestartPreparation() {
+        GameplayLevelCatalog catalog = GameplayLevelCatalog.builtIns();
+        PreparedGameplaySession session =
+                PreparedGameplaySession.createInitialSession(catalog);
+        try {
+            assertSame(catalog, session.getTerrainGenerator().catalog());
+        } finally {
+            session.cleanupGPUResourcesRecursively();
+        }
+    }
+
     @Test
     public void terrainPreparationProducesCanonicalBootstrapWithoutGpuAssets() {
         PreparedGameplaySession session =

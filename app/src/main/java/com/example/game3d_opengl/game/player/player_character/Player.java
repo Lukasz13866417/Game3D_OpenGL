@@ -24,11 +24,7 @@ import com.example.game3d_opengl.game.player.player_logic.OutputNode;
 import com.example.game3d_opengl.game.player.player_logic.PlayerLogic;
 import com.example.game3d_opengl.game.player.player_logic.jump.JumpConfig;
 import com.example.game3d_opengl.game.settings.TouchSensitivitySettings;
-import com.example.game3d_opengl.game.terrain.terrain_api.main.Tile;
-import com.example.game3d_opengl.game.terrain.track_elements.portal.ExitPortal;
-import com.example.game3d_opengl.game.terrain.track_elements.portal.Portal;
-import com.example.game3d_opengl.game.terrain.track_elements.potion.Potion;
-import com.example.game3d_opengl.game.terrain.track_elements.spike.DeathSpike;
+import com.example.game3d_opengl.game.player.player_logic.PlayerSupportSurface;
 import com.example.game3d_opengl.rendering.object3d.UnbatchedObject3DWithOutline;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
@@ -91,7 +87,6 @@ public class Player implements WorldActor {
     // transient input buffers (per-frame)
     private float pendingSwipeDx = 0f;
     private float pendingSwipeDy = 0f;
-    private final float[] spikeHazardPointTmp = new float[3];
     private static final float SPIKE_KILL_RADIUS_FACTOR = 1.6f;
     private static final float SPIKE_KILL_MIN_RADIUS = 0.3f;
     private static final float SPIKE_KILL_HEIGHT_FACTOR = 0.90f;
@@ -105,7 +100,7 @@ public class Player implements WorldActor {
     private float lastRecoverableTrackY;
     private boolean hasRecoverableTrackAnchor = false;
     private RecoveryCapabilities recoveryCapabilities = RecoveryCapabilities.NONE;
-    private Tile pendingFootingTile = null;
+    private PlayerSupportSurface pendingFootingTile = null;
     private int pendingFootingTriangleIndex = -1;
     private float pendingFootingDistance = Float.POSITIVE_INFINITY;
     private boolean tileInteractionSweepOpen = false;
@@ -650,7 +645,7 @@ public class Player implements WorldActor {
         clearPendingFootingCandidate();
     }
 
-    public void interactWith(Tile tile) {
+    public void interactWith(PlayerSupportSurface tile) {
         boolean openedLocalSweep = false;
         if (!tileInteractionSweepOpen) {
             beginTileInteractionSweep();
@@ -664,27 +659,9 @@ public class Player implements WorldActor {
         }
     }
 
-    public void interactWith(Potion potion) {
-        // No-op for now (placeholder for potion effects)
-    }
-
-    public void interactWith(DeathSpike spike) {
-        if (spike == null) return;
-        if (spike.writeHazardPoint(spikeHazardPointTmp)) {
-            frameStartState.addNearbyDeathSpike(
-                    spikeHazardPointTmp[0],
-                    spikeHazardPointTmp[1],
-                    spikeHazardPointTmp[2]
-            );
-        }
-    }
-
-    public void interactWith(Portal portal) {
-        // No-op for now (portal handling later)
-    }
-
-    public void interactWith(ExitPortal portal) {
-        // No-op for now (portal handling later)
+    /** Compatibility hook for the old diagnostic spike addon. */
+    public void recordLegacyDeathSpike(float x, float y, float z) {
+        frameStartState.addNearbyDeathSpike(x, y, z);
     }
 
     private void applyInput(float dtMillis, float swipeDx, float swipeDy) {
@@ -730,10 +707,10 @@ public class Player implements WorldActor {
     }
 
     private void refreshActiveHorizontalSpeed() {
-        Tile groundedTile = frameStartState.getTileBelow();
+        PlayerSupportSurface groundedTile = frameStartState.getTileBelow();
         if (groundedTile != null) {
             frameStartState.setActiveHorizontalSpeed(
-                    groundedTile.getProfile().applyHorizontalSpeed(config.playerSpeed)
+                    groundedTile.applyHorizontalSpeed(config.playerSpeed)
             );
             return;
         }
@@ -754,14 +731,15 @@ public class Player implements WorldActor {
         return verticalVel * dt;
     }
 
-    private void setHasFooting(Tile tile, int collisionTriangleIndex) {
+    private void setHasFooting(
+            PlayerSupportSurface tile, int collisionTriangleIndex) {
         frameStartState.setTileBelow(tile);
         frameStartState.setCollisionTriangleIndex(collisionTriangleIndex);
         lastRecoverableTrackY = object3D.objY;
         hasRecoverableTrackAnchor = true;
     }
 
-    private void probeTileForFooting(Tile tile) {
+    private void probeTileForFooting(PlayerSupportSurface tile) {
         float verticalTravel = getVerticalTravelForCollision();
         int triangleIndex = frameStartState.probeCollisionTriangleIndex(tile, verticalTravel);
         if (triangleIndex < 0) {

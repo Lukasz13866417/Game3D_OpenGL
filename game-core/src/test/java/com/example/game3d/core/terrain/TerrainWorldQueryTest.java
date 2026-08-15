@@ -2,6 +2,10 @@ package com.example.game3d.core.terrain;
 
 import com.example.game3d.core.math.Aabb;
 import com.example.game3d.core.math.Vec3;
+import com.example.game3d.core.terrain.addon.Addon;
+import com.example.game3d.core.terrain.addon.AddonFootprint;
+import com.example.game3d.core.terrain.addon.DeathSpike;
+import com.example.game3d.core.terrain.addon.Potion;
 
 import org.junit.Test;
 
@@ -32,20 +36,20 @@ public class TerrainWorldQueryTest {
 
     @Test
     public void featureQueryDeduplicatesAcrossGridCellsAndSortsById() {
-        TerrainFeature.Spike later = new TerrainFeature.Spike(
+        Addon later = spike(
                 9L, new Vec3(0.0, 0.0, 0.0), 6.0, 1.0);
-        TerrainFeature.Feather earlier = new TerrainFeature.Feather(
+        Addon earlier = potion(
                 3L, new Vec3(1.0, 1.0, 1.0), 5.0);
         TerrainWorld world = new TerrainWorld(Arrays.asList(
-                featurePatch(2L, later), featurePatch(1L, earlier)));
+                addonPatch(2L, later), addonPatch(1L, earlier)));
 
-        List<TerrainFeature> result = world.queryFeatures(new Aabb(
+        List<Addon> result = world.queryAddons(new Aabb(
                 new Vec3(-10.0, -2.0, -10.0),
                 new Vec3(10.0, 4.0, 10.0)));
 
         assertEquals(2, result.size());
-        assertEquals(3L, result.get(0).id);
-        assertEquals(9L, result.get(1).id);
+        assertEquals(3L, result.get(0).id());
+        assertEquals(9L, result.get(1).id());
     }
 
     @Test
@@ -73,25 +77,25 @@ public class TerrainWorldQueryTest {
 
     @Test
     public void callerOwnedFeatureScratchIsClearedDeduplicatedAndReusable() {
-        TerrainFeature.Spike later = new TerrainFeature.Spike(
+        Addon later = spike(
                 9L, new Vec3(0.0, 0.0, 0.0), 6.0, 1.0);
-        TerrainFeature.Feather earlier = new TerrainFeature.Feather(
+        Addon earlier = potion(
                 3L, new Vec3(1.0, 1.0, 1.0), 5.0);
         TerrainWorld world = new TerrainWorld(Arrays.asList(
-                featurePatch(2L, later), featurePatch(1L, earlier)));
-        ArrayList<TerrainFeature> scratch = new ArrayList<TerrainFeature>();
-        scratch.add(new TerrainFeature.Feather(
+                addonPatch(2L, later), addonPatch(1L, earlier)));
+        ArrayList<Addon> scratch = new ArrayList<Addon>();
+        scratch.add(potion(
                 999L, new Vec3(100.0, 100.0, 100.0), 0.1));
 
-        world.queryFeatures(new Aabb(
+        world.queryAddons(new Aabb(
                 new Vec3(-10.0, -2.0, -10.0),
                 new Vec3(10.0, 4.0, 10.0)), scratch);
 
         assertEquals(2, scratch.size());
-        assertEquals(3L, scratch.get(0).id);
-        assertEquals(9L, scratch.get(1).id);
+        assertEquals(3L, scratch.get(0).id());
+        assertEquals(9L, scratch.get(1).id());
 
-        world.queryFeatures(Aabb.around(
+        world.queryAddons(Aabb.around(
                 new Vec3(1000.0, 1000.0, 1000.0), 1.0, 1.0, 1.0), scratch);
         assertEquals("a later empty query must not expose stale candidates",
                 0, scratch.size());
@@ -107,18 +111,18 @@ public class TerrainWorldQueryTest {
     @Test(expected = IllegalArgumentException.class)
     public void duplicateFeatureIdsAreRejected() {
         new TerrainWorld(Arrays.asList(
-                featurePatch(1L, new TerrainFeature.Feather(
+                addonPatch(1L, potion(
                         4L, new Vec3(0.0, 1.0, 0.0), 0.2)),
-                featurePatch(2L, new TerrainFeature.Spike(
+                addonPatch(2L, spike(
                         4L, new Vec3(2.0, 0.0, 0.0), 0.4, 1.0))));
     }
 
     @Test
     public void deterministicDigestIncludesFeatureShapeAndIsPatchOrderIndependent() {
         TerrainPatch trianglePatch = patch(1L, triangle(1L, 0.0));
-        TerrainPatch smallSpike = featurePatch(2L, new TerrainFeature.Spike(
+        TerrainPatch smallSpike = addonPatch(2L, spike(
                 2L, new Vec3(0.0, 0.0, -2.0), 0.2, 1.0));
-        TerrainPatch largeSpike = featurePatch(2L, new TerrainFeature.Spike(
+        TerrainPatch largeSpike = addonPatch(2L, spike(
                 2L, new Vec3(0.0, 0.0, -2.0), 0.8, 2.0));
 
         TerrainWorld ordered = new TerrainWorld(Arrays.asList(trianglePatch, smallSpike));
@@ -139,11 +143,32 @@ public class TerrainWorldQueryTest {
 
     private static TerrainPatch patch(long patchId, TerrainTriangle triangle) {
         return new TerrainPatch(patchId, Collections.singletonList(triangle),
-                Collections.<TerrainFeature>emptyList());
+                Collections.<Addon>emptyList());
     }
 
-    private static TerrainPatch featurePatch(long patchId, TerrainFeature feature) {
+    private static TerrainPatch addonPatch(long patchId, Addon addon) {
         return new TerrainPatch(patchId, Collections.<TerrainTriangle>emptyList(),
-                Collections.singletonList(feature));
+                Collections.singletonList(addon));
+    }
+
+    private static Addon potion(long id, Vec3 center, double triggerRadius) {
+        Potion potion = new Potion(center, triggerRadius, "TEST");
+        potion.place(id, 0L, AddonFootprint.around(
+                center, triggerRadius, triggerRadius, triggerRadius));
+        return potion;
+    }
+
+    private static Addon spike(long id, Vec3 center, double radius, double height) {
+        Vec3 nearLeft = new Vec3(center.x - radius, center.y, center.z + radius);
+        Vec3 nearRight = new Vec3(center.x + radius, center.y, center.z + radius);
+        Vec3 farLeft = new Vec3(center.x - radius, center.y, center.z - radius);
+        Vec3 farRight = new Vec3(center.x + radius, center.y, center.z - radius);
+        DeathSpike spike = new DeathSpike(
+                nearLeft, nearRight, farLeft, farRight,
+                center.add(Vec3.UP.multiply(height)), Vec3.UP, 0.0,
+                center, radius, height);
+        spike.place(id, 0L, AddonFootprint.quadrilateral(
+                nearLeft, nearRight, farLeft, farRight));
+        return spike;
     }
 }

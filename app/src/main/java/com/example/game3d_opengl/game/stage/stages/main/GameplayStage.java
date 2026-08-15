@@ -23,7 +23,7 @@ import com.example.game3d.core.terrain.TerrainCommit;
 import com.example.game3d.core.terrain.TerrainCollisionIndex;
 import com.example.game3d.core.terrain.TerrainSnapshot;
 import com.example.game3d.core.terrain.TerrainOutput;
-import com.example.game3d.core.terrain.StreamingTerrainGenerator;
+import com.example.game3d.authoring.GameplayTerrainStream;
 import com.example.game3d_opengl.MyGLRenderer;
 import com.example.game3d_opengl.game.hud.GameHUD;
 import com.example.game3d_opengl.game.player.core.AndroidSimulationController;
@@ -33,8 +33,8 @@ import com.example.game3d_opengl.game.settings.SlowFrameStats;
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
 import com.example.game3d_opengl.game.stage.stage_api.RenderContext;
 import com.example.game3d_opengl.game.stage.stage_api.SceneRenderer;
-import com.example.game3d_opengl.game.terrain.track_elements.GameplayElementBatchRenderers;
-import com.example.game3d_opengl.game.terrain.presentation.CanonicalTerrainPresentation;
+import com.example.game3d_opengl.game.terrain.presentation.TerrainPresentation;
+import com.example.game3d_opengl.game.terrain.presentation.TerrainRendererRegistry;
 import com.example.game3d_opengl.game.terrain.track_elements.portal.PortalLightingEnvironment;
 import com.example.game3d_opengl.rendering.Camera;
 import com.example.game3d_opengl.rendering.util3d.FColor;
@@ -67,6 +67,7 @@ public class GameplayStage extends Stage {
     // Emergency catch-up runs on the GL thread. A large command burst directly becomes a long
     // rendered frame; the prepared lead/grace window gives us time to spread this work out.
     static final int COMMITTED_FRONTIER_EXTRA_GENERATION_BUDGET = 16;
+    static final int TERRAIN_AUTHORING_COMMAND_BUDGET = 128;
 
     private static final float INITIAL_PHASE_DURATION_MS = 2800f;
     private static final float PHASE_DURATION_GROWTH_FACTOR = 1.35f;
@@ -97,6 +98,7 @@ public class GameplayStage extends Stage {
     }
 
     private PreparedGameplaySession preparedSession;
+    private final TerrainRendererRegistry terrainRenderers;
 
     public GameplayStage(MyGLRenderer.StageManager stageManager, PreparedGameplaySession preparedSession){
         super(stageManager);
@@ -104,6 +106,7 @@ public class GameplayStage extends Stage {
             throw new IllegalArgumentException("preparedSession == null");
         }
         this.preparedSession = preparedSession;
+        this.terrainRenderers = stageManager.terrainRendererRegistry();
     }
 
     @Override
@@ -217,7 +220,7 @@ public class GameplayStage extends Stage {
         }
     }
 
-    StreamingTerrainGenerator terrainGenerator;
+    GameplayTerrainStream terrainGenerator;
 
     private Camera camera;
     private int frameCounter = 0;
@@ -283,7 +286,7 @@ public class GameplayStage extends Stage {
     private Player player;
     private AndroidSimulationController simulationController;
     private TerrainOutput terrainOutput;
-    private CanonicalTerrainPresentation terrainPresentation;
+    private TerrainPresentation terrainPresentation;
     private final PhysicsConfig presentationPhysicsConfig = new PhysicsConfig();
     private Vec3 renderOrigin = Vec3.ZERO;
     private long deferredSimulationElapsedNanos;
@@ -387,7 +390,7 @@ public class GameplayStage extends Stage {
                     "Gameplay session reached installation without its prepared collision index");
         }
         terrainPresentation =
-                new CanonicalTerrainPresentation(initialTerrain);
+                new TerrainPresentation(initialTerrain, terrainRenderers);
         Vec3 initialPosition =
                 new Vec3(player.getX(), player.getY(), player.getZ());
         AndroidSimulationController.TickListener listener =
@@ -748,20 +751,18 @@ public class GameplayStage extends Stage {
     }
 
     private void logDetailedFrameTiming(float dt) {
-        GameplayElementBatchRenderers renderers =
-                GameplayElementBatchRenderers.getDefaultOrNull();
-        int potionDraws = renderers != null
-                ? renderers.getPotionBatchDrawCalls() : 0;
-        int potionInstances = renderers != null
-                ? renderers.getPotionBatchInstanceCount() : 0;
-        int spikeDraws = renderers != null
-                ? renderers.getSpikeBatchDrawCalls() : 0;
-        int spikeInstances = renderers != null
-                ? renderers.getSpikeBatchInstanceCount() : 0;
+        int potionDraws = terrainPresentation != null
+                ? terrainPresentation.potionBatchDrawCalls() : 0;
+        int potionInstances = terrainPresentation != null
+                ? terrainPresentation.potionBatchInstanceCount() : 0;
+        int spikeDraws = terrainPresentation != null
+                ? terrainPresentation.spikeBatchDrawCalls() : 0;
+        int spikeInstances = terrainPresentation != null
+                ? terrainPresentation.spikeBatchInstanceCount() : 0;
         int visibleTiles = terrainPresentation != null
                 ? terrainPresentation.visibleSegmentCount() : 0;
         int visibleAddons = terrainPresentation != null
-                ? terrainPresentation.visibleFeatureCount() : 0;
+                ? terrainPresentation.visibleAddonCount() : 0;
         Log.d(FRAME_DETAIL_LOG_TAG, "dt=" + dt
                 + " visible=" + visibleTiles + "," + visibleAddons
                 + " potionBatch=" + potionDraws + "/" + potionInstances
@@ -1227,6 +1228,24 @@ public class GameplayStage extends Stage {
         }
     }
 
+    private void fillPlannedGameplayTerrain() {
+        int guard = 0;
+        while (terrainGenerator.getPlannedSegmentCount()
+                < REPLENISH_TERRAIN_THRESHOLD) {
+            int before = terrainGenerator.getPlannedSegmentCount();
+            enqueueGameplayLevels(REPLENISH_LEVEL_COUNT);
+            int after = terrainGenerator.getPlannedSegmentCount();
+            if (after <= before) {
+                throw new IllegalStateException(
+                        "A gameplay level did not add planned terrain");
+            }
+            if (++guard > REPLENISH_TERRAIN_THRESHOLD) {
+                throw new IllegalStateException(
+                        "Gameplay catalog could not fill the terrain plan");
+            }
+        }
+    }
+
     private void advanceNextSessionPreparation(int chunkBudget) {
         if (chunkBudget <= 0) {
             return;
@@ -1236,7 +1255,8 @@ public class GameplayStage extends Stage {
             return;
         }
         if (nextPreparedSession == null) {
-            nextPreparedSession = PreparedGameplaySession.createInitialSession();
+            nextPreparedSession = PreparedGameplaySession.createInitialSession(
+                    terrainGenerator.catalog());
         }
         if (!nextPreparedSession.isSpawnPlayableReady()) {
             SlowFrameStats.markTerrainGenerating();
@@ -1260,7 +1280,8 @@ public class GameplayStage extends Stage {
 
     private void handOffPreparedNextSessionToLoadingStage() {
         if (nextPreparedSession == null) {
-            nextPreparedSession = PreparedGameplaySession.createInitialSession();
+            nextPreparedSession = PreparedGameplaySession.createInitialSession(
+                    terrainGenerator.catalog());
         }
         PreparedGameplaySession session = nextPreparedSession;
         nextPreparedSession = null;
@@ -1380,10 +1401,9 @@ public class GameplayStage extends Stage {
                 generateCurrentTerrainThisFrame || mustCatchUpCurrentTerrain;
 
         if (allowRoutineCurrentTerrainGeneration
-                && shouldEnqueueGameplayLevels(
-                        terrainGenerator.getSegmentCount(),
-                        terrainGenerator.hasPendingGenerationWork())) {
-            enqueueGameplayLevels(REPLENISH_LEVEL_COUNT);
+                && terrainGenerator.getPlannedSegmentCount()
+                < REPLENISH_TERRAIN_THRESHOLD) {
+            fillPlannedGameplayTerrain();
         }
         committedLeadTiles =
                 terrainGenerator.getCommittedLeadAheadOf(referenceTileId);
@@ -1406,7 +1426,8 @@ public class GameplayStage extends Stage {
                 && terrainGenerator.hasPendingGenerationWork()) {
             SlowFrameStats.markTerrainGenerating();
             currentTerrainGeneratedThisFrame = true;
-            terrainGenerator.generateChunks(generationBudget);
+            terrainGenerator.generate(
+                    TERRAIN_AUTHORING_COMMAND_BUDGET, generationBudget);
             committedLeadTiles =
                     terrainGenerator.getCommittedLeadAheadOf(referenceTileId);
         }
@@ -1414,10 +1435,9 @@ public class GameplayStage extends Stage {
         // A same-frame drain can empty the authoring queue. Refill immediately when lead is
         // still short so even frames / next-session prep cannot leave the frontier empty.
         if (committedLeadTiles < desiredLeadTiles
-                && shouldEnqueueGameplayLevels(
-                        terrainGenerator.getSegmentCount(),
-                        terrainGenerator.hasPendingGenerationWork())) {
-            enqueueGameplayLevels(REPLENISH_LEVEL_COUNT);
+                && terrainGenerator.getPlannedSegmentCount()
+                < REPLENISH_TERRAIN_THRESHOLD) {
+            fillPlannedGameplayTerrain();
             int refillBudget = Math.min(
                     COMMITTED_FRONTIER_EXTRA_GENERATION_BUDGET,
                     desiredLeadTiles - committedLeadTiles);
@@ -1425,7 +1445,8 @@ public class GameplayStage extends Stage {
                     && terrainGenerator.hasPendingGenerationWork()) {
                 SlowFrameStats.markTerrainGenerating();
                 currentTerrainGeneratedThisFrame = true;
-                terrainGenerator.generateChunks(refillBudget);
+                terrainGenerator.generate(
+                        TERRAIN_AUTHORING_COMMAND_BUDGET, refillBudget);
                 committedLeadTiles =
                         terrainGenerator.getCommittedLeadAheadOf(referenceTileId);
             }

@@ -8,7 +8,9 @@ import com.example.game3d.core.terrain.CollisionTerrain;
 import com.example.game3d.core.terrain.SurfaceProperties;
 import com.example.game3d.core.terrain.TerrainCollisionIndex;
 import com.example.game3d.core.terrain.TerrainCommit;
-import com.example.game3d.core.terrain.TerrainFeature;
+import com.example.game3d.core.terrain.addon.Addon;
+import com.example.game3d.core.terrain.addon.AddonContactContext;
+import com.example.game3d.core.terrain.addon.AddonEffectSink;
 import com.example.game3d.core.terrain.TerrainSnapshot;
 import com.example.game3d.core.terrain.TerrainTriangle;
 import com.example.game3d.core.terrain.TerrainWorld;
@@ -39,17 +41,17 @@ public strictfp final class SimulationEngine {
     private final ArrayList<TerrainTriangle> triangleNeighborhoodScratch =
             new ArrayList<TerrainTriangle>(16);
     private Aabb triangleNeighborhoodBounds;
-    private final ArrayList<TerrainFeature> featureQueryScratch =
-            new ArrayList<TerrainFeature>(8);
+    private final ArrayList<Addon> addonQueryScratch =
+            new ArrayList<Addon>(8);
     private final ArrayList<JumpDecision> forecastJumpScratch =
             new ArrayList<JumpDecision>();
     private final ArrayList<SimulationEvent> forecastEventScratch =
             new ArrayList<SimulationEvent>();
     private SafeSupportForecastCache safeSupportForecastCache;
     private double commandedCruisingSpeed;
-    private FeatureActivitySnapshot cachedFeatureActivity =
-            new FeatureActivitySnapshot(Collections.<Long>emptySet());
-    private boolean featureActivityDirty;
+    private AddonActivitySnapshot cachedAddonActivity =
+            new AddonActivitySnapshot(Collections.<Long>emptySet());
+    private boolean addonActivityDirty;
 
     public SimulationEngine(TerrainWorld terrain, PhysicsConfig config,
                             Vec3 initialPosition, int initialAirJumpCharges,
@@ -171,6 +173,7 @@ public strictfp final class SimulationEngine {
                 ? new ArrayList<SpinSegment>() : null;
         ArrayList<JumpDecision> jumpEvaluations = new ArrayList<JumpDecision>();
         ArrayList<SimulationEvent> events = new ArrayList<SimulationEvent>();
+        decayHeldGestureCharge();
         InputOutcome inputOutcome = processInput(input.events);
         updateReleasedCharge();
 
@@ -232,7 +235,7 @@ public strictfp final class SimulationEngine {
                     eventTimeNanos(state, 1.0), state.position, 1.0));
         }
         if (!state.dead) {
-            collectFeathers(events);
+            collectPickups(events);
         }
         enforceFallingOnlyLandingJumpArm();
         sortEvents(events);
@@ -302,7 +305,7 @@ public strictfp final class SimulationEngine {
      * Builds the presentation frame around an already captured authoritative player snapshot.
      *
      * <p>The Android clock already receives the snapshot from {@link #step}; accepting it here
-     * avoids taking a duplicate body snapshot merely to attach terrain/feature presentation
+     * avoids taking a duplicate body snapshot merely to attach terrain/addon presentation
      * state.</p>
      */
     public SimulationFrameSnapshot frameSnapshot(PlayerSnapshot playerSnapshot) {
@@ -311,13 +314,13 @@ public strictfp final class SimulationEngine {
             throw new IllegalArgumentException(
                     "playerSnapshot must describe the engine's current tick");
         }
-        if (featureActivityDirty) {
-            cachedFeatureActivity =
-                    new FeatureActivitySnapshot(state.collectedFeatures);
-            featureActivityDirty = false;
+        if (addonActivityDirty) {
+            cachedAddonActivity =
+                    new AddonActivitySnapshot(state.inactiveAddonIds);
+            addonActivityDirty = false;
         }
         return new SimulationFrameSnapshot(
-                playerSnapshot, terrainRevision(), cachedFeatureActivity);
+                playerSnapshot, terrainRevision(), cachedAddonActivity);
     }
 
     public long terrainRevision() {
@@ -351,8 +354,8 @@ public strictfp final class SimulationEngine {
         index.apply(commit);
         invalidateSafeSupportForecast();
         invalidateTriangleNeighborhood();
-        featureQueryScratch.clear();
-        purgeRetiredCollectedFeatures(index);
+        addonQueryScratch.clear();
+        purgeRetiredInactiveAddons(index);
         if (supportedId >= 0L
                 && oldFingerprint != index.collisionFingerprint(supportedId)) {
             clearSupport();
@@ -361,7 +364,7 @@ public strictfp final class SimulationEngine {
 
     /**
      * Atomically swaps the immutable terrain snapshot between fixed ticks. Body state, collected
-     * feature IDs, and support identity are retained when the referenced triangle still exists.
+     * addon IDs, and support identity are retained when the referenced triangle still exists.
      */
     public void replaceTerrain(TerrainWorld replacement) {
         if (replacement == null) {
@@ -370,7 +373,7 @@ public strictfp final class SimulationEngine {
         terrain = replacement;
         invalidateSafeSupportForecast();
         invalidateTriangleNeighborhood();
-        featureQueryScratch.clear();
+        addonQueryScratch.clear();
         if (state.supportTriangleId >= 0L
                 && !replacement.containsTriangle(state.supportTriangleId)) {
             clearSupport();
@@ -449,9 +452,9 @@ public strictfp final class SimulationEngine {
             return;
         }
 
-        // Classify the complete physical finger path, independently of horizontal/vertical
-        // sensitivity. Per-MotionEvent checks can be bypassed simply by packetizing the same
-        // path differently, so keep cumulative displacement and peak excursion for the phase.
+        // Raw motion decides whether this individual packet is vertical enough. Earlier
+        // steering never poisons a later upward packet; sensitivity-scaled Y decides how much
+        // charge that accepted packet contributes.
         state.gestureRawDeltaX += event.rawDeltaXScreenHeights;
         state.gestureMaxAbsRawDeltaX = Math.max(
                 state.gestureMaxAbsRawDeltaX,
@@ -459,21 +462,66 @@ public strictfp final class SimulationEngine {
 
         if (event.rawDeltaYScreenHeights < 0.0) {
             state.gestureRawUpwardDistance -= event.rawDeltaYScreenHeights;
-            // An upward correction changes the held gesture's intent back to jumping.
             state.impactBrakeArmed = false;
-            state.gestureChargePotential = clamp01(state.gestureChargePotential
-                    - event.deltaYScreenHeights * config.swipeChargePerScreenHeight);
-        } else if (isVerticallyDominantDownSwipe(event)) {
-            if (!state.grounded && state.velocity.y < 0.0) {
-                state.impactBrakeArmed = true;
-                state.landingJumpArmed = false;
+            double contribution = Math.max(0.0,
+                    -event.deltaYScreenHeights * config.swipeChargePerScreenHeight);
+            state.gestureLastSwipeChargeEligible = contribution > 0.0
+                    && isUpwardChargeSwipe(event);
+            if (state.gestureLastSwipeChargeEligible) {
+                state.gestureCharge = clamp01(state.gestureCharge + contribution);
+                state.gestureChargePotential = state.gestureCharge;
+                state.heldChargeLastContributionNanos = state.timeNanos;
             }
-            state.gestureChargePotential = clamp01(state.gestureChargePotential
-                    - event.deltaYScreenHeights * config.swipeCancelPerScreenHeight);
+        } else {
+            state.gestureLastSwipeChargeEligible = false;
+            applyImpactBrakeSwipe(event);
         }
+    }
 
-        state.gestureCharge = jumpChargePathEligible(state)
-                ? state.gestureChargePotential : 0.0;
+    private boolean isUpwardChargeSwipe(PlayerInputEvent event) {
+        return event.rawDeltaYScreenHeights < 0.0
+                && Math.abs(event.rawDeltaXScreenHeights) <=
+                -event.rawDeltaYScreenHeights * config.maxJumpChargeXToYRatio
+                        + 1.0e-12;
+    }
+
+    private void decayHeldGestureCharge() {
+        if (!state.touchHeld || state.gestureConsumed
+                || state.heldChargeLastContributionNanos < 0L) {
+            return;
+        }
+        long graceEnd = state.heldChargeLastContributionNanos
+                + config.heldGestureChargeGraceNanos;
+        // State time is this tick's start. Age charge only through that boundary so a release
+        // is never evaluated using charge from the future portion of its physics tick.
+        long tickEnd = state.timeNanos;
+        long tickStart = Math.max(0L, tickEnd - PhysicsConfig.FIXED_DT_NANOS);
+        long decayStart = Math.max(tickStart, graceEnd);
+        long decayNanos = Math.max(0L, tickEnd - decayStart);
+        if (decayNanos == 0L) {
+            return;
+        }
+        double decay = (double) decayNanos
+                / (double) config.heldGestureChargeDecayNanos;
+        state.gestureCharge = clamp01(state.gestureCharge - decay);
+        state.gestureChargePotential = state.gestureCharge;
+        if (!charged()) {
+            state.landingJumpArmed = false;
+        }
+    }
+
+    private void applyImpactBrakeSwipe(PlayerInputEvent event) {
+        if (!isVerticallyDominantDownSwipe(event)) {
+            return;
+        }
+        if (!state.grounded && state.velocity.y < 0.0) {
+            state.impactBrakeArmed = true;
+            state.landingJumpArmed = false;
+        }
+        double cancellation =
+                event.deltaYScreenHeights * config.swipeCancelPerScreenHeight;
+        state.gestureCharge = clamp01(state.gestureCharge - cancellation);
+        state.gestureChargePotential = state.gestureCharge;
     }
 
     private boolean isVerticallyDominantDownSwipe(PlayerInputEvent event) {
@@ -486,11 +534,7 @@ public strictfp final class SimulationEngine {
     }
 
     private boolean jumpChargePathEligible(PlayerBodyState body) {
-        double upward = body.gestureRawUpwardDistance;
-        double horizontal = body.gestureMaxAbsRawDeltaX;
-        return upward > 0.0
-                && horizontal <= config.maxJumpChargeXScreenHeights + 1.0e-12
-                && horizontal <= config.maxJumpChargeXToYRatio * upward + 1.0e-12;
+        return body.gestureLastSwipeChargeEligible;
     }
 
     private void updateReleasedCharge() {
@@ -786,8 +830,8 @@ public strictfp final class SimulationEngine {
                         if (impactBrake) {
                             clearGestureRequest(body);
                             // The downward intent has been consumed, but the physical touch has
-                            // not. Begin a fresh gesture phase so reversing into an upward swipe
-                            // can charge a jump without requiring TOUCH_UP + TOUCH_DOWN first.
+                            // not. Begin a fresh held-charge accumulator so reversing into an
+                            // upward swipe works without requiring TOUCH_UP + TOUCH_DOWN first.
                             body.gestureConsumed = false;
                             if (wouldBounce && allowLandingRules) {
                                 events.add(new SimulationEvent(
@@ -1340,51 +1384,49 @@ public strictfp final class SimulationEngine {
     private long findOverlappingSpike(PlayerBodyState body) {
         Aabb bodyBounds = CylinderCollider.bounds(body.position, body.axis(),
                 config.cylinderHalfLength, config.cylinderRadius);
-        terrain.queryFeatures(bodyBounds, featureQueryScratch);
-        for (int i = 0; i < featureQueryScratch.size(); i++) {
-            TerrainFeature feature = featureQueryScratch.get(i);
-            if (feature.kind != TerrainFeature.Kind.SPIKE) {
+        terrain.queryAddons(bodyBounds, addonQueryScratch);
+        AddonContactContext context = new AddonContactContext(
+                body.position, body.axis(), config.cylinderRadius,
+                config.cylinderHalfLength, bodyBounds);
+        ContactProbeSink sink = new ContactProbeSink();
+        for (int i = 0; i < addonQueryScratch.size(); i++) {
+            Addon addon = addonQueryScratch.get(i);
+            if (addon.contactPhase() != Addon.ContactPhase.HAZARD) {
                 continue;
             }
-            TerrainFeature.Spike spike = (TerrainFeature.Spike) feature;
-            double dx = body.position.x - spike.center.x;
-            double dz = body.position.z - spike.center.z;
-            double horizontalRadius = spike.radius + config.cylinderRadius
-                    + config.cylinderHalfLength;
-            if (dx * dx + dz * dz <= horizontalRadius * horizontalRadius
-                    && bodyBounds.min.y <= spike.center.y + spike.height
-                    && bodyBounds.max.y >= spike.center.y) {
-                return spike.id;
+            sink.clear();
+            addon.evaluateContact(context, sink);
+            if (sink.hazardId >= 0L) {
+                return sink.hazardId;
             }
         }
         return -1L;
     }
 
-    private void collectFeathers(List<SimulationEvent> events) {
+    private void collectPickups(List<SimulationEvent> events) {
         Aabb bodyBounds = CylinderCollider.bounds(state.position, state.axis(),
                 config.cylinderHalfLength, config.cylinderRadius);
-        terrain.queryFeatures(
-                bodyBounds.expanded(config.cylinderRadius), featureQueryScratch);
-        for (int i = 0; i < featureQueryScratch.size(); i++) {
-            TerrainFeature feature = featureQueryScratch.get(i);
-            if (feature.kind != TerrainFeature.Kind.FEATHER
-                    || state.collectedFeatures.contains(feature.id)) {
+        terrain.queryAddons(
+                bodyBounds.expanded(config.cylinderRadius), addonQueryScratch);
+        AddonContactContext context = new AddonContactContext(
+                state.position, state.axis(), config.cylinderRadius,
+                config.cylinderHalfLength, bodyBounds);
+        ContactProbeSink sink = new ContactProbeSink();
+        for (int i = 0; i < addonQueryScratch.size(); i++) {
+            Addon addon = addonQueryScratch.get(i);
+            if (addon.contactPhase() != Addon.ContactPhase.PICKUP
+                    || state.inactiveAddonIds.contains(addon.id())) {
                 continue;
             }
-            TerrainFeature.Feather feather = (TerrainFeature.Feather) feature;
-            Vec3 offset = feather.center.subtract(state.position);
-            double axial = clamp(offset.dot(state.axis()),
-                    -config.cylinderHalfLength, config.cylinderHalfLength);
-            Vec3 nearestAxisPoint = state.position.add(state.axis().multiply(axial));
-            double triggerDistance = config.cylinderRadius + feather.triggerRadius;
-            if (feather.center.subtract(nearestAxisPoint).lengthSquared()
-                    <= triggerDistance * triggerDistance) {
-                state.collectedFeatures.add(feature.id);
-                featureActivityDirty = true;
-                state.airJumpCharges++;
+            sink.clear();
+            addon.evaluateContact(context, sink);
+            if (sink.pickupId >= 0L) {
+                state.inactiveAddonIds.add(sink.pickupId);
+                addonActivityDirty = true;
+                state.airJumpCharges += sink.airJumpCharges;
                 invalidateSafeSupportForecast();
                 events.add(new SimulationEvent(SimulationEvent.Type.FEATHER_COLLECTED,
-                        feature.id, "air jump charges=" + state.airJumpCharges,
+                        sink.pickupId, "air jump charges=" + state.airJumpCharges,
                         eventTimeNanos(state, 1.0), state.position, 1.0));
             }
         }
@@ -1506,6 +1548,8 @@ public strictfp final class SimulationEngine {
         body.gestureRawDeltaX = 0.0;
         body.gestureRawUpwardDistance = 0.0;
         body.gestureMaxAbsRawDeltaX = 0.0;
+        body.gestureLastSwipeChargeEligible = false;
+        body.heldChargeLastContributionNanos = -1L;
     }
 
     private boolean charged() {
@@ -1554,6 +1598,7 @@ public strictfp final class SimulationEngine {
                 && state.gestureRawUpwardDistance >= -1.0e-12
                 && Double.isFinite(state.gestureMaxAbsRawDeltaX)
                 && state.gestureMaxAbsRawDeltaX >= -1.0e-12
+                && state.heldChargeLastContributionNanos >= -1L
                 && state.airJumpCharges >= 0
                 && (!state.landingJumpArmed
                 || (!state.grounded
@@ -1591,6 +1636,8 @@ public strictfp final class SimulationEngine {
         hash = mix(hash, quantize(state.gestureRawDeltaX));
         hash = mix(hash, quantize(state.gestureRawUpwardDistance));
         hash = mix(hash, quantize(state.gestureMaxAbsRawDeltaX));
+        hash = mix(hash, state.gestureLastSwipeChargeEligible ? 1L : 0L);
+        hash = mix(hash, state.heldChargeLastContributionNanos);
         hash = mix(hash, state.airJumpCharges);
         hash = mix(hash, state.grounded ? 1L : 0L);
         hash = mix(hash, state.supportTriangleId);
@@ -1611,25 +1658,48 @@ public strictfp final class SimulationEngine {
         hash = mix(hash, state.airborneReleaseNanos);
         hash = mix(hash, quantize(state.airborneReleaseCharge));
         hash = mix(hash, state.jumpCooldownUntilNanos);
-        ArrayList<Long> collectedFeatureIds =
-                new ArrayList<Long>(state.collectedFeatures);
-        Collections.sort(collectedFeatureIds);
-        hash = mix(hash, collectedFeatureIds.size());
-        for (Long featureId : collectedFeatureIds) {
-            hash = mix(hash, featureId.longValue());
+        ArrayList<Long> inactiveAddonIds =
+                new ArrayList<Long>(state.inactiveAddonIds);
+        Collections.sort(inactiveAddonIds);
+        hash = mix(hash, inactiveAddonIds.size());
+        for (Long addonId : inactiveAddonIds) {
+            hash = mix(hash, addonId.longValue());
         }
         return hash;
     }
 
-    private void purgeRetiredCollectedFeatures(TerrainCollisionIndex index) {
+    private void purgeRetiredInactiveAddons(TerrainCollisionIndex index) {
         ArrayList<Long> removed = new ArrayList<Long>();
-        for (Long featureId : state.collectedFeatures) {
-            if (!index.containsFeature(featureId.longValue())) {
-                removed.add(featureId);
+        for (Long addonId : state.inactiveAddonIds) {
+            if (!index.containsAddon(addonId.longValue())) {
+                removed.add(addonId);
             }
         }
-        if (state.collectedFeatures.removeAll(removed)) {
-            featureActivityDirty = true;
+        if (state.inactiveAddonIds.removeAll(removed)) {
+            addonActivityDirty = true;
+        }
+    }
+
+    private static final class ContactProbeSink implements AddonEffectSink {
+        long hazardId = -1L;
+        long pickupId = -1L;
+        int airJumpCharges;
+
+        void clear() {
+            hazardId = -1L;
+            pickupId = -1L;
+            airJumpCharges = 0;
+        }
+
+        @Override
+        public void hitHazard(long addonId) {
+            hazardId = addonId;
+        }
+
+        @Override
+        public void grantAirJump(long addonId, int charges) {
+            pickupId = addonId;
+            airJumpCharges = charges;
         }
     }
 

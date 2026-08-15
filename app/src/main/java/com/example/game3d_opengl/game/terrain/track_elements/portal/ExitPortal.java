@@ -8,6 +8,8 @@ import com.example.game3d_opengl.game.terrain.track_elements.portal.assets.Porta
 import com.example.game3d_opengl.game.terrain.track_elements.portal.assets.PortalAssets;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 
+/** @deprecated Mutable compatibility addon for the legacy terrain diagnostics. */
+@Deprecated
 public final class ExitPortal extends Addon {
     private static final Vector3D WORLD_UP = new Vector3D(0f, 1f, 0f);
 
@@ -116,9 +118,7 @@ public final class ExitPortal extends Addon {
 
     @Override
     public void accept(Player player) {
-        if (player != null) {
-            player.interactWith(this);
-        }
+        // Legacy portals were visual-only.
     }
 
     @Override
