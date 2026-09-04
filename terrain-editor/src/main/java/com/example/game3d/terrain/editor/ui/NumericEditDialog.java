@@ -41,10 +41,19 @@ public final class NumericEditDialog {
         while (dialog.showAndWait().orElse(ButtonType.CANCEL) == apply) {
             try {
                 TileEdits.Mode selectedMode = mode.getValue();
-                return Optional.of(new NumericEditRequest(field.getValue(), selectedMode,
+                NumericEditRequest request = new NumericEditRequest(field.getValue(), selectedMode,
                         Double.parseDouble(start.getText().trim()),
                         selectedMode == TileEdits.Mode.LINEAR_SEQUENCE
-                                ? Double.parseDouble(increment.getText().trim()) : 0.0));
+                                ? Double.parseDouble(increment.getText().trim()) : 0.0);
+                if (selectedMode == TileEdits.Mode.LINEAR_SEQUENCE && selectedCount > 0) {
+                    double last = request.start()
+                            + (selectedCount - 1.0) * request.increment();
+                    if (!Double.isFinite(last)) {
+                        throw new IllegalArgumentException(
+                                "Numeric sequence produces a non-finite value");
+                    }
+                }
+                return Optional.of(request);
             } catch (IllegalArgumentException invalid) {
                 new Alert(Alert.AlertType.ERROR, "Values must be finite numbers.").showAndWait();
             }

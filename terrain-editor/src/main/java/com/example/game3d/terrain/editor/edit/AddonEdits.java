@@ -6,12 +6,14 @@ import com.example.game3d.terrain.io.model.Placement;
 import com.example.game3d.terrain.io.model.StructureDocument;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Set;
 
 public final class AddonEdits {
     private AddonEdits() {}
 
     public static DocumentEdit add(AddonReservation reservation) {
+        requireFinite(reservation);
         return document -> {
             if (!(document instanceof StructureDocument structure))
                 throw new IllegalArgumentException("Addon operation requires a structure");
@@ -37,6 +39,7 @@ public final class AddonEdits {
         if (sourceId == null || sourceId.isEmpty() || placement == null) {
             throw new IllegalArgumentException("sourceId and placement are required");
         }
+        requireFinite(placement);
         return document -> {
             if (!(document instanceof StructureDocument structure)) {
                 throw new IllegalArgumentException(
@@ -49,6 +52,7 @@ public final class AddonEdits {
                     addons.add(addon);
                     continue;
                 }
+                requireFinite(addon);
                 addons.add(new AddonReservation(addon.sourceId(), addon.kind(),
                         placement, addon.pairSourceId(), addon.parameters()));
                 found = true;
@@ -58,5 +62,28 @@ public final class AddonEdits {
             }
             return structure.withAddons(addons);
         };
+    }
+
+    private static void requireFinite(AddonReservation reservation) {
+        if (reservation == null) {
+            throw new IllegalArgumentException("reservation is required");
+        }
+        requireFinite(reservation.placement());
+        for (Map.Entry<String, Double> parameter : reservation.parameters().entrySet()) {
+            Double value = parameter.getValue();
+            if (value == null || !Double.isFinite(value)) {
+                throw new IllegalArgumentException("Addon parameter '" + parameter.getKey()
+                        + "' must be finite");
+            }
+        }
+    }
+
+    private static void requireFinite(Placement placement) {
+        if (placement.mode() == Placement.Mode.SEGMENT_NORMALIZED
+                && (!Double.isFinite(placement.across())
+                || !Double.isFinite(placement.along()))) {
+            throw new IllegalArgumentException(
+                    "Normalized placement coordinates must be finite");
+        }
     }
 }

@@ -20,11 +20,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -157,6 +159,24 @@ class RandomGridAddonEditsTest {
         StructureDocument noCapacity = oneRow.withAddons(full);
         assertThrows(IllegalStateException.class, () -> RandomGridAddonEdits.expand(
                 noCapacity, 1L, 1, AddonKind.AIR_JUMP_POTION));
+    }
+
+    @Test void capacityAdditionCannotOverflowOrMutateHistory() {
+        StructureDocument base = straight(GridMode.ADVANCED, 1);
+        AddonReservation existing = new AddonReservation(
+                "00000000-0000-0000-0000-000000000099",
+                AddonKind.DEATH_SPIKE, Placement.grid(1, 1, 1, 1), null, Map.of());
+        StructureDocument source = base.withAddons(List.of(existing));
+        EditorHistory history = new EditorHistory(EditorState.unsaved(source));
+
+        assertThrows(IllegalArgumentException.class, () -> history.apply(
+                RandomGridAddonEdits.add(
+                        1L, Integer.MAX_VALUE, AddonKind.DEATH_SPIKE)));
+
+        assertSame(source, history.state().document());
+        assertEquals(0L, history.state().revision());
+        assertFalse(history.canUndo());
+        assertFalse(history.canRedo());
     }
 
     private static StructureDocument straight(GridMode mode, int count) {

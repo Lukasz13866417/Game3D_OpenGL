@@ -28,11 +28,12 @@ public final class TileEdits {
             List<TileRecord> generated = new ArrayList<>();
             for (int i = 0; i < spec.count(); i++) {
                 generated.add(new TileRecord(sourceIds.get(), solid,
-                        spec.startTurn() + i * spec.turnIncrement(),
-                        spec.startSlope() + i * spec.slopeIncrement(),
-                        spec.startLift() + i * spec.liftIncrement(), surface,
-                        spec.startAlpha() + i * spec.alphaIncrement(),
-                        spec.startBrightness() + i * spec.brightnessIncrement()));
+                        finiteSequence(spec.startTurn(), spec.turnIncrement(), i, "turn"),
+                        finiteSequence(spec.startSlope(), spec.slopeIncrement(), i, "slope"),
+                        finiteSequence(spec.startLift(), spec.liftIncrement(), i, "lift"), surface,
+                        finiteSequence(spec.startAlpha(), spec.alphaIncrement(), i, "alpha"),
+                        finiteSequence(spec.startBrightness(), spec.brightnessIncrement(), i,
+                                "brightness")));
             }
             tiles.addAll(insertAt, generated);
             return structure.withTiles(tiles);
@@ -84,6 +85,14 @@ public final class TileEdits {
 
     public static DocumentEdit numeric(Set<String> sourceIds, Field field, Mode mode,
                                        double start, double increment) {
+        if (sourceIds == null || field == null || mode == null) {
+            throw new IllegalArgumentException("Numeric edit arguments are required");
+        }
+        requireFinite(start, field.name().toLowerCase());
+        requireFinite(increment, field.name().toLowerCase() + " increment");
+        if (mode != Mode.LINEAR_SEQUENCE && increment != 0.0) {
+            throw new IllegalArgumentException("Only a linear sequence has an increment");
+        }
         return document -> {
             StructureDocument structure = requireStructure(document);
             List<TileRecord> tiles = new ArrayList<>();
@@ -93,10 +102,13 @@ public final class TileEdits {
                     tiles.add(tile);
                     continue;
                 }
-                double operand = mode == Mode.LINEAR_SEQUENCE ? start + selectedIndex * increment : start;
+                double operand = mode == Mode.LINEAR_SEQUENCE
+                        ? finiteSequence(start, increment, selectedIndex, field.name().toLowerCase())
+                        : requireFinite(start, field.name().toLowerCase());
                 selectedIndex++;
                 double current = fieldValue(tile, field);
-                double value = mode == Mode.ADD ? current + operand : operand;
+                double value = mode == Mode.ADD
+                        ? requireFinite(current + operand, field.name().toLowerCase()) : operand;
                 tiles.add(withField(tile, field, value));
             }
             return structure.withTiles(tiles);
@@ -172,5 +184,17 @@ public final class TileEdits {
         if (!(document instanceof StructureDocument structure))
             throw new IllegalArgumentException("Tile operation requires a structure document");
         return structure;
+    }
+
+    private static double finiteSequence(
+            double start, double increment, int index, String field) {
+        return requireFinite(start + index * increment, field);
+    }
+
+    private static double requireFinite(double value, String field) {
+        if (!Double.isFinite(value)) {
+            throw new NumberFormatException(field + " edit produced a non-finite value");
+        }
+        return value;
     }
 }

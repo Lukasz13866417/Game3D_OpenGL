@@ -38,6 +38,27 @@ class NumericTileEditTest {
                 TileEdits.Field.SLOPE, TileEdits.Mode.ADD, 1, 2));
     }
 
+    @Test void computedOverflowRejectsWholeEdit() {
+        StructureDocument source = new StructureDocument(1, "overflow", GridMode.ADVANCED,
+                Arrays.asList(tile("a", Double.MAX_VALUE), tile("b", 2)), java.util.List.of());
+
+        assertThrows(NumberFormatException.class, () -> TileEdits.numeric(Set.of("a"),
+                TileEdits.Field.TURN, TileEdits.Mode.ADD, Double.MAX_VALUE, 0).apply(source));
+        assertThrows(NumberFormatException.class, () -> TileEdits.numeric(Set.of("a", "b"),
+                TileEdits.Field.TURN, TileEdits.Mode.LINEAR_SEQUENCE,
+                Double.MAX_VALUE, Double.MAX_VALUE).apply(source));
+
+        assertEquals(Arrays.asList(Double.MAX_VALUE, 2.0), turns(source));
+    }
+
+    @Test void finiteSemanticErrorsRemainEditableDraftValues() {
+        StructureDocument source = new StructureDocument(1, "semantic-draft", GridMode.ADVANCED,
+                java.util.List.of(tile("a", 0)), java.util.List.of());
+        StructureDocument result = (StructureDocument) TileEdits.numeric(Set.of("a"),
+                TileEdits.Field.ALPHA, TileEdits.Mode.SET, 2.0, 0).apply(source);
+        assertEquals(2.0, result.tiles().get(0).alpha());
+    }
+
     private static TileRecord tile(String id, double turn) {
         return new TileRecord(id, true, turn, 0, 0, "NORMAL", 1, 1);
     }

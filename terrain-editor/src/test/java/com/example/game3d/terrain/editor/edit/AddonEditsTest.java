@@ -1,5 +1,7 @@
 package com.example.game3d.terrain.editor.edit;
 
+import com.example.game3d.terrain.editor.state.EditorHistory;
+import com.example.game3d.terrain.editor.state.EditorState;
 import com.example.game3d.terrain.io.model.AddonKind;
 import com.example.game3d.terrain.io.model.AddonReservation;
 import com.example.game3d.terrain.io.model.GridMode;
@@ -13,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class AddonEditsTest {
@@ -47,5 +51,27 @@ class AddonEditsTest {
         assertThrows(IllegalArgumentException.class, () -> AddonEdits
                 .replacePlacement("missing", Placement.grid(1, 1, 1, 1))
                 .apply(source));
+    }
+
+    @Test void nonFinitePlacementAndParametersAreRejectedBeforeHistoryChanges() {
+        assertThrows(IllegalArgumentException.class, () -> Placement.normalized(
+                "tile", Double.NaN, .5));
+        assertThrows(IllegalArgumentException.class, () -> Placement.normalized(
+                "tile", .5, Double.POSITIVE_INFINITY));
+
+        StructureDocument source = new StructureDocument(1, "finite-boundary",
+                GridMode.ADVANCED, List.of(), List.of());
+        EditorHistory history = new EditorHistory(EditorState.unsaved(source));
+        AddonReservation badParameter = new AddonReservation("bad-addon",
+                AddonKind.DEATH_SPIKE, Placement.grid(1, 1, 1, 1), null,
+                Map.of("height", Double.NEGATIVE_INFINITY));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> history.apply(AddonEdits.add(badParameter)));
+
+        assertSame(source, history.state().document());
+        assertEquals(0L, history.state().revision());
+        assertFalse(history.canUndo());
+        assertFalse(history.canRedo());
     }
 }

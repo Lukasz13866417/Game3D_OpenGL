@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
 import java.util.stream.Stream;
 
 /** Atomic, collision-safe recovery snapshots after an idle delay or focus loss. */
@@ -49,38 +50,76 @@ public final class RecoveryService implements AutoCloseable {
     public record RestoreResult(
             EditorState state,
             boolean reboundToOriginal,
-            Path originalSourcePath) {
+            Path originalSourcePath,
+            DiskVersion diskVersion) {
         public boolean requiresSaveAs() {
             return state.sourcePath() == null;
         }
     }
 
     private final TerrainJsonCodec codec;
-    private final AtomicFileStore files;
+    private final RecoveryStorage storage;
     private final Path directory;
     private final String instanceId;
     private final long idleMillis;
     private final ScheduledExecutorService executor;
+    private final Executor statusExecutor;
+    private final RecoveryStatusListener statusListener;
     private ScheduledFuture<?> pending;
     private EditorState latest;
+    private volatile RecoveryStatus status =
+            new RecoveryStatus(RecoveryHealth.NOT_NEEDED, null, null);
 
     public RecoveryService(TerrainJsonCodec codec, Path directory, Duration idle) {
         this(codec, directory, idle, UUID.randomUUID().toString());
     }
 
+    public RecoveryService(
+            TerrainJsonCodec codec,
+            Path directory,
+            Duration idle,
+            Executor statusExecutor,
+            RecoveryStatusListener statusListener) {
+        this(codec, directory, idle, UUID.randomUUID().toString(),
+                new NioRecoveryStorage(), newRecoveryExecutor(), statusExecutor,
+                statusListener);
+    }
+
     RecoveryService(
             TerrainJsonCodec codec, Path directory, Duration idle,
             String instanceId) {
+        this(codec, directory, idle, instanceId,
+                new NioRecoveryStorage(), newRecoveryExecutor(), Runnable::run,
+                ignored -> {});
+    }
+
+    /** Advanced constructor for UI status delivery and hermetic tests. The service owns executor. */
+    public RecoveryService(
+            TerrainJsonCodec codec,
+            Path directory,
+            Duration idle,
+            String instanceId,
+            RecoveryStorage storage,
+            ScheduledExecutorService executor,
+            Executor statusExecutor,
+            RecoveryStatusListener statusListener) {
         if (codec == null || directory == null || idle == null
-                || instanceId == null || instanceId.isEmpty()) {
+                || instanceId == null || instanceId.isEmpty() || storage == null
+                || executor == null || statusExecutor == null || statusListener == null) {
             throw new IllegalArgumentException("Recovery arguments are required");
         }
         this.codec = codec;
-        this.files = new AtomicFileStore();
+        this.storage = storage;
         this.directory = directory;
         this.instanceId = instanceId;
         this.idleMillis = idle.toMillis();
-        this.executor = Executors.newSingleThreadScheduledExecutor(task -> {
+        this.executor = executor;
+        this.statusExecutor = statusExecutor;
+        this.statusListener = statusListener;
+    }
+
+    private static ScheduledExecutorService newRecoveryExecutor() {
+        return Executors.newSingleThreadScheduledExecutor(task -> {
             Thread thread = new Thread(task, "terrain-editor-recovery");
             thread.setDaemon(true);
             return thread;
@@ -90,12 +129,21 @@ public final class RecoveryService implements AutoCloseable {
     public synchronized void edited(EditorState state) {
         latest = state;
         if (pending != null) pending.cancel(false);
+        reportPendingUnlessFailed(pathFor(state));
         pending = executor.schedule(this::saveLatestUnchecked,
                 idleMillis, TimeUnit.MILLISECONDS);
     }
 
     public synchronized void focusLost() {
-        saveLatestUnchecked();
+        if (pending != null) pending.cancel(false);
+        if (latest == null) {
+            pending = null;
+            return;
+        }
+        reportPendingUnlessFailed(pathFor(latest));
+        // Encoding and fsync can be expensive on large drafts; never perform them on the FX
+        // focus event. close()/checkpoint() remain synchronous durability boundaries.
+        pending = executor.schedule(this::saveLatestUnchecked, 0L, TimeUnit.MILLISECONDS);
     }
 
     /** Synchronously writes a replacement draft, reporting failure to the caller. */
@@ -105,8 +153,15 @@ public final class RecoveryService implements AutoCloseable {
         if (pending != null) pending.cancel(false);
         pending = null;
         Path path = pathFor(state);
-        files.writeUtf8(path, encodeEnvelope(state, codec));
-        return path;
+        try {
+            String encoded = encodeEnvelope(state, codec);
+            storage.writeUtf8(path, encoded);
+            report(new RecoveryStatus(RecoveryHealth.SAVED, path, null));
+            return path;
+        } catch (IOException | RuntimeException failure) {
+            report(new RecoveryStatus(RecoveryHealth.FAILED, path, failure));
+            throw failure;
+        }
     }
 
     public Path pathFor(EditorState state) {
@@ -115,10 +170,17 @@ public final class RecoveryService implements AutoCloseable {
     }
 
     public synchronized void clear(EditorState state) throws IOException {
-        Files.deleteIfExists(pathFor(state));
-        latest = null;
-        if (pending != null) pending.cancel(false);
-        pending = null;
+        Path path = pathFor(state);
+        try {
+            storage.deleteIfExists(path);
+            latest = null;
+            if (pending != null) pending.cancel(false);
+            pending = null;
+            report(new RecoveryStatus(RecoveryHealth.NOT_NEEDED, path, null));
+        } catch (IOException | RuntimeException failure) {
+            report(new RecoveryStatus(RecoveryHealth.FAILED, path, failure));
+            throw failure;
+        }
     }
 
     public static List<RecoveryDraft> list(Path directory) throws IOException {
@@ -163,13 +225,23 @@ public final class RecoveryService implements AutoCloseable {
                     EditorState rebound = new EditorState(
                             envelope.document, source, envelope.baseDigest,
                             Set.of(), 0L, List.of());
-                    return new RestoreResult(rebound, true, source);
+                    return new RestoreResult(
+                            rebound, true, source, current.diskVersion());
                 }
             } catch (IOException | CodecException changedMissingOrInvalid) {
                 // Fall through to an untitled recovery. Never bind uncertain disk state.
             }
         }
-        return new RestoreResult(EditorState.unsaved(envelope.document), false, source);
+        if (source != null && envelope.baseDigest == null && !Files.exists(source)) {
+            // A new document can carry an intended Save target even before that file exists.
+            // Keeping that absent target is safe because CREATE_NEW still conditionally checks
+            // absence and will conflict if another process creates it after restoration.
+            EditorState intended = new EditorState(
+                    envelope.document, source, null, Set.of(), 0L, List.of());
+            return new RestoreResult(intended, true, source, null);
+        }
+        return new RestoreResult(
+                EditorState.unsaved(envelope.document), false, source, null);
     }
 
     public static void deleteDraft(RecoveryDraft draft) throws IOException {
@@ -179,10 +251,39 @@ public final class RecoveryService implements AutoCloseable {
 
     private synchronized void saveLatestUnchecked() {
         if (latest == null) return;
+        Path path = pathFor(latest);
         try {
-            files.writeUtf8(pathFor(latest), encodeEnvelope(latest, codec));
-        } catch (IOException ignored) {
-            // Explicit Save reports storage errors; recovery remains best effort.
+            String encoded = encodeEnvelope(latest, codec);
+            storage.writeUtf8(path, encoded);
+            pending = null;
+            report(new RecoveryStatus(RecoveryHealth.SAVED, path, null));
+        } catch (IOException | RuntimeException failure) {
+            pending = null;
+            report(new RecoveryStatus(RecoveryHealth.FAILED, path, failure));
+        }
+    }
+
+    public RecoveryStatus status() {
+        return status;
+    }
+
+    /**
+     * A scheduled retry is useful work, but it is not yet evidence that recovery is healthy.
+     * Keep the last failure (and therefore its persistent UI warning/actions) visible until an
+     * actual write succeeds or the draft is explicitly cleared.
+     */
+    private void reportPendingUnlessFailed(Path path) {
+        if (status.health() != RecoveryHealth.FAILED) {
+            report(new RecoveryStatus(RecoveryHealth.PENDING, path, null));
+        }
+    }
+
+    private void report(RecoveryStatus next) {
+        status = next;
+        try {
+            statusExecutor.execute(() -> statusListener.statusChanged(next));
+        } catch (RuntimeException ignored) {
+            // Losing a status callback must not turn a successful recovery write into a failure.
         }
     }
 
@@ -195,7 +296,8 @@ public final class RecoveryService implements AutoCloseable {
                 state.sourcePath().toAbsolutePath().normalize().toString());
         if (state.savedContentDigest() == null) root.add("baseDigest", JsonNull.INSTANCE);
         else root.addProperty("baseDigest", state.savedContentDigest());
-        root.add("document", JsonParser.parseString(codec.encode(state.document())));
+        root.add("document", JsonParser.parseString(
+                codec.encodeRoundTripped(state.document())));
         return JSON.toJson(root) + "\n";
     }
 
@@ -284,5 +386,17 @@ public final class RecoveryService implements AutoCloseable {
     }
 
     private record RecoveryMetadata(String documentId, Path sourcePath) {
+    }
+
+    private static final class NioRecoveryStorage implements RecoveryStorage {
+        private final AtomicFileStore files = new AtomicFileStore();
+
+        @Override public void writeUtf8(Path path, String content) throws IOException {
+            files.writeUtf8(path, content);
+        }
+
+        @Override public void deleteIfExists(Path path) throws IOException {
+            Files.deleteIfExists(path);
+        }
     }
 }

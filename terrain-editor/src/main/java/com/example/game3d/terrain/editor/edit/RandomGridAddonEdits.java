@@ -57,8 +57,8 @@ public final class RandomGridAddonEdits {
             throw new IllegalArgumentException(
                     "Random GRID placement requires an ADVANCED structure");
         }
-        if (structure.addons().size() + count
-                > TerrainContentLimits.MAX_STRUCTURE_ADDONS) {
+        if (count > TerrainContentLimits.MAX_STRUCTURE_ADDONS
+                - structure.addons().size()) {
             throw new IllegalArgumentException(
                     "Random placement would exceed the structure limit of "
                             + TerrainContentLimits.MAX_STRUCTURE_ADDONS + " addons");
