@@ -13,6 +13,7 @@ import com.example.game3d.core.terrain.TerrainSnapshot;
 import com.example.game3d.core.terrain.TerrainWorld;
 import com.example.game3d.core.terrain.TrackBuilder;
 import com.example.game3d.terrain.io.publish.PublishedGameplayCatalogLoader;
+import com.example.game3d.terrain.io.publish.PublishedCatalogException;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -34,16 +35,24 @@ public final class ScenarioRegistry {
     private final Map<String, Scenario> scenarios = new LinkedHashMap<String, Scenario>();
     private final PhysicsConfig config = new PhysicsConfig();
     private final GameplayLevelCatalog gameplayCatalog;
+    private final String selectedPublishedEntryId;
 
     public ScenarioRegistry() {
-        this(loadPublishedCatalogOrBuiltIns());
+        this(loadPublishedCatalogOrBuiltIns(), null);
     }
 
     ScenarioRegistry(GameplayLevelCatalog gameplayCatalog) {
+        this(gameplayCatalog, null);
+    }
+
+    ScenarioRegistry(
+            GameplayLevelCatalog gameplayCatalog,
+            String selectedPublishedEntryId) {
         if (gameplayCatalog == null) {
             throw new IllegalArgumentException("gameplayCatalog == null");
         }
         this.gameplayCatalog = gameplayCatalog;
+        this.selectedPublishedEntryId = selectedPublishedEntryId;
         register(flatRest());
         register(groundJump());
         register(jumpChargeXBoundaryAccept());
@@ -66,6 +75,36 @@ public final class ScenarioRegistry {
         register(streamingCommit());
         register(generatedGameplayStream());
         register(publishedCatalogLevel());
+    }
+
+    /** Strict explicit artifact loading used by the editor; never falls back to built-ins. */
+    public static ScenarioRegistry fromPublishedCatalog(
+            Path catalogPath,
+            String selectedEntryId) throws java.io.IOException, PublishedCatalogException {
+        if (catalogPath == null || !Files.isRegularFile(catalogPath)) {
+            throw new java.io.IOException(
+                    "Published terrain catalog is not a file: " + catalogPath);
+        }
+        try (Reader reader = Files.newBufferedReader(
+                catalogPath, StandardCharsets.UTF_8)) {
+            return new ScenarioRegistry(
+                    new PublishedGameplayCatalogLoader().load(reader), selectedEntryId);
+        }
+    }
+
+    /** Strict packaged-artifact loading used when an exact entry is requested without a path. */
+    public static ScenarioRegistry fromPackagedCatalog(String selectedEntryId)
+            throws java.io.IOException, PublishedCatalogException {
+        InputStream packaged = ScenarioRegistry.class.getResourceAsStream(
+                PACKAGED_TERRAIN_CATALOG);
+        if (packaged == null) {
+            throw new java.io.IOException(
+                    "Packaged terrain catalog is missing: " + PACKAGED_TERRAIN_CATALOG);
+        }
+        try (Reader reader = new InputStreamReader(packaged, StandardCharsets.UTF_8)) {
+            return new ScenarioRegistry(
+                    new PublishedGameplayCatalogLoader().load(reader), selectedEntryId);
+        }
     }
 
     public Scenario require(String name) {
@@ -371,11 +410,19 @@ public final class ScenarioRegistry {
      * desktop validation exercises more than the built-in fallback prefix.
      */
     private Scenario publishedCatalogLevel() {
-        long ordinal = catalogExerciseOrdinal(gameplayCatalog);
+        long ordinal;
+        String providerId;
+        if (selectedPublishedEntryId == null) {
+            ordinal = catalogExerciseOrdinal(gameplayCatalog);
+            providerId = gameplayCatalog.select(ordinal).stableId();
+        } else {
+            ordinal = 0L;
+            providerId = gameplayCatalog.require(selectedPublishedEntryId).stableId();
+        }
         Vec3 terrainStart = new Vec3(0.0, -3.5, -0.5);
         GameplayTerrainStream generator = new GameplayTerrainStream(
                 TrackProfile.gameplayDefault(), terrainStart, 0L, gameplayCatalog);
-        generator.enqueueGameplayLevel((int) ordinal);
+        generator.enqueueGameplayLevel(providerId, ordinal);
         generator.generateChunks(-1);
         TerrainSnapshot snapshot = generator.snapshot();
         generator.close();
@@ -386,7 +433,8 @@ public final class ScenarioRegistry {
                 .build();
         return new Scenario(
                 "published_catalog_level",
-                "A level selected from the same published catalog consumed by Android",
+                "Published catalog level '" + providerId
+                        + "' selected from the same artifact consumed by Android",
                 compatibilityWorld,
                 snapshot,
                 new Vec3(0.0, -0.5, -0.5),

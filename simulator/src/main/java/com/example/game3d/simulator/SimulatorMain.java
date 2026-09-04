@@ -24,13 +24,12 @@ public final class SimulatorMain {
     }
 
     public static void main(String[] args) throws Exception {
-        ScenarioRegistry registry = new ScenarioRegistry();
         if (args.length == 0 || "help".equals(args[0]) || "--help".equals(args[0])) {
             printHelp();
             return;
         }
         if ("list".equals(args[0])) {
-            for (Scenario scenario : registry.all()) {
+            for (Scenario scenario : new ScenarioRegistry().all()) {
                 System.out.println(scenario.name + " - " + scenario.description);
             }
             return;
@@ -52,6 +51,27 @@ public final class SimulatorMain {
             throw new IllegalArgumentException("run requires a scenario name");
         }
 
+        CatalogSelection catalogSelection = CatalogSelection.parse(args);
+        if (catalogSelection.catalogPath != null
+                && catalogSelection.entryId == null) {
+            throw new IllegalArgumentException(
+                    "--catalog requires --catalog-entry for exact published-level selection");
+        }
+        if (catalogSelection.entryId != null
+                && !"published_catalog_level".equals(args[1])) {
+            throw new IllegalArgumentException(
+                    "--catalog-entry is only valid for published_catalog_level");
+        }
+        ScenarioRegistry registry;
+        if (catalogSelection.catalogPath != null) {
+            registry = ScenarioRegistry.fromPublishedCatalog(
+                    catalogSelection.catalogPath, catalogSelection.entryId);
+        } else if (catalogSelection.entryId != null) {
+            registry = ScenarioRegistry.fromPackagedCatalog(
+                    catalogSelection.entryId);
+        } else {
+            registry = new ScenarioRegistry();
+        }
         Scenario scenario = registry.require(args[1]);
         Options options = Options.parse(args, scenario.defaultTicks);
         PhysicsConfig config = new PhysicsConfig();
@@ -190,6 +210,7 @@ public final class SimulatorMain {
         System.out.println("  run <scenario> [--ticks N | --duration-ms N]");
         System.out.println("       [--trace summary|contacts|full] [--out FILE]");
         System.out.println("       [--obj FILE] [--interactive]");
+        System.out.println("       [--catalog-entry STABLE_ID [--catalog FILE]]");
     }
 
     static int diff(Path leftPath, Path rightPath) throws IOException {
@@ -373,6 +394,9 @@ public final class SimulatorMain {
                     options.objPath = Paths.get(requireValue(args, ++i, arg));
                 } else if ("--interactive".equals(arg)) {
                     options.interactive = true;
+                } else if ("--catalog".equals(arg)
+                        || "--catalog-entry".equals(arg)) {
+                    requireValue(args, ++i, arg);
                 } else {
                     throw new IllegalArgumentException("Unknown option " + arg);
                 }
@@ -384,6 +408,52 @@ public final class SimulatorMain {
         }
 
         private static String requireValue(String[] args, int index, String option) {
+            if (index >= args.length) {
+                throw new IllegalArgumentException(option + " requires a value");
+            }
+            return args[index];
+        }
+    }
+
+    private static final class CatalogSelection {
+        Path catalogPath;
+        String entryId;
+
+        static CatalogSelection parse(String[] args) {
+            CatalogSelection selection = new CatalogSelection();
+            for (int i = 2; i < args.length; i++) {
+                String argument = args[i];
+                if ("--catalog".equals(argument)) {
+                    if (selection.catalogPath != null) {
+                        throw new IllegalArgumentException("--catalog was supplied more than once");
+                    }
+                    selection.catalogPath = Paths.get(requireValue(args, ++i, argument));
+                } else if ("--catalog-entry".equals(argument)) {
+                    if (selection.entryId != null) {
+                        throw new IllegalArgumentException(
+                                "--catalog-entry was supplied more than once");
+                    }
+                    selection.entryId = requireValue(args, ++i, argument);
+                    if (selection.entryId.trim().isEmpty()) {
+                        throw new IllegalArgumentException("--catalog-entry must not be blank");
+                    }
+                } else if (requiresValue(argument)) {
+                    requireValue(args, ++i, argument);
+                }
+            }
+            return selection;
+        }
+
+        private static boolean requiresValue(String argument) {
+            return "--ticks".equals(argument)
+                    || "--duration-ms".equals(argument)
+                    || "--trace".equals(argument)
+                    || "--out".equals(argument)
+                    || "--obj".equals(argument);
+        }
+
+        private static String requireValue(
+                String[] args, int index, String option) {
             if (index >= args.length) {
                 throw new IllegalArgumentException(option + " requires a value");
             }

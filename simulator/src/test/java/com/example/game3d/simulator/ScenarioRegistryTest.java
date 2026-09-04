@@ -82,6 +82,28 @@ public class ScenarioRegistryTest {
     }
 
     @Test
+    public void explicitPublishedSelectionUsesExactIdAtOrdinalZero() {
+        final long[] selectedOrdinal = { Long.MIN_VALUE };
+        final int[] wrongProviderCalls = { 0 };
+        GameplayLevelProvider wrong = provider("not-selected", 1, ordinal -> {
+            wrongProviderCalls[0]++;
+        });
+        GameplayLevelProvider selected = provider("selected-exactly", 2, ordinal -> {
+            selectedOrdinal[0] = ordinal;
+        });
+        GameplayLevelCatalog catalog = GameplayLevelCatalog.builtIns()
+                .withAdditionalEntries(java.util.Arrays.asList(wrong, selected));
+
+        Scenario scenario = new ScenarioRegistry(catalog, "selected-exactly")
+                .require("published_catalog_level");
+
+        assertEquals(0L, selectedOrdinal[0]);
+        assertEquals(0, wrongProviderCalls[0]);
+        assertEquals(2, scenario.terrainSnapshot.segments.size());
+        assertTrue(scenario.description.contains("selected-exactly"));
+    }
+
+    @Test
     public void allScenariosUseCanonicalTerrainAndRun() {
         PhysicsConfig config = new PhysicsConfig();
         for (Scenario scenario : new ScenarioRegistry().all()) {
@@ -196,5 +218,31 @@ public class ScenarioRegistryTest {
         assertTrue("guard scenario swipe must move upward",
                 found.rawDeltaYScreenHeights < 0.0);
         return found;
+    }
+
+    private static GameplayLevelProvider provider(
+            final String id,
+            final int tileCount,
+            final java.util.function.LongConsumer observedOrdinal) {
+        return new GameplayLevelProvider() {
+            @Override public String stableId() {
+                return id;
+            }
+
+            @Override public BaseTerrainStructure<?> create(long levelOrdinal) {
+                observedOrdinal.accept(levelOrdinal);
+                return new AdvancedTerrainStructure(tileCount) {
+                    @Override protected void generateTiles(Terrain.TileBrush brush) {
+                        for (int index = 0; index < tileCount; index++) {
+                            brush.addSegment(id + "-" + index);
+                        }
+                    }
+
+                    @Override protected void generateAddons(
+                            Terrain.AdvancedGridBrush brush, int rows, int columns) {
+                    }
+                };
+            }
+        };
     }
 }

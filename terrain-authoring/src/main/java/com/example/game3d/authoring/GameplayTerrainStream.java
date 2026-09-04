@@ -39,6 +39,15 @@ public final class GameplayTerrainStream implements TerrainOutput {
         terrain.enqueueStructure(provider.create(levelOrdinal));
     }
 
+    /**
+     * Enqueues one exact catalog entry for tooling and deterministic targeted validation.
+     * Normal gameplay continues to use ordinal-based selection above.
+     */
+    public void enqueueGameplayLevel(String stableId, long levelOrdinal) {
+        GameplayLevelProvider provider = catalog.require(stableId);
+        terrain.enqueueStructure(provider.create(Math.max(0L, levelOrdinal)));
+    }
+
     public int generateChunks(int segmentBudget) {
         return terrain.generateChunks(segmentBudget);
     }

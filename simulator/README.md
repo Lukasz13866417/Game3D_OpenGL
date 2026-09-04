@@ -58,6 +58,16 @@ simulator, and deliberately selects a custom entry when the catalog has one. Ove
 `-Dgame3d.terrainCatalog=/absolute/path/runtime-catalog.json` when validating an artifact outside
 the packaged build resource.
 
+Editor and CI workflows can load an explicit artifact strictly (without the gameplay fallback) and
+select a provider by stable ID. An explicit `--catalog` must always be paired with
+`--catalog-entry`, so this path cannot accidentally fall back to ordinal selection:
+
+```bash
+./gradlew :simulator:run --args="run published_catalog_level \
+  --catalog /absolute/path/runtime-catalog.json \
+  --catalog-entry custom-level --trace summary --out build/traces/custom-level.ndjson"
+```
+
 ## Side-view visualization
 
 `tools/visualize_simulation.py` writes a self-contained SVG containing the authoritative terrain

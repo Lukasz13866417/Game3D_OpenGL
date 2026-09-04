@@ -8,6 +8,7 @@ import org.junit.Test;
 import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 public final class GameplayTerrainStreamTest {
     @Test
@@ -58,6 +59,40 @@ public final class GameplayTerrainStreamTest {
                 }
             }
         }
+    }
+
+    @Test
+    public void exactStableIdEnqueueBypassesOrdinalSelection() {
+        GameplayLevelProvider custom = new GameplayLevelProvider() {
+            @Override public String stableId() { return "exact-custom"; }
+            @Override public BaseTerrainStructure<?> create(long levelOrdinal) {
+                return new AdvancedTerrainStructure(2) {
+                    @Override protected void generateTiles(Terrain.TileBrush brush) {
+                        brush.addSegment("exact-0");
+                        brush.addSegment("exact-1");
+                    }
+                    @Override protected void generateAddons(
+                            Terrain.AdvancedGridBrush brush, int rows, int columns) { }
+                };
+            }
+        };
+        GameplayLevelCatalog catalog = GameplayLevelCatalog.builtIns()
+                .withAdditionalEntries(Collections.singletonList(custom));
+        GameplayTerrainStream stream = new GameplayTerrainStream(
+                TrackProfile.gameplayDefault(), Vec3.ZERO, 0L, catalog);
+
+        stream.enqueueGameplayLevel("exact-custom", 999L);
+        stream.generateChunks(-1);
+
+        assertEquals(2, stream.snapshot().segments.size());
+        assertEquals("exact-custom", catalog.require("exact-custom").stableId());
+        try {
+            catalog.require("missing");
+            fail("Expected missing provider rejection");
+        } catch (IllegalArgumentException expected) {
+            // Expected.
+        }
+        stream.close();
     }
 
     private static int builtinIndex(String id) {

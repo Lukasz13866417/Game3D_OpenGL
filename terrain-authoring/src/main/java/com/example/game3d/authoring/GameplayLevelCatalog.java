@@ -67,6 +67,20 @@ public final class GameplayLevelCatalog {
         return entries.get(selected);
     }
 
+    /** Resolves one stable provider ID without involving ordinal-based random selection. */
+    public GameplayLevelProvider require(String stableId) {
+        if (stableId == null || stableId.isEmpty()) {
+            throw new IllegalArgumentException("Gameplay provider ID is empty");
+        }
+        for (GameplayLevelProvider entry : entries) {
+            if (stableId.equals(entry.stableId())) {
+                return entry;
+            }
+        }
+        throw new IllegalArgumentException(
+                "Unknown gameplay terrain provider '" + stableId + "'");
+    }
+
     public GameplayLevelCatalog withAdditionalEntries(
             List<GameplayLevelProvider> additions) {
         if (additions == null || additions.isEmpty()) {
