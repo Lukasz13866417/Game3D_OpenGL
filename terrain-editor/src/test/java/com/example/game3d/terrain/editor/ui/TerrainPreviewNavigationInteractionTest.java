@@ -7,9 +7,11 @@ import com.example.game3d.core.terrain.TerrainSnapshot;
 import com.example.game3d.core.terrain.TerrainVertexAppearance;
 import com.example.game3d.core.terrain.addon.Addon;
 import javafx.scene.Camera;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +22,8 @@ import org.testfx.util.WaitForAsyncUtils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,6 +50,7 @@ class TerrainPreviewNavigationInteractionTest {
 
     @Test
     void walkModeRespondsToAllKeysAndOrbitRemainsAnIndependentMode(FxRobot robot) {
+        awaitPreviewBuild();
         robot.clickOn("#preview-walk-mode");
         WaitForAsyncUtils.waitForFxEvents();
         assertTrue(preview.isFocused(),
@@ -61,11 +66,23 @@ class TerrainPreviewNavigationInteractionTest {
                 "Walk mode must initially face the first solid tile's forward direction");
         assertCameraRepresents(start, preview.cameraForTesting());
 
+        double beforeLookYaw = preview.walkYawForTesting();
+        double beforeLookPitch = preview.walkPitchForTesting();
+        robot.interact(() -> dragViewport(30, 20));
+        WaitForAsyncUtils.waitForFxEvents();
+        assertTrue(preview.walkYawForTesting() < beforeLookYaw,
+                "dragging right must mouse-look to the right");
+        assertTrue(preview.walkPitchForTesting() > beforeLookPitch,
+                "dragging down must look farther down");
+        press(robot, KeyCode.R);
+        assertEquals(beforeLookYaw, preview.walkYawForTesting(), EPSILON);
+
         press(robot, KeyCode.W);
         Vec3 forward = preview.walkPositionForTesting();
         assertVecEquals(start.add(TRACK_FORWARD.multiply(.8)), forward);
         robot.interact(() -> preview.show(snapshotWithLeadingGapAndDiagonalSolid(),
                 Collections.emptyMap(), Collections.emptyMap(), ignored -> { }));
+        awaitPreviewBuild();
         assertVecEquals(forward, preview.walkPositionForTesting());
         press(robot, KeyCode.S);
         assertVecEquals(start, preview.walkPositionForTesting());
@@ -97,6 +114,12 @@ class TerrainPreviewNavigationInteractionTest {
         press(robot, KeyCode.E);
         assertVecEquals(start, preview.walkPositionForTesting());
 
+        press(robot, KeyCode.W);
+        press(robot, KeyCode.R);
+        assertVecEquals(start, preview.walkPositionForTesting());
+        assertEquals(WalkCameraState.DEFAULT_PITCH_DEGREES,
+                preview.walkPitchForTesting(), EPSILON);
+
         robot.clickOn("#preview-orbit-mode");
         clickViewport(robot);
         assertEquals(TerrainPreviewPane.NavigationMode.ORBIT,
@@ -120,9 +143,40 @@ class TerrainPreviewNavigationInteractionTest {
         assertTrue(preview.isFocused(), "Clicking the viewport must give navigation keyboard focus");
     }
 
+    private void dragViewport(double deltaX, double deltaY) {
+        Node viewport = preview.lookup("#preview-viewport");
+        viewport.fireEvent(mouseEvent(MouseEvent.MOUSE_PRESSED, 100, 100, true));
+        viewport.fireEvent(mouseEvent(
+                MouseEvent.MOUSE_DRAGGED, 100 + deltaX, 100 + deltaY, true));
+        viewport.fireEvent(mouseEvent(
+                MouseEvent.MOUSE_RELEASED, 100 + deltaX, 100 + deltaY, false));
+    }
+
+    private static MouseEvent mouseEvent(
+            javafx.event.EventType<MouseEvent> type,
+            double x,
+            double y,
+            boolean primaryDown) {
+        return new MouseEvent(type, x, y, x, y, MouseButton.PRIMARY, 1,
+                false, false, false, false,
+                primaryDown, false, false,
+                false, false, false, null);
+    }
+
     private static void press(FxRobot robot, KeyCode key) {
         robot.press(key).release(key);
         WaitForAsyncUtils.waitForFxEvents();
+    }
+
+    private void awaitPreviewBuild() {
+        try {
+            WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS,
+                    () -> preview.completedBuildTicketForTesting()
+                            == preview.requestedBuildTicketForTesting());
+            WaitForAsyncUtils.waitForFxEvents();
+        } catch (TimeoutException timeout) {
+            throw new AssertionError("Preview build did not attach", timeout);
+        }
     }
 
     private static void assertCameraRepresents(Vec3 worldPosition, Camera camera) {

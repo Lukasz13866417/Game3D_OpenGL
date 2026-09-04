@@ -1,8 +1,11 @@
 package com.example.game3d.terrain.editor.ui;
 
 import com.example.game3d.terrain.editor.compile.AuthoringDocumentCompiler;
+import com.example.game3d.terrain.editor.compile.CompileRequest;
 import com.example.game3d.terrain.editor.compile.CompileResult;
+import com.example.game3d.terrain.editor.compile.CompileTicket;
 import com.example.game3d.terrain.editor.compile.DebouncedCompiler;
+import com.example.game3d.terrain.editor.compile.EditorReferenceSnapshot;
 import com.example.game3d.terrain.editor.edit.AddonEdits;
 import com.example.game3d.terrain.editor.edit.AddonPlacementRequest;
 import com.example.game3d.terrain.editor.edit.LevelEdits;
@@ -12,9 +15,13 @@ import com.example.game3d.terrain.editor.edit.RepeatSpec;
 import com.example.game3d.terrain.editor.edit.RandomGridAddonEdits;
 import com.example.game3d.terrain.editor.edit.TileEdits;
 import com.example.game3d.terrain.editor.persistence.EditorPersistence;
-import com.example.game3d.terrain.editor.persistence.ExternalConflictGuard;
+import com.example.game3d.terrain.editor.persistence.DiskVersion;
+import com.example.game3d.terrain.editor.persistence.ExpectedDiskVersion;
 import com.example.game3d.terrain.editor.persistence.RecoveryService;
-import com.example.game3d.terrain.editor.persistence.UserStateDirectory;
+import com.example.game3d.terrain.editor.persistence.RecoveryHealth;
+import com.example.game3d.terrain.editor.persistence.RecoveryStatus;
+import com.example.game3d.terrain.editor.persistence.SaveIntent;
+import com.example.game3d.terrain.editor.persistence.SaveResult;
 import com.example.game3d.terrain.editor.state.EditorHistory;
 import com.example.game3d.terrain.editor.state.EditorState;
 import com.example.game3d.terrain.io.TerrainJsonCodec;
@@ -29,13 +36,13 @@ import com.example.game3d.terrain.io.model.TileRecord;
 import com.example.game3d.terrain.io.resolve.TerrainDocumentRepository;
 import com.example.game3d.terrain.io.validation.ValidationProblem;
 import com.example.game3d.core.terrain.SurfaceProperties;
-import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.ChoiceBox;
@@ -46,11 +53,15 @@ import javafx.scene.control.SelectionMode;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.TitledPane;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -58,8 +69,6 @@ import javafx.scene.layout.VBox;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Files;
-import java.nio.file.attribute.FileTime;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -78,45 +87,182 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
     private final EditorHistory history;
     private final DebouncedCompiler compiler;
     private final RecoveryService recovery;
-    private final ExternalConflictGuard externalConflict = new ExternalConflictGuard();
+    private final WorkspacePrompts prompts;
+    private final Path recoveryDirectory;
     private final ListView<Object> sequence = new ListView<>();
-    private final ListView<String> problems = new ListView<>();
+    private final ListView<ValidationProblem> problems = new ListView<>();
     private final TerrainPreviewPane preview = new TerrainPreviewPane();
     private final VBox inspector = new VBox(8);
+    private final Label documentStatus = new Label();
+    private final Label compileStatus = new Label("Preview: pending");
+    private final Label recoveryStatus = new Label("Recovery: idle");
+    private final Label projectStatus = new Label("Standalone");
+    private final Label catalogStatus = new Label("Catalog: n/a");
+    private final Button retryRecovery = new Button("Retry recovery");
+    private final Button openRecoveryFolder = new Button("Open recovery folder");
+    private final UUID workspaceId = UUID.randomUUID();
     private Runnable titleChanged = () -> {};
-    private FileTime knownWriteTime;
+    private Runnable sessionChanged = () -> {};
+    private DiskVersion diskVersion;
+    private boolean externalConflictPending;
+    private long compileSequence;
+    private CompileTicket activeCompile;
+    private RecoveryStatus latestRecoveryStatus;
+    private Path projectContentRoot;
+    private boolean closed;
 
     public EditorWorkspace(EditorState initial, TerrainDocumentRepository repository) {
-        codec = new TerrainJsonCodec();
-        persistence = new EditorPersistence(codec);
+        this(initial, repository, EditorWorkspaceDependencies.production(), null, false);
+    }
+
+    /**
+     * Opens a document together with the exact disk version observed by the same load operation.
+     * Keeping those values atomic prevents a replacement between load and tab construction from
+     * being mistaken for the version that produced the in-memory document.
+     */
+    public EditorWorkspace(
+            EditorState initial,
+            TerrainDocumentRepository repository,
+            DiskVersion loadedDiskVersion) {
+        this(initial, repository, EditorWorkspaceDependencies.production(),
+                loadedDiskVersion, true);
+    }
+
+    public EditorWorkspace(
+            EditorState initial,
+            TerrainDocumentRepository repository,
+            EditorWorkspaceDependencies dependencies) {
+        this(initial, repository, dependencies, null, false);
+    }
+
+    public EditorWorkspace(
+            EditorState initial,
+            TerrainDocumentRepository repository,
+            EditorWorkspaceDependencies dependencies,
+            DiskVersion loadedDiskVersion) {
+        this(initial, repository, dependencies, loadedDiskVersion, true);
+    }
+
+    private EditorWorkspace(
+            EditorState initial,
+            TerrainDocumentRepository repository,
+            EditorWorkspaceDependencies dependencies,
+            DiskVersion loadedDiskVersion,
+            boolean diskVersionWasLoadedAtomically) {
+        if (initial == null || repository == null || dependencies == null) {
+            throw new IllegalArgumentException("Workspace arguments are required");
+        }
+        codec = dependencies.codec();
+        persistence = dependencies.persistence();
         history = new EditorHistory(initial);
-        compiler = new DebouncedCompiler(new AuthoringDocumentCompiler(repository),
-                Duration.ofMillis(180), Platform::runLater);
-        recovery = new RecoveryService(codec, UserStateDirectory.terrainEditor().resolve("recovery"),
-                Duration.ofSeconds(4));
-        knownWriteTime = readWriteTime(initial.sourcePath());
+        compiler = dependencies.compilerFactory().create(
+                new AuthoringDocumentCompiler());
+        recovery = dependencies.recoveryFactory().create(
+                this::recoveryStatusChanged);
+        prompts = dependencies.prompts();
+        recoveryDirectory = dependencies.recoveryDirectory();
+        preview.setPreviewStateListener(this::previewStateChanged);
+        diskVersion = diskVersionWasLoadedAtomically
+                ? loadedDiskVersion : readDiskVersion(initial.sourcePath());
         setPadding(new Insets(6));
-        setLeft(buildSequencePane());
-        setCenter(preview);
-        setRight(buildInspector());
-        setBottom(buildProblems());
+        Node sequencePane = buildSequencePane();
+        ScrollPane inspectorScroll = new ScrollPane(buildInspector());
+        inspectorScroll.setFitToWidth(true);
+        inspectorScroll.setMinWidth(170);
+        inspectorScroll.setPrefWidth(280);
+        SplitPane horizontal = new SplitPane(sequencePane, preview, inspectorScroll);
+        double leftDivider = dependencies.layoutPreferences()
+                .read("workspace.horizontal.left", .20);
+        double rightDivider = dependencies.layoutPreferences()
+                .read("workspace.horizontal.right", .79);
+        if (rightDivider - leftDivider < .15) {
+            leftDivider = .20;
+            rightDivider = .79;
+        }
+        horizontal.setDividerPositions(leftDivider, rightDivider);
+        horizontal.getDividers().get(0).positionProperty().addListener(
+                (observable, oldValue, value) -> dependencies.layoutPreferences()
+                        .write("workspace.horizontal.left", value.doubleValue()));
+        horizontal.getDividers().get(1).positionProperty().addListener(
+                (observable, oldValue, value) -> dependencies.layoutPreferences()
+                        .write("workspace.horizontal.right", value.doubleValue()));
+        preview.setMinWidth(260);
+        TitledPane problemsPane = new TitledPane("Problems", buildProblems());
+        problemsPane.setCollapsible(true);
+        problemsPane.setExpanded(true);
+        SplitPane vertical = new SplitPane(horizontal, problemsPane);
+        vertical.setOrientation(Orientation.VERTICAL);
+        vertical.setDividerPositions(dependencies.layoutPreferences()
+                .read("workspace.vertical.problems", .82));
+        vertical.getDividers().get(0).positionProperty().addListener(
+                (observable, oldValue, value) -> dependencies.layoutPreferences()
+                        .write("workspace.vertical.problems", value.doubleValue()));
+        setCenter(vertical);
+        setBottom(buildStatusBar());
         sequence.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         sequence.getSelectionModel().getSelectedItems().addListener(
                 (javafx.collections.ListChangeListener<Object>) change -> selectionChanged());
         refresh();
+        updateStatus();
+        recoveryStatusChanged(recovery.status());
+        if (initial.sourcePath() == null) recovery.edited(initial);
+        requestCompile(new EditorReferenceSnapshot(repository, List.of()));
     }
 
+    public UUID workspaceId() { return workspaceId; }
     public EditorState state() { return history.state(); }
     public void setTitleChanged(Runnable callback) { titleChanged = callback; }
+    public void setSessionChanged(Runnable callback) {
+        sessionChanged = callback == null ? () -> {} : callback;
+    }
     public boolean dirty() { return state().isDirty(codec); }
+    public boolean hasExternalConflictPending() { return externalConflictPending; }
+    public boolean canUndo() { return history.canUndo(); }
+    public boolean canRedo() { return history.canRedo(); }
+    String projectStatusForTesting() { return projectStatus.getText(); }
+
+    public void setProjectContentRoot(Path contentRoot) {
+        projectContentRoot = contentRoot == null
+                ? null : contentRoot.toAbsolutePath().normalize();
+        refreshProjectStatus();
+    }
+
+    private void refreshProjectStatus() {
+        if (projectContentRoot == null || state().sourcePath() == null) {
+            projectStatus.setText("Standalone");
+            return;
+        }
+        Path source = state().sourcePath().toAbsolutePath().normalize();
+        projectStatus.setText(source.startsWith(projectContentRoot)
+                ? (state().document() instanceof LevelDocument
+                ? "Project level" : "Project structure")
+                : "Standalone");
+    }
+
+    public void setCatalogMembership(boolean included) {
+        catalogStatus.setText(state().document() instanceof LevelDocument
+                ? "Catalog: " + (included ? "registered" : "not registered")
+                : "Catalog: n/a");
+    }
 
     public void undo() { history.undo(); changed(true); }
     public void redo() { history.redo(); changed(true); }
 
     /** Re-resolves saved references after an explicit project-content reload. */
     public void recompile() {
-        history.replaceState(state().nextCompileRevision());
-        refresh();
+        sessionChanged.run();
+    }
+
+    /** Submits one immutable project/open-tab reference generation for this workspace. */
+    public void requestCompile(EditorReferenceSnapshot references) {
+        if (closed) return;
+        CompileTicket ticket = new CompileTicket(workspaceId, ++compileSequence);
+        activeCompile = ticket;
+        compileStatus.setText("Preview: compiling r" + state().revision());
+        preview.showCompiling("Compiling draft revision " + state().revision() + "…");
+        CompileRequest request = new CompileRequest(ticket, state().revision(),
+                state().document(), references, references.problems());
+        compiler.submit(request, this::compiled);
     }
 
     public boolean save(Path target) throws IOException {
@@ -126,39 +272,56 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
     public boolean save(Path target, Supplier<Path> saveAsTarget) throws IOException {
         if (target == null) return false;
         Path actualTarget = target;
-        boolean sameAsSource = ExternalConflictGuard.sameFileName(
-                state().sourcePath(), actualTarget);
-        boolean changedNow = sameAsSource && hasExternalChange();
-        if (externalConflict.requiresExplicitSaveDecision(
-                state().sourcePath(), actualTarget, changedNow)) {
-            ButtonType saveAs = new ButtonType("Save As…", ButtonBar.ButtonData.OTHER);
-            ButtonType overwrite = new ButtonType(
-                    "Overwrite External File", ButtonBar.ButtonData.YES);
-            Alert alert = new Alert(Alert.AlertType.WARNING,
-                    "The original file changed outside the editor. Choose a new file, "
-                            + "explicitly overwrite the external version, or cancel.",
-                    saveAs, overwrite, ButtonType.CANCEL);
-            alert.setTitle("External File Conflict");
-            ButtonType answer = alert.showAndWait().orElse(ButtonType.CANCEL);
-            if (answer == ButtonType.CANCEL) return false;
-            if (answer == saveAs) {
-                actualTarget = saveAsTarget.get();
-                if (actualTarget == null) return false;
-                if (ExternalConflictGuard.sameFileName(
-                        state().sourcePath(), actualTarget)) {
+        ExpectedDiskVersion expected;
+        SaveIntent intent;
+        if (sameFile(state().sourcePath(), actualTarget) && diskVersion != null) {
+            expected = ExpectedDiskVersion.exact(diskVersion);
+            intent = SaveIntent.SAVE_IF_UNCHANGED;
+        } else {
+            expected = ExpectedDiskVersion.absent();
+            intent = SaveIntent.CREATE_NEW;
+        }
+        while (true) {
+            SaveResult result = persistence.save(
+                    state(), actualTarget, expected, intent);
+            if (result instanceof SaveResult.Saved saved) {
+                history.replaceState(saved.state());
+                diskVersion = saved.diskVersion();
+                externalConflictPending = false;
+                refreshProjectStatus();
+                recovery.clear(state());
+                titleChanged.run();
+                updateStatus();
+                sessionChanged.run();
+                return true;
+            }
+
+            SaveResult.Conflict conflict = (SaveResult.Conflict) result;
+            WorkspacePrompts.SaveConflictChoice answer =
+                    prompts.saveConflict(conflict.actual().isPresent());
+            if (answer == WorkspacePrompts.SaveConflictChoice.CANCEL) return false;
+            if (answer == WorkspacePrompts.SaveConflictChoice.SAVE_AS) {
+                Path replacement = saveAsTarget.get();
+                if (replacement == null) return false;
+                if (sameFile(actualTarget, replacement)) {
                     new Alert(Alert.AlertType.ERROR,
-                            "Save As must choose a different file while an external "
-                                    + "conflict is pending.").showAndWait();
-                    return false;
+                            "Save As must choose a different target while this conflict "
+                                    + "is pending.").showAndWait();
+                    continue;
                 }
+                actualTarget = replacement;
+                expected = ExpectedDiskVersion.absent();
+                intent = SaveIntent.CREATE_NEW;
+                continue;
+            }
+            if (conflict.actual().isPresent()) {
+                expected = ExpectedDiskVersion.exact(conflict.actual().get());
+                intent = SaveIntent.OVERWRITE_CONFIRMED;
+            } else {
+                expected = ExpectedDiskVersion.absent();
+                intent = SaveIntent.CREATE_NEW;
             }
         }
-        history.replaceState(persistence.save(state(), actualTarget));
-        knownWriteTime = Files.getLastModifiedTime(actualTarget);
-        externalConflict.resolved();
-        recovery.clear(state());
-        titleChanged.run();
-        return true;
     }
 
     public void focusLost() { recovery.focusLost(); }
@@ -170,38 +333,41 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
 
     /** Checks disk only on explicit focus/tab events; no silent live reload occurs. */
     public boolean checkExternalChange() {
-        if (externalConflict.pending()) return true;
+        if (externalConflictPending) return true;
         if (!hasExternalChange()) return false;
         resolveExternalConflict();
         return true;
     }
 
+    /** Resolves or rejects an external version mismatch before disk-backed publishing. */
+    public boolean resolveExternalChangeBeforeBuild() {
+        if (externalConflictPending) return true;
+        if (!hasExternalChange()) return true;
+        resolveExternalConflict();
+        if (externalConflictPending) return true;
+        return !hasExternalChange();
+    }
+
     private boolean hasExternalChange() {
         try {
-            return state().sourcePath() != null && knownWriteTime != null
-                    && persistence.externallyChanged(state().sourcePath(), knownWriteTime);
+            return state().sourcePath() != null && diskVersion != null
+                    && !diskVersion.sameContent(
+                    persistence.diskVersion(state().sourcePath()));
         } catch (IOException missingOrUnreadable) {
             return state().sourcePath() != null;
         }
     }
 
     private boolean resolveExternalConflict() {
-        ButtonType reload = new ButtonType("Reload from Disk", ButtonBar.ButtonData.YES);
-        ButtonType keep = new ButtonType("Keep Editor Version", ButtonBar.ButtonData.NO);
-        Alert alert = new Alert(Alert.AlertType.WARNING,
-                "This file changed outside the editor. Reload discards editor changes; "
-                        + "keeping requires a later explicit Save to replace the disk version.",
-                reload, keep, ButtonType.CANCEL);
-        alert.setTitle("External File Change");
-        ButtonType answer = alert.showAndWait().orElse(ButtonType.CANCEL);
-        if (answer == reload) {
+        WorkspacePrompts.ExternalChangeChoice answer = prompts.externalChange();
+        if (answer == WorkspacePrompts.ExternalChangeChoice.RELOAD) {
             try {
                 EditorPersistence.LoadedDocument loaded = persistence.load(state().sourcePath());
                 // Reload explicitly discards the editor version, including its pending recovery.
                 recovery.clear(state());
                 history.reset(loaded.state());
-                knownWriteTime = loaded.writeTime();
-                externalConflict.resolved();
+                diskVersion = loaded.diskVersion();
+                externalConflictPending = false;
                 changed(false);
                 return false;
             } catch (Exception error) {
@@ -209,39 +375,38 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
                 return false;
             }
         }
-        if (answer == keep) {
-            knownWriteTime = readWriteTime(state().sourcePath());
-            externalConflict.keepEditorVersion();
+        if (answer == WorkspacePrompts.ExternalChangeChoice.KEEP_EDITOR) {
+            externalConflictPending = true;
+            updateStatus();
             return true;
         }
         return false;
     }
 
-    private static FileTime readWriteTime(Path path) {
-        try { return path == null ? null : Files.getLastModifiedTime(path); }
+    private DiskVersion readDiskVersion(Path path) {
+        try { return path == null ? null : persistence.diskVersion(path); }
         catch (IOException ignored) { return null; }
     }
 
-    public boolean confirmClose(Supplier<Path> saveAsTarget) {
-        if (!dirty()) {
-            try {
-                recovery.clear(state());
-                return true;
-            } catch (IOException error) {
-                new Alert(Alert.AlertType.ERROR,
-                        "Could not clear the recovery draft:\n" + error.getMessage())
-                        .showAndWait();
-                return false;
-            }
+    private static boolean sameFile(Path left, Path right) {
+        if (left == null || right == null) return false;
+        Path normalizedLeft = left.toAbsolutePath().normalize();
+        Path normalizedRight = right.toAbsolutePath().normalize();
+        if (normalizedLeft.equals(normalizedRight)) return true;
+        try {
+            return Files.exists(normalizedLeft) && Files.exists(normalizedRight)
+                    && Files.isSameFile(normalizedLeft, normalizedRight);
+        } catch (IOException inaccessible) {
+            return false;
         }
-        ButtonType save = new ButtonType("Save", ButtonBar.ButtonData.YES);
-        ButtonType discard = new ButtonType("Don't Save", ButtonBar.ButtonData.NO);
-        ButtonType cancel = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
-                "Save changes to " + state().document().id() + "?", save, discard, cancel);
-        ButtonType answer = alert.showAndWait().orElse(cancel);
-        if (answer == cancel) return false;
-        if (answer == save) {
+    }
+
+    /** Collects the close decision without deleting a discard recovery checkpoint. */
+    public boolean prepareClose(Supplier<Path> saveAsTarget) {
+        if (!dirty()) return true;
+        WorkspacePrompts.CloseChoice answer = prompts.closeDirty(state().document().id());
+        if (answer == WorkspacePrompts.CloseChoice.CANCEL) return false;
+        if (answer == WorkspacePrompts.CloseChoice.SAVE) {
             Path target = state().sourcePath() == null ? saveAsTarget.get() : state().sourcePath();
             if (target == null) return false;
             try { return save(target, saveAsTarget); }
@@ -250,6 +415,11 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
                 return false;
             }
         }
+        return true;
+    }
+
+    /** Applies a previously accepted close decision. */
+    public boolean commitClose() {
         try {
             recovery.clear(state());
             return true;
@@ -261,8 +431,13 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
         }
     }
 
+    public boolean confirmClose(Supplier<Path> saveAsTarget) {
+        return prepareClose(saveAsTarget) && commitClose();
+    }
+
     private VBox buildSequencePane() {
-        sequence.setPrefWidth(285);
+        sequence.setMinWidth(150);
+        sequence.setPrefWidth(260);
         sequence.setCellFactory(list -> new SequenceCell());
         Button add = new Button("Add Tile");
         add.setOnAction(event -> addTile());
@@ -272,7 +447,7 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
         delete.setOnAction(event -> delete());
         Button repeat = new Button("Repeat…");
         repeat.setOnAction(event -> repeat());
-        HBox actions = new HBox(5, add, duplicate, delete, repeat);
+        FlowPane actions = new FlowPane(5, 5, add, duplicate, delete, repeat);
         Button addon = new Button("Add Addon…");
         addon.setOnAction(event -> addAddon());
         Button randomAddons = new Button("Random GRID…");
@@ -283,7 +458,8 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
         inline.setOnAction(event -> addInlineStructure());
         Button up = new Button("↑"); up.setOnAction(event -> moveSelected(-1));
         Button down = new Button("↓"); down.setOnAction(event -> moveSelected(1));
-        HBox contentActions = new HBox(5, addon, randomAddons, reference, inline);
+        FlowPane contentActions = new FlowPane(5, 5,
+                addon, randomAddons, reference, inline);
         HBox ordering = new HBox(5, new Label("Reorder (or drag):"), up, down);
         ordering.setAlignment(Pos.CENTER_LEFT);
         VBox box = new VBox(6, new Label("Sequence"), sequence, actions,
@@ -294,15 +470,87 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
 
     private VBox buildInspector() {
         inspector.setPadding(new Insets(0, 4, 0, 10));
-        inspector.setPrefWidth(270);
+        inspector.setMinWidth(160);
         return inspector;
     }
 
     private VBox buildProblems() {
         problems.setPrefHeight(115);
-        VBox box = new VBox(3, new Label("Problems"), problems);
+        problems.setCellFactory(list -> new ListCell<>() {
+            @Override protected void updateItem(ValidationProblem item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.toString());
+            }
+        });
+        problems.setOnMouseClicked(event -> {
+            ValidationProblem selected = problems.getSelectionModel().getSelectedItem();
+            if (selected != null) selectProblem(selected);
+        });
+        VBox box = new VBox(3, problems);
         VBox.setVgrow(problems, Priority.ALWAYS);
         return box;
+    }
+
+    private FlowPane buildStatusBar() {
+        retryRecovery.setVisible(false);
+        retryRecovery.setManaged(false);
+        retryRecovery.setOnAction(event -> {
+            try { recovery.checkpoint(state()); }
+            catch (IOException ignored) { /* RecoveryService reports the failure. */ }
+        });
+        openRecoveryFolder.setVisible(false);
+        openRecoveryFolder.setManaged(false);
+        openRecoveryFolder.setOnAction(event -> openRecoveryDirectory());
+        FlowPane status = new FlowPane(14, 4, documentStatus, compileStatus,
+                recoveryStatus, retryRecovery, openRecoveryFolder,
+                projectStatus, catalogStatus);
+        status.setAlignment(Pos.CENTER_LEFT);
+        status.setPadding(new Insets(5, 8, 2, 8));
+        status.setStyle("-fx-border-color: transparent transparent transparent transparent;"
+                + " -fx-background-color: rgba(235,235,235,.92);");
+        return status;
+    }
+
+    private void updateStatus() {
+        documentStatus.setText((dirty() ? "Unsaved" : "Saved")
+                + (externalConflictPending ? " · EXTERNAL CONFLICT" : "") + " · "
+                + state().document().id());
+    }
+
+    private void recoveryStatusChanged(RecoveryStatus status) {
+        latestRecoveryStatus = status;
+        String text = switch (status.health()) {
+            case NOT_NEEDED -> "Recovery: not needed";
+            case PENDING -> "Recovery: pending";
+            case SAVED -> "Recovery: saved";
+            case FAILED -> "Recovery: FAILED";
+        };
+        recoveryStatus.setText(text);
+        boolean failed = status.health() == RecoveryHealth.FAILED;
+        retryRecovery.setVisible(failed);
+        retryRecovery.setManaged(failed);
+        openRecoveryFolder.setVisible(failed);
+        openRecoveryFolder.setManaged(failed);
+        recoveryStatus.setTooltip(failed && status.failure() != null
+                ? new javafx.scene.control.Tooltip(status.failure().getMessage()) : null);
+    }
+
+    private void openRecoveryDirectory() {
+        try {
+            Path directory = latestRecoveryStatus != null
+                    && latestRecoveryStatus.path() != null
+                    && latestRecoveryStatus.path().getParent() != null
+                    ? latestRecoveryStatus.path().getParent()
+                    : recoveryDirectory;
+            Files.createDirectories(directory);
+            if (java.awt.Desktop.isDesktopSupported()) {
+                java.awt.Desktop.getDesktop().open(directory.toFile());
+            }
+        } catch (Exception error) {
+            new Alert(Alert.AlertType.ERROR,
+                    "Could not open the recovery folder:\n" + error.getMessage())
+                    .showAndWait();
+        }
     }
 
     private void addTile() {
@@ -415,8 +663,10 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
             applyStructureEdit(target,
                     TileEdits.repeat(structure.tiles().size(), true, "NORMAL", spec));
             changed(true);
-        } catch (NumberFormatException invalid) {
-            new Alert(Alert.AlertType.ERROR, "Every repetition value must be a number").showAndWait();
+        } catch (IllegalArgumentException invalid) {
+            new Alert(Alert.AlertType.ERROR,
+                    "Every repetition value must be finite and the generated sequence "
+                            + "must not overflow.\n\n" + invalid.getMessage()).showAndWait();
         }
     }
 
@@ -700,6 +950,13 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
         all.addAll(selectedAddons);
         all.addAll(selectedLevelEntryIds());
         history.replaceState(state().withSelection(all));
+        Set<String> previewSelection = new LinkedHashSet<>();
+        for (String id : ids) previewSelection.add(occurrenceSourceKey(target, id));
+        for (String id : selectedAddons) {
+            previewSelection.add(occurrenceSourceKey(target, id));
+        }
+        previewSelection.addAll(selectedLevelEntryIds());
+        preview.setSelectedSourceIds(previewSelection);
         inspector.getChildren().clear();
         inspector.getChildren().add(new Label(all.isEmpty() ? "Document" : all.size() + " selected"));
         inspector.getChildren().add(new Separator());
@@ -780,6 +1037,11 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
                 new Label("Surface"), surface, applyCategories, numeric);
     }
 
+    private static String occurrenceSourceKey(StructureTarget target, String localId) {
+        return target != null && target.entrySourceId != null
+                ? target.entrySourceId + "/" + localId : localId;
+    }
+
     private static AddonReservation addon(
             StructureDocument structure, String sourceId) {
         for (AddonReservation addon : structure.addons()) {
@@ -807,6 +1069,8 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
         refresh();
         if (recover) recovery.edited(state());
         titleChanged.run();
+        updateStatus();
+        sessionChanged.run();
     }
 
     private void refresh() {
@@ -825,7 +1089,6 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
                 }
             }
         }
-        compiler.submit(state().revision(), state().document(), this::compiled);
     }
 
     /** Stable and occurrence-aware: identical local IDs in different inline entries stay distinct. */
@@ -867,13 +1130,69 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
     }
 
     private void compiled(CompileResult result) {
-        if (result.revision() != state().revision()) return;
+        if (closed || !result.ticket().equals(activeCompile)) return;
         history.replaceState(state().withProblems(result.problems()));
-        List<String> messages = new ArrayList<>();
-        for (ValidationProblem problem : result.problems()) messages.add(problem.toString());
-        problems.setItems(FXCollections.observableArrayList(messages));
-        if (result.successful()) preview.show(result.snapshot(), result.sourceSegmentIds(),
-                result.sourceAddonIds(), this::selectSourceId);
+        problems.setItems(FXCollections.observableArrayList(result.problems()));
+        if (result.successful()) {
+            compileStatus.setText("Preview: current r" + result.documentRevision());
+            preview.show(result.snapshot(), result.sourceSegmentIds(),
+                    result.sourceAddonIds(), this::selectSourceId);
+        } else if (result.compilerFailed()) {
+            compileStatus.setText("Preview: failed r" + result.documentRevision());
+            preview.showFailure("Preview compiler failed for revision "
+                    + result.documentRevision()
+                    + (preview.hasCurrentGeometry()
+                    ? ". The last good preview is retained."
+                    : ". No valid preview has been built yet."));
+        } else {
+            compileStatus.setText("Preview: invalid r" + result.documentRevision());
+            preview.showInvalid("Current draft revision " + result.documentRevision()
+                    + (preview.hasCurrentGeometry()
+                    ? " has errors. The last good preview is retained."
+                    : " has errors. No valid preview has been built yet."));
+        }
+    }
+
+    private void previewStateChanged(TerrainPreviewPane.PreviewState previewState) {
+        String label = switch (previewState) {
+            case EMPTY -> "empty";
+            case COMPILING -> "compiling / building geometry";
+            case CURRENT -> "current";
+            case STALE_INVALID -> preview.hasCurrentGeometry()
+                    ? "invalid (stale)" : "invalid";
+            case FAILED -> preview.hasCurrentGeometry()
+                    ? "failed (stale)" : "failed";
+        };
+        compileStatus.setText("Preview: " + label + " r" + state().revision());
+    }
+
+    private void selectProblem(ValidationProblem problem) {
+        String path = problem.path();
+        int index = indexedPath(path, "$.tiles[");
+        if (index >= 0 && state().document() instanceof StructureDocument structure
+                && index < structure.tiles().size()) {
+            selectSourceId(structure.tiles().get(index).sourceId());
+            return;
+        }
+        index = indexedPath(path, "$.addons[");
+        if (index >= 0 && state().document() instanceof StructureDocument structure
+                && index < structure.addons().size()) {
+            selectSourceId(structure.addons().get(index).sourceId());
+            return;
+        }
+        index = indexedPath(path, "$.entries[");
+        if (index >= 0 && state().document() instanceof LevelDocument level
+                && index < level.entries().size()) {
+            selectSourceId(level.entries().get(index).sourceId());
+        }
+    }
+
+    private static int indexedPath(String path, String prefix) {
+        if (path == null || !path.startsWith(prefix)) return -1;
+        int end = path.indexOf(']', prefix.length());
+        if (end < 0) return -1;
+        try { return Integer.parseInt(path.substring(prefix.length(), end)); }
+        catch (NumberFormatException invalid) { return -1; }
     }
 
     private void selectSourceId(String sourceId) {
@@ -1140,5 +1459,12 @@ public final class EditorWorkspace extends BorderPane implements AutoCloseable {
         }
     }
 
-    @Override public void close() { compiler.close(); recovery.close(); }
+    @Override public void close() {
+        if (closed) return;
+        closed = true;
+        activeCompile = null;
+        compiler.close();
+        preview.dispose();
+        recovery.close();
+    }
 }

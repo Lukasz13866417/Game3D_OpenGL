@@ -281,6 +281,15 @@ public final class BuiltinProviderImporter {
             return new StructureDocument(structure.formatVersion(), id,
                     structure.gridMode(), structure.tiles(), structure.addons());
         }
+
+        public LevelDocument inlineLevelWithId(String levelId) {
+            requireDocumentId(levelId);
+            StructureDocument inline = structureWithId(levelId + ".structure");
+            return new LevelDocument(TerrainSourceDocument.CURRENT_FORMAT_VERSION,
+                    levelId, TrackProfile.GAMEPLAY_PROFILE_ID,
+                    List.of(LevelEntry.inline(stableUuid(
+                            providerId, levelOrdinal, "level-entry", 0L), inline)));
+        }
     }
 
     private record PlacementAndParameters(

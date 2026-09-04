@@ -7,13 +7,29 @@ import com.example.game3d.core.terrain.TerrainSnapshot;
 /** World-space state for the terrain preview's keyboard navigation mode. */
 final class WalkCameraState {
     static final double DEFAULT_EYE_HEIGHT = 1.65;
+    static final double DEFAULT_PITCH_DEGREES = 8.0;
+    private static final double MIN_PITCH_DEGREES = -85.0;
+    private static final double MAX_PITCH_DEGREES = 85.0;
 
     private Vec3 position = Vec3.ZERO;
     private double yawDegrees;
+    private double pitchDegrees = DEFAULT_PITCH_DEGREES;
     private boolean initialized;
 
     boolean initializeIfNeeded(TerrainSnapshot snapshot) {
         if (initialized || snapshot == null) return initialized;
+        return initialize(snapshot);
+    }
+
+    boolean reset(TerrainSnapshot snapshot) {
+        initialized = false;
+        position = Vec3.ZERO;
+        yawDegrees = 0.0;
+        pitchDegrees = DEFAULT_PITCH_DEGREES;
+        return snapshot != null && initialize(snapshot);
+    }
+
+    private boolean initialize(TerrainSnapshot snapshot) {
         for (TerrainSegment segment : snapshot.segments) {
             if (!segment.solid) continue;
             Vec3 nearCenter = segment.nearLeft.add(segment.nearRight).multiply(.5);
@@ -43,6 +59,10 @@ final class WalkCameraState {
         return yawDegrees;
     }
 
+    double pitchDegrees() {
+        return pitchDegrees;
+    }
+
     void move(double distance) {
         requireInitialized();
         double yawRadians = Math.toRadians(yawDegrees);
@@ -55,6 +75,13 @@ final class WalkCameraState {
     void turn(double degrees) {
         requireInitialized();
         yawDegrees = normalizeDegrees(yawDegrees + degrees);
+    }
+
+    void mouseLook(double deltaX, double deltaY) {
+        requireInitialized();
+        yawDegrees = normalizeDegrees(yawDegrees - deltaX * .22);
+        pitchDegrees = Math.max(MIN_PITCH_DEGREES,
+                Math.min(MAX_PITCH_DEGREES, pitchDegrees + deltaY * .22));
     }
 
     void elevate(double distance) {

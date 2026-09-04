@@ -7,6 +7,7 @@ import com.example.game3d.terrain.io.CodecException;
 import com.example.game3d.terrain.io.TerrainJsonCodec;
 import com.example.game3d.terrain.io.model.GridMode;
 import com.example.game3d.terrain.io.model.StructureDocument;
+import com.example.game3d.terrain.io.resolve.TerrainProjectContentIndex;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ProjectTerrainDocumentRepositoryTest {
@@ -40,6 +42,16 @@ class ProjectTerrainDocumentRepositoryTest {
         assertNotNull(repository.findStructure("structures/shared"));
         assertNotNull(repository.findLevel("shared.level"));
         assertNotNull(repository.findLevel("levels/course.json"));
+        assertEquals(structures.resolve("shared.json").toAbsolutePath().normalize(),
+                repository.contentIndex().structuresById().get("shared.structure")
+                        .sourcePath());
+        assertEquals(levels.resolve("course.json").toAbsolutePath().normalize(),
+                repository.contentIndex().levelsById().get("shared.level")
+                        .sourcePath());
+        assertEquals(repository.snapshotView().contentIndex().levelsById(),
+                repository.contentIndex().levelsById(),
+                "the wrapper must expose the exact current immutable generation");
+        TerrainProjectContentIndex firstIndex = repository.contentIndex();
 
         StructureDocument oneTile = (StructureDocument) TileEdits.repeat(
                 0, true, "NORMAL",
@@ -51,6 +63,11 @@ class ProjectTerrainDocumentRepositoryTest {
 
         repository.reload(projectRoot);
         assertEquals(1, repository.findStructure("shared.structure").tiles().size());
+        assertNotSame(firstIndex, repository.contentIndex());
+        assertEquals(0, firstIndex.structuresById().get("shared.structure")
+                .document().tiles().size(), "an earlier index remains frozen");
+        assertEquals(1, repository.contentIndex().structuresById()
+                .get("shared.structure").document().tiles().size());
     }
 
     @Test void failedReloadKeepsThePreviousUsableSnapshot() throws Exception {
@@ -67,5 +84,33 @@ class ProjectTerrainDocumentRepositoryTest {
         Files.writeString(content.resolve("broken.json"), "{ definitely-not-json }");
         assertThrows(CodecException.class, () -> repository.reload(projectRoot));
         assertNotNull(repository.findStructure("shared.structure"));
+    }
+
+    @Test void loadedCandidateIsAdoptedAsOneGeneration() throws Exception {
+        TerrainJsonCodec codec = new TerrainJsonCodec();
+        Path firstRoot = Files.createDirectories(projectRoot.resolve("first"));
+        Path secondRoot = Files.createDirectories(projectRoot.resolve("second"));
+        Path firstStructures = Files.createDirectories(
+                firstRoot.resolve("terrain-content/structures"));
+        Path secondStructures = Files.createDirectories(
+                secondRoot.resolve("terrain-content/structures"));
+        Files.writeString(firstStructures.resolve("first.json"), codec.encode(
+                DocumentFactories.blankStructure("first", GridMode.ADVANCED)));
+        Files.writeString(secondStructures.resolve("second.json"), codec.encode(
+                DocumentFactories.blankStructure("second", GridMode.ADVANCED)));
+        ProjectTerrainDocumentRepository current =
+                new ProjectTerrainDocumentRepository(codec);
+        ProjectTerrainDocumentRepository candidate =
+                new ProjectTerrainDocumentRepository(codec);
+        current.reload(firstRoot);
+        candidate.reload(secondRoot);
+
+        current.replaceWith(candidate);
+
+        assertEquals(null, current.findStructure("first"));
+        assertNotNull(current.findStructure("second"));
+        assertEquals(secondRoot.resolve("terrain-content").toAbsolutePath(),
+                current.contentRoot());
+        assertEquals(candidate.contentIndex(), current.contentIndex());
     }
 }
