@@ -5,14 +5,15 @@ Ks 0.1 0.1 0.1
 Ns 14
 d 1
 
-newmtl mint_tread
-Ka 0.009 0.0108 0.01152
-Kd 0.025 0.03 0.032
-Ks 0.03 0.03 0.03
-Ns 10
+newmtl mint_groove_emissive
+Ka 0.2 0.94 0.67
+Kd 0.2 0.94 0.67
+Ks 0 0 0
+Ns 1
+Ke 0.2 0.94 0.67
 d 1
 
-newmtl mint_light
+newmtl mint_motion_band_emissive
 Ka 0.2 0.94 0.67
 Kd 0.2 0.94 0.67
 Ks 0 0 0
@@ -27,7 +28,7 @@ Ks 0.22 0.22 0.22
 Ns 34
 d 1
 
-newmtl mint_light
+newmtl mint_side_emissive
 Ka 0.2 0.94 0.67
 Kd 0.2 0.94 0.67
 Ks 0 0 0

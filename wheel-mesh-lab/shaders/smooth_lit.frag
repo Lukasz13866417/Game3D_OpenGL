@@ -8,7 +8,6 @@ uniform float uAmbient;
 uniform float uDiffuse;
 uniform float uSpecular;
 uniform float uShininess;
-uniform float uOpacityMultiplier;
 in vec3 vWorldPos;
 in vec3 vWorldNormal;
 out vec4 fragColor;
@@ -21,5 +20,5 @@ void main(){
   float NdotH = max(dot(N, H), 0.0);
   float spec = pow(NdotH, uShininess);
   vec3 color = vColor.rgb * (uAmbient + uDiffuse * NdotL) + uLightColor * uSpecular * spec;
-  fragColor = vec4(color, vColor.a * uOpacityMultiplier);
+  fragColor = vec4(color, vColor.a);
 }

@@ -1,5 +1,5 @@
 #version 300 es
-precision mediump float;
+precision highp float;
 uniform sampler2D uSceneTex;
 uniform vec2 uSceneTexelStep;
 uniform float uThreshold;

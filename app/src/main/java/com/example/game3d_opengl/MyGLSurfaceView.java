@@ -1,8 +1,11 @@
 package com.example.game3d_opengl;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.opengl.GLSurfaceView;
+import android.os.Build;
 import android.view.Display;
+import android.view.Choreographer;
 import android.view.MotionEvent;
 
 import com.example.game3d_opengl.game.stage.stage_api.Stage;
@@ -15,6 +18,9 @@ public class MyGLSurfaceView extends GLSurfaceView {
     private static final int EGL_OPENGL_ES3_BIT_KHR = 0x40;
 
     private final MyGLRenderer renderer;
+    private final Choreographer choreographer;
+    private final PresentationCallbackScheduler presentationCallbackScheduler;
+    private boolean vsyncCallbacksRunning;
     private volatile int vsyncDivisor = 1; // 1 = render every vsync
     private int vsyncCounter = 0;
 
@@ -52,30 +58,157 @@ public class MyGLSurfaceView extends GLSurfaceView {
         setRenderer(renderer);
         // Use display vsync via Choreographer; one draw per vsync
         setRenderMode(RENDERMODE_WHEN_DIRTY);
-        post(new Runnable() {
-            final android.view.Choreographer choreographer = android.view.Choreographer.getInstance();
-            final android.view.Choreographer.FrameCallback callback = new android.view.Choreographer.FrameCallback() {
-                @Override public void doFrame(long frameTimeNanos) {
-                    renderer.onVsync(frameTimeNanos);
-                    int div = vsyncDivisor;
-                    if (div <= 1) {
-                        requestRender();
-                    } else {
-                        vsyncCounter++;
-                        if (vsyncCounter >= div) {
-                            vsyncCounter = 0;
-                            requestRender();
-                        }
-                    }
-                    choreographer.postFrameCallback(this);
-                }
-            };
-            @Override public void run() {
-                choreographer.postFrameCallback(callback);
-                renderer.setUseFrameCap(false);
+        choreographer = Choreographer.getInstance();
+        presentationCallbackScheduler =
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                        ? new Api33PresentationCallbackScheduler(
+                                choreographer, this::dispatchVsync)
+                        : new LegacyPresentationCallbackScheduler(
+                                choreographer, this::dispatchVsync);
+        setKeepScreenOn(true);
+    }
+
+    private void dispatchVsync(long presentationTimeNanos) {
+        if (!vsyncCallbacksRunning) {
+            return;
+        }
+        int divisor = vsyncDivisor;
+        boolean renderThisVsync;
+        if (divisor <= 1) {
+            renderThisVsync = true;
+        } else {
+            vsyncCounter++;
+            if (vsyncCounter >= divisor) {
+                vsyncCounter = 0;
+                renderThisVsync = true;
+            } else {
+                renderThisVsync = false;
+            }
+        }
+        // Publish and request from one ordered GL-thread event. GLSurfaceView drains queued events
+        // before selecting its next dirty render, so a callback that arrives during an in-flight
+        // draw remains unavailable to that draw. Multiple callbacks waiting behind the same draw
+        // still coalesce in the renderer's latest-only mailbox before one render is selected.
+        queueEvent(() -> {
+            renderer.onVsync(presentationTimeNanos);
+            if (renderThisVsync) {
+                requestRender();
             }
         });
-        setKeepScreenOn(true);
+        postNextVsyncCallback();
+    }
+
+    private void startVsyncCallbacks() {
+        if (vsyncCallbacksRunning) {
+            return;
+        }
+        vsyncCallbacksRunning = true;
+        vsyncCounter = 0;
+        queueEvent(renderer::resetFrameTimeline);
+        renderer.setUseFrameCap(false);
+        postNextVsyncCallback();
+    }
+
+    private void postNextVsyncCallback() {
+        if (!vsyncCallbacksRunning) {
+            return;
+        }
+        presentationCallbackScheduler.post();
+    }
+
+    private void stopVsyncCallbacks() {
+        if (!vsyncCallbacksRunning) {
+            return;
+        }
+        vsyncCallbacksRunning = false;
+        presentationCallbackScheduler.remove();
+        queueEvent(renderer::resetFrameTimeline);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        startVsyncCallbacks();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        stopVsyncCallbacks();
+        super.onDetachedFromWindow();
+    }
+
+    @Override
+    public void onPause() {
+        stopVsyncCallbacks();
+        super.onPause();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (isAttachedToWindow()) {
+            startVsyncCallbacks();
+        }
+    }
+
+    private interface PresentationTimeConsumer {
+        void accept(long presentationTimeNanos);
+    }
+
+    private interface PresentationCallbackScheduler {
+        void post();
+
+        void remove();
+    }
+
+    private static final class LegacyPresentationCallbackScheduler
+            implements PresentationCallbackScheduler {
+        private final Choreographer choreographer;
+        private final Choreographer.FrameCallback callback;
+
+        LegacyPresentationCallbackScheduler(
+                Choreographer choreographer,
+                PresentationTimeConsumer consumer) {
+            this.choreographer = choreographer;
+            callback = consumer::accept;
+        }
+
+        @Override
+        public void post() {
+            choreographer.postFrameCallback(callback);
+        }
+
+        @Override
+        public void remove() {
+            choreographer.removeFrameCallback(callback);
+        }
+    }
+
+    /** Keeps API-33-only Choreographer types out of the class verified on older devices. */
+    @TargetApi(Build.VERSION_CODES.TIRAMISU)
+    private static final class Api33PresentationCallbackScheduler
+            implements PresentationCallbackScheduler {
+        private final Choreographer choreographer;
+        private final Choreographer.VsyncCallback callback;
+
+        Api33PresentationCallbackScheduler(
+                Choreographer choreographer,
+                PresentationTimeConsumer consumer) {
+            this.choreographer = choreographer;
+            callback = frameData -> consumer.accept(
+                    frameData.getPreferredFrameTimeline()
+                            .getExpectedPresentationTimeNanos());
+        }
+
+        @Override
+        public void post() {
+            choreographer.postVsyncCallback(callback);
+        }
+
+        @Override
+        public void remove() {
+            choreographer.removeVsyncCallback(callback);
+        }
     }
 
     public MyGLRenderer getRenderer() {

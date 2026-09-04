@@ -28,7 +28,6 @@ public final class FlatLitShaderPair<
     }
 
     private int uMVP, uModel, uColor, aPos, aNormal;
-    private int uSpinAngleStart, uSpinAngleStep, uOpacityMultiplier;
     private int uLightPos, uLightColor, uCameraPos, uAmbient, uDiffuse, uSpecular, uShininess;
 
     public FlatLitShaderPair(int programHandle, String vs, String fs) {
@@ -51,21 +50,13 @@ public final class FlatLitShaderPair<
                 "uniform float uDiffuse;\n" +
                 "uniform float uSpecular;\n" +
                 "uniform float uShininess;\n" +
-                "uniform float uSpinAngleStart;\n" +
-                "uniform float uSpinAngleStep;\n" +
-                "uniform float uOpacityMultiplier;\n" +
                 "in vec3 vPosition;\n" +
                 "in vec3 aNormal;\n" +
                 "out vec4 vLitColor;\n" +
                 "void main(){\n" +
-                "  float spinAngle = uSpinAngleStart + float(gl_InstanceID) * uSpinAngleStep;\n" +
-                "  float spinCos = cos(spinAngle);\n" +
-                "  float spinSin = sin(spinAngle);\n" +
-                "  vec3 localPosition = vec3(vPosition.x, spinCos * vPosition.y - spinSin * vPosition.z, spinSin * vPosition.y + spinCos * vPosition.z);\n" +
-                "  vec3 localNormal = vec3(aNormal.x, spinCos * aNormal.y - spinSin * aNormal.z, spinSin * aNormal.y + spinCos * aNormal.z);\n" +
-                "  vec4 wp = uModelMatrix * vec4(localPosition, 1.0);\n" +
+                "  vec4 wp = uModelMatrix * vec4(vPosition, 1.0);\n" +
                 "  vec3 worldPos = wp.xyz;\n" +
-                "  vec3 worldNormal = normalize(mat3(uModelMatrix) * localNormal);\n" +
+                "  vec3 worldNormal = normalize(mat3(uModelMatrix) * aNormal);\n" +
                 "  vec3 L = normalize(uLightPos - worldPos);\n" +
                 "  vec3 V = normalize(uCameraPos - worldPos);\n" +
                 "  vec3 H = normalize(L + V);\n" +
@@ -73,8 +64,8 @@ public final class FlatLitShaderPair<
                 "  float NdotH = max(dot(worldNormal, H), 0.0);\n" +
                 "  float spec = pow(NdotH, uShininess);\n" +
                 "  vec3 color = vColor.rgb * (uAmbient + uDiffuse * NdotL) + uLightColor * uSpecular * spec;\n" +
-                "  vLitColor = vec4(color, vColor.a * uOpacityMultiplier);\n" +
-                "  gl_Position = uMVPMatrix * vec4(localPosition, 1.0);\n" +
+                "  vLitColor = vec4(color, vColor.a);\n" +
+                "  gl_Position = uMVPMatrix * vec4(vPosition, 1.0);\n" +
                 "}";
         String fs =
                 "#version 300 es\n" +
@@ -113,9 +104,6 @@ public final class FlatLitShaderPair<
         this.uDiffuse = GLES20.glGetUniformLocation(p, "uDiffuse");
         this.uSpecular = GLES20.glGetUniformLocation(p, "uSpecular");
         this.uShininess = GLES20.glGetUniformLocation(p, "uShininess");
-        this.uSpinAngleStart = GLES20.glGetUniformLocation(p, "uSpinAngleStart");
-        this.uSpinAngleStep = GLES20.glGetUniformLocation(p, "uSpinAngleStep");
-        this.uOpacityMultiplier = GLES20.glGetUniformLocation(p, "uOpacityMultiplier");
         this.aPos = GLES20.glGetAttribLocation(p, "vPosition");
         this.aNormal = GLES20.glGetAttribLocation(p, "aNormal");
     }
@@ -140,9 +128,6 @@ public final class FlatLitShaderPair<
         GLES20.glUniform1f(uDiffuse, fragmentArgs.diffuse);
         GLES20.glUniform1f(uSpecular, fragmentArgs.specular);
         GLES20.glUniform1f(uShininess, Math.max(1f, fragmentArgs.shininess));
-        GLES20.glUniform1f(uSpinAngleStart, vertexArgs.spinAngleStartRadians);
-        GLES20.glUniform1f(uSpinAngleStep, vertexArgs.spinAngleStepRadians);
-        GLES20.glUniform1f(uOpacityMultiplier, fragmentArgs.opacityMultiplier);
     }
 
     public static final class Builder

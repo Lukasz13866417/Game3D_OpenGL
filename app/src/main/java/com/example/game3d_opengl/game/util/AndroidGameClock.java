@@ -5,10 +5,13 @@ import android.os.SystemClock;
 import android.view.MotionEvent;
 
 /**
- * One explicit monotonic clock domain for Android input and simulation scheduling.
+ * One explicit, nanosecond-precision monotonic clock domain for Android input and simulation
+ * scheduling.
  *
- * <p>MotionEvent timestamps use uptime. Keeping controller epochs and lifecycle transitions in
- * that same domain avoids relying on undocumented relationships between Android clock APIs.
+ * <p>{@link MotionEvent} timestamps use uptime. On Android, {@link System#nanoTime()} and
+ * Choreographer timestamps use that same monotonic uptime time base with nanosecond precision.
+ * Keeping the value in that native domain avoids both millisecond quantization and an artificial
+ * epoch offset between input and simulation.</p>
  */
 public final class AndroidGameClock {
     private static final long NANOS_PER_MILLISECOND = 1_000_000L;
@@ -17,7 +20,17 @@ public final class AndroidGameClock {
     }
 
     public static long nowNanos() {
-        return SystemClock.uptimeMillis() * NANOS_PER_MILLISECOND;
+        return System.nanoTime();
+    }
+
+    /**
+     * Maps a Choreographer/System.nanoTime timestamp into the MotionEvent uptime domain.
+     *
+     * <p>Unlike converting through {@code uptimeMillis()}, this retains the timestamp's
+     * nanosecond cadence. In particular, 120 Hz is not reduced to a repeating 8/9 ms pattern.</p>
+     */
+    public static long fromSystemNanoTime(long monotonicTimeNanos) {
+        return monotonicTimeNanos;
     }
 
     public static long eventTimeNanos(MotionEvent event) {

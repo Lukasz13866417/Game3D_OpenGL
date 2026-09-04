@@ -13,7 +13,6 @@ import android.os.Trace;
 import android.util.Log;
 
 import java.util.ArrayDeque;
-
 import com.example.game3d_opengl.game.player.player_character.PlayerAssets;
 import com.example.game3d_opengl.game.settings.GameSettingsPersistence;
 import com.example.game3d_opengl.game.settings.SlowFrameStats;
@@ -46,9 +45,9 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
     private int surfaceW = 0, surfaceH = 0;
     private long lastFrameTime = -1;
     private long lastSlowFrameLogNanos = Long.MIN_VALUE;
-    // Last UI vsync timestamp provided by Choreographer (set from UI thread)
-    private volatile long lastVsyncNanos = -1;
-    private volatile long lastVsyncSequence = 0L;
+    private final VsyncHandoff vsyncHandoff = new VsyncHandoff();
+    private final VsyncHandoff.DrawInput frameTimelineInput =
+            new VsyncHandoff.DrawInput();
     private long lastConsumedVsyncSequence = -1L;
     private long lastDrawStartNanos = -1L;
     private long lastCallbackCpuNanos = 0L;
@@ -82,8 +81,12 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
 
     // Called from UI thread's Choreographer callback to provide vsync time
     public void onVsync(long frameTimeNanos) {
-        this.lastVsyncNanos = frameTimeNanos;
-        this.lastVsyncSequence += 1L;
+        vsyncHandoff.publish(frameTimeNanos);
+    }
+
+    /** Starts the next rendered frame from a fresh presentation epoch. */
+    public void resetFrameTimeline() {
+        vsyncHandoff.reset();
     }
 
 
@@ -159,7 +162,7 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         validateEs31Context();
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        lastFrameTime = System.nanoTime();
+        lastFrameTime = -1L;
         resetFramePacingWindow();
         lastConsumedVsyncSequence = -1L;
         lastDrawStartNanos = -1L;
@@ -204,12 +207,16 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(GL10 gl) {
+        // Claim the frame sample before doing any other work. The tiny synchronized consume gives
+        // a racing publisher one of two outcomes: this draw owns the complete sample, or the next
+        // draw does. The reusable output keeps this hot path allocation-free.
+        vsyncHandoff.consumeLatest(frameTimelineInput);
         boolean tracing = isAppTracingEnabled();
         if (tracing) {
             Trace.beginSection("G3D:frameJava");
         }
         try {
-            drawFrame(gl);
+            drawFrame(gl, frameTimelineInput);
         } finally {
             if (tracing) {
                 Trace.endSection();
@@ -217,27 +224,39 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         }
     }
 
-    private void drawFrame(GL10 gl) {
+    private void drawFrame(GL10 gl, VsyncHandoff.DrawInput frameTimeline) {
         long callbackStartNanos = System.nanoTime();
         long callbackThreadCpuStartNanos = Debug.threadCpuTimeNanos();
         long previousCallbackCpuNanos = lastCallbackCpuNanos;
         applyPendingTransition();
-        if (lastFrameTime == -1) {
-            lastFrameTime = System.nanoTime();
+        if (frameTimeline.resetRequested) {
+            lastFrameTime = -1L;
+            lastConsumedVsyncSequence = -1L;
         }
+        boolean advanceTimeline = shouldAdvanceTimeline(
+                useFrameCap, frameTimeline);
 
         // Frame pacing and dt:
         // If Choreographer provides a vsync timestamp, prefer that for stable dt.
         // Otherwise, fall back to System.nanoTime() with optional sleep-based cap.
-        long vsync = lastVsyncNanos;
-        long vsyncSequence = lastVsyncSequence;
+        long vsync = frameTimeline.hasSample
+                ? frameTimeline.presentationTimeNanos
+                : -1L;
+        long vsyncSequence = frameTimeline.hasSample
+                ? frameTimeline.sequence
+                : -1L;
         long now = System.nanoTime();
-        long referenceNow = (vsync > 0 ? vsync : now);
+        long referenceNow = advanceTimeline
+                ? (vsync > 0 ? vsync : now)
+                : (lastFrameTime >= 0L ? lastFrameTime : now);
 
-        long elapsed = (lastFrameTime > 0 ? (referenceNow - lastFrameTime) : 0);
-        if (vsync <= 0) {
+        long elapsed = advanceTimeline
+                ? elapsedSinceAcceptedFrame(lastFrameTime, referenceNow)
+                : 0L;
+        if (advanceTimeline && vsync <= 0) {
             // No vsync provided: optionally apply coarse sleep-based cap
-            if (useFrameCap && elapsed < TARGET_FRAME_NS) {
+            if (useFrameCap && lastFrameTime >= 0L
+                    && elapsed < TARGET_FRAME_NS) {
                 long sleepNs = TARGET_FRAME_NS - elapsed;
                 long sleepMs = sleepNs / 1_000_000L;
                 int extraNs = (int) (sleepNs % 1_000_000L);
@@ -248,11 +267,15 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
                 } catch (InterruptedException ignored) {}
                 now = System.nanoTime();
                 referenceNow = now;
-                elapsed = (lastFrameTime > 0 ? (referenceNow - lastFrameTime) : 0);
+                elapsed = elapsedSinceAcceptedFrame(
+                        lastFrameTime, referenceNow);
             }
         }
+        if (advanceTimeline) {
+            referenceNow = advanceAcceptedFrameTime(lastFrameTime, referenceNow);
+            lastFrameTime = referenceNow;
+        }
         float deltaTime = (elapsed <= 0 ? 0.0f : (elapsed / 1_000_000f)); // ms
-        lastFrameTime = referenceNow;
         float simulationDt = Math.min(deltaTime, MAX_SIMULATION_DT_MS);
 
         Stage currentStage = getCurrentStage();
@@ -286,10 +309,22 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
                     GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         }
         if (stageWillDraw) {
-            currentStage.updateThenDraw(
-                    simulationDt,
-                    AndroidGameClock.nowNanos(),
-                    Math.max(0L, elapsed));
+            // Drive presentation/interpolation from Choreographer's display-timeline timestamp. A fresh
+            // uptimeMillis-based callback timestamp both loses sub-millisecond cadence and adds
+            // variable GL-thread callback latency to otherwise evenly spaced presentations.
+            long presentationTimeNanos =
+                    AndroidGameClock.fromSystemNanoTime(referenceNow);
+            if (advanceTimeline) {
+                currentStage.updateThenDraw(
+                        simulationDt,
+                        presentationTimeNanos,
+                        Math.max(0L, elapsed));
+            } else {
+                // GLSurfaceView swaps after every onDrawFrame callback. Redraw an exact current
+                // frame so a redundant request never presents an undefined/stale back buffer,
+                // while keeping simulation, input and the presentation timeline untouched.
+                currentStage.redrawCurrentFrame(presentationTimeNanos);
+            }
         }
         SlowFrameStats.endFrame();
         finishFramePacing(
@@ -322,7 +357,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         long vsyncAgeNanos = vsyncNanos > 0L
                 ? Math.max(0L, callbackStartNanos - vsyncNanos)
                 : 0L;
-        long sequenceGap = lastConsumedVsyncSequence >= 0L
+        long sequenceGap = vsyncSequence >= 0L
+                && lastConsumedVsyncSequence >= 0L
                 ? Math.max(0L, vsyncSequence - lastConsumedVsyncSequence)
                 : 0L;
         int coalescedVsyncs = sequenceGap > 1L
@@ -360,7 +396,9 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             }
         }
 
-        lastConsumedVsyncSequence = vsyncSequence;
+        if (vsyncSequence >= 0L) {
+            lastConsumedVsyncSequence = vsyncSequence;
+        }
         lastDrawStartNanos = callbackStartNanos;
 
         if (pacingFrameCount >= FRAME_PACING_WINDOW_SIZE) {
@@ -412,6 +450,68 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
         return (int) Math.min(Integer.MAX_VALUE, roundedIntervals - 1L);
     }
 
+    static long elapsedSinceAcceptedFrame(
+            long previousFrameTimeNanos, long candidateFrameTimeNanos) {
+        if (previousFrameTimeNanos < 0L
+                || candidateFrameTimeNanos <= previousFrameTimeNanos) {
+            return 0L;
+        }
+        return candidateFrameTimeNanos - previousFrameTimeNanos;
+    }
+
+    static long advanceAcceptedFrameTime(
+            long previousFrameTimeNanos, long candidateFrameTimeNanos) {
+        if (previousFrameTimeNanos < 0L) {
+            return candidateFrameTimeNanos;
+        }
+        return Math.max(previousFrameTimeNanos, candidateFrameTimeNanos);
+    }
+
+    static boolean shouldAdvanceTimeline(
+            boolean useFallbackFrameCap,
+            VsyncHandoff.DrawInput frameTimeline) {
+        return useFallbackFrameCap || frameTimeline.hasSample;
+    }
+
+    /** Latest-only UI-to-GL mailbox with one allocation-free critical section per operation. */
+    static final class VsyncHandoff {
+        private long pendingPresentationTimeNanos = -1L;
+        private long lastPublishedSequence;
+        private boolean samplePending;
+        private boolean resetRequested;
+
+        synchronized void publish(long presentationTimeNanos) {
+            lastPublishedSequence += 1L;
+            pendingPresentationTimeNanos = presentationTimeNanos;
+            samplePending = true;
+        }
+
+        synchronized void reset() {
+            pendingPresentationTimeNanos = -1L;
+            samplePending = false;
+            resetRequested = true;
+        }
+
+        synchronized void consumeLatest(DrawInput output) {
+            output.hasSample = samplePending;
+            output.presentationTimeNanos = samplePending
+                    ? pendingPresentationTimeNanos
+                    : -1L;
+            output.sequence = samplePending ? lastPublishedSequence : -1L;
+            output.resetRequested = resetRequested;
+            pendingPresentationTimeNanos = -1L;
+            samplePending = false;
+            resetRequested = false;
+        }
+
+        static final class DrawInput {
+            boolean hasSample;
+            long presentationTimeNanos = -1L;
+            long sequence = -1L;
+            boolean resetRequested;
+        }
+    }
+
     private void resetFramePacingWindow() {
         pacingFrameCount = 0;
         pacingMissedCallbacks = 0;
@@ -459,6 +559,8 @@ public class MyGLRenderer implements GLSurfaceView.Renderer {
             currentStage.setInitialized();
             currentStage.init(androidContext, width, height);
             currentStage.activate(Stage.ActivationReason.FRESH_ENTER);
+        } else {
+            currentStage.onSurfaceSizeChanged(width, height);
         }
     }
 

@@ -14,7 +14,6 @@ import com.example.game3d_opengl.rendering.util3d.ObjMaterialGroupLoader;
 import com.example.game3d_opengl.rendering.util3d.PreparedModelData;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Map;
 import static com.example.game3d_opengl.game.player.player_character.PlayerConfig.*;
 
@@ -23,8 +22,19 @@ import static com.example.game3d_opengl.game.player.player_character.PlayerConfi
  * Disk parsing can happen in the background, while mesh creation stays on the GL thread.
  */
 public class PlayerAssets {
+    static final String MINT_GROOVE_EMISSIVE_MATERIAL =
+            "mint_groove_emissive";
+    static final String MINT_SIDE_EMISSIVE_MATERIAL =
+            "mint_side_emissive";
+    static final String MINT_MOTION_BAND_EMISSIVE_MATERIAL =
+            "mint_motion_band_emissive";
+    /** Canonical angular coverage of all eighteen real mint grooves. */
+    static final float MINT_MOTION_BAND_DUTY_CYCLE = 0.26164f;
+    private static final Mesh3DInfill[] NO_FILL_MESHES =
+            new Mesh3DInfill[0];
+
     private static final float NEON_DARK_CHANNEL = 0.04f;
-    private static final float NEON_BRIGHT_CHANNEL = 0.98f;
+    static final float NEON_BRIGHT_CHANNEL = 0.98f;
     private static final float NEON_SATURATION_GAIN = 2.2f;
 
     static UnbatchedObject3DWithOutline PLAYER_OBJECT;
@@ -35,9 +45,18 @@ public class PlayerAssets {
     private static Mesh3DInfill violetPrimaryGrooves;
     private static Mesh3DInfill violetSecondaryGrooves;
     private static Mesh3DInfill violetDetailGrooves;
-    private static Mesh3DInfill mintThemeMesh;
+    private static Mesh3DInfill[] loadedFillMeshes = NO_FILL_MESHES;
+    private static Mesh3DInfill mintGrooveEmissiveMesh;
+    private static Mesh3DInfill mintSideEmissiveMesh;
+    private static Mesh3DInfill mintMotionBandEmissiveMesh;
+    private static Mesh3DInfill[] mintRollInvariantMeshes = NO_FILL_MESHES;
+    private static PreparedModelData mintGrooveTemporalGeometry;
+    private static PreparedModelData mintMotionBandTemporalGeometry;
     private static final FColor mintThemeColor =
             CLR(0.20f, 0.94f, 0.67f, 1f);
+    private static final FColor mintGrooveRenderColor =
+            CLR(0.20f, 0.94f, 0.67f, 1f);
+    private static float mintGrooveSharpScale = 1f;
     private static float violetPrimaryVisibility = 1f;
     private static float violetSecondaryVisibility = 1f;
     private static float violetDetailVisibility = 1f;
@@ -209,9 +228,58 @@ public class PlayerAssets {
             return;
         }
         writeNeonThemeColor(themeColor, mintThemeColor);
-        if (mintThemeMesh != null) {
-            mintThemeMesh.setFillColor(mintThemeColor);
-        }
+        applyMintThemeColor();
+    }
+
+    /**
+     * Returns the stable multipart array owned by the currently loaded player object.
+     * The array must be treated as read-only and stays valid until the player asset is
+     * discarded or replaced. This avoids per-frame copies in wheel-local render passes.
+     */
+    static synchronized Mesh3DInfill[] loadedFillMeshes() {
+        return loadedFillMeshes;
+    }
+
+    static synchronized Mesh3DInfill mintGrooveEmissiveMesh() {
+        return mintGrooveEmissiveMesh;
+    }
+
+    static synchronized Mesh3DInfill mintSideEmissiveMesh() {
+        return mintSideEmissiveMesh;
+    }
+
+    static synchronized Mesh3DInfill mintMotionBandEmissiveMesh() {
+        return mintMotionBandEmissiveMesh;
+    }
+
+    /** Rotationally symmetric carcass/hub/side meshes; treat the returned array as read-only. */
+    static synchronized Mesh3DInfill[] mintRollInvariantMeshes() {
+        return mintRollInvariantMeshes;
+    }
+
+    static synchronized PreparedModelData mintGrooveTemporalGeometry() {
+        return mintGrooveTemporalGeometry;
+    }
+
+    static synchronized PreparedModelData mintMotionBandTemporalGeometry() {
+        return mintMotionBandTemporalGeometry;
+    }
+
+    /** Stable theme object; temporal rendering treats it as read-only on the GL thread. */
+    static synchronized FColor mintEmissionThemeColor() {
+        return mintThemeColor;
+    }
+
+    /** Sets the current-pose groove core without changing the full-energy temporal source. */
+    static synchronized void setMintGrooveSharpScale(float scale) {
+        mintGrooveSharpScale = clamp01(scale);
+        applyMintGrooveRenderScale(mintGrooveSharpScale);
+    }
+
+    static boolean isMintEmissionMaterial(String materialName) {
+        return MINT_GROOVE_EMISSIVE_MATERIAL.equals(materialName)
+                || MINT_SIDE_EMISSIVE_MATERIAL.equals(materialName)
+                || MINT_MOTION_BAND_EMISSIVE_MATERIAL.equals(materialName);
     }
 
     static void writeNeonThemeColor(FColor themeColor, FColor destination) {
@@ -250,11 +318,42 @@ public class PlayerAssets {
         violetPrimaryGrooves = builtPlayer.violetPrimary;
         violetSecondaryGrooves = builtPlayer.violetSecondary;
         violetDetailGrooves = builtPlayer.violetDetail;
-        mintThemeMesh = builtPlayer.mintTheme;
+        loadedFillMeshes = builtPlayer.fillMeshes;
+        mintGrooveEmissiveMesh = builtPlayer.mintGrooveEmissive;
+        mintSideEmissiveMesh = builtPlayer.mintSideEmissive;
+        mintMotionBandEmissiveMesh = builtPlayer.mintMotionBandEmissive;
+        mintRollInvariantMeshes = builtPlayer.mintRollInvariantMeshes;
+        mintGrooveTemporalGeometry = builtPlayer.mintGrooveTemporalGeometry;
+        mintMotionBandTemporalGeometry =
+                builtPlayer.mintMotionBandTemporalGeometry;
         applyVioletSpinAppearance();
-        if (mintThemeMesh != null) {
-            mintThemeMesh.setFillColor(mintThemeColor);
+        applyMintThemeColor();
+    }
+
+    private static void applyMintThemeColor() {
+        if (mintGrooveEmissiveMesh != null) {
+            applyMintGrooveRenderScale(mintGrooveSharpScale);
         }
+        if (mintSideEmissiveMesh != null) {
+            mintSideEmissiveMesh.setFillColor(mintThemeColor);
+        }
+        if (mintMotionBandEmissiveMesh != null) {
+            // The atlas resolver applies duty-cycle and LOD weights. Keep the source shell at
+            // full neon so the core and direct bloom residual share one radiometric source.
+            mintMotionBandEmissiveMesh.setFillColor(mintThemeColor);
+        }
+    }
+
+    private static void applyMintGrooveRenderScale(float scale) {
+        if (mintGrooveEmissiveMesh == null) {
+            return;
+        }
+        float safeScale = clamp01(scale);
+        mintGrooveRenderColor.rgba[0] = mintThemeColor.r() * safeScale;
+        mintGrooveRenderColor.rgba[1] = mintThemeColor.g() * safeScale;
+        mintGrooveRenderColor.rgba[2] = mintThemeColor.b() * safeScale;
+        mintGrooveRenderColor.rgba[3] = 1f;
+        mintGrooveEmissiveMesh.setFillColor(mintGrooveRenderColor);
     }
 
     private static void applyVioletSpinAppearance() {
@@ -295,7 +394,14 @@ public class PlayerAssets {
         violetPrimaryGrooves = null;
         violetSecondaryGrooves = null;
         violetDetailGrooves = null;
-        mintThemeMesh = null;
+        loadedFillMeshes = NO_FILL_MESHES;
+        mintGrooveEmissiveMesh = null;
+        mintSideEmissiveMesh = null;
+        mintMotionBandEmissiveMesh = null;
+        mintRollInvariantMeshes = NO_FILL_MESHES;
+        mintGrooveTemporalGeometry = null;
+        mintMotionBandTemporalGeometry = null;
+        mintGrooveSharpScale = 1f;
         loadedWheelStyle = null;
         gpuResourcesDirty = false;
     }
@@ -308,22 +414,22 @@ public class PlayerAssets {
         }
 
         Mesh3DInfill[] meshes = new Mesh3DInfill[parts.size()];
-        Mesh3DInfill[] spinBlurCandidates =
-                new Mesh3DInfill[parts.size()];
-        int spinBlurMeshCount = 0;
         Mesh3DInfill violetCore = null;
         Mesh3DInfill violetPrimary = null;
         Mesh3DInfill violetSecondary = null;
         Mesh3DInfill violetDetail = null;
-        Mesh3DInfill mintTheme = null;
+        Mesh3DInfill mintGrooveEmissive = null;
+        Mesh3DInfill mintSideEmissive = null;
+        Mesh3DInfill mintMotionBandEmissive = null;
+        Mesh3DInfill mintRubber = null;
+        Mesh3DInfill mintHub = null;
+        PreparedModelData mintGrooveGeometry = null;
+        PreparedModelData mintMotionBandGeometry = null;
         int meshIndex = 0;
         for (Map.Entry<String, PreparedModelData> entry : parts.entrySet()) {
             Mesh3DInfill mesh =
                     buildPlayerPart(entry.getKey(), entry.getValue());
             meshes[meshIndex++] = mesh;
-            if (isSpinBlurMaterial(entry.getKey())) {
-                spinBlurCandidates[spinBlurMeshCount++] = mesh;
-            }
             if ("violet_core".equals(entry.getKey())) {
                 violetCore = mesh;
             } else if ("violet_glow_primary".equals(entry.getKey())) {
@@ -332,18 +438,29 @@ public class PlayerAssets {
                 violetSecondary = mesh;
             } else if ("violet_glow_detail".equals(entry.getKey())) {
                 violetDetail = mesh;
-            } else if ("mint_light".equals(entry.getKey())) {
-                mintTheme = mesh;
+            } else if (MINT_GROOVE_EMISSIVE_MATERIAL.equals(entry.getKey())) {
+                mintGrooveEmissive = mesh;
+                mintGrooveGeometry = entry.getValue();
+            } else if (MINT_SIDE_EMISSIVE_MATERIAL.equals(entry.getKey())) {
+                mintSideEmissive = mesh;
+            } else if (MINT_MOTION_BAND_EMISSIVE_MATERIAL.equals(
+                    entry.getKey())) {
+                mintMotionBandEmissive = mesh;
+                mintMotionBandGeometry = entry.getValue();
+            } else if ("mint_rubber".equals(entry.getKey())) {
+                mintRubber = mesh;
+            } else if ("mint_hub".equals(entry.getKey())) {
+                mintHub = mesh;
             }
         }
+
+        Mesh3DInfill[] mintRollInvariant = compactMeshes(
+                mintRubber, mintHub, mintSideEmissive);
 
         UnbatchedObject3DWithOutline obj =
                 UnbatchedObject3DWithOutline.wrapMultipart(
                         meshes,
-                        null,
-                        Arrays.copyOf(
-                                spinBlurCandidates,
-                                spinBlurMeshCount));
+                        null);
         obj.objX = INITIAL_POSITION_X;
         obj.objY = INITIAL_POSITION_Y;
         obj.objZ = INITIAL_POSITION_Z;
@@ -353,21 +470,33 @@ public class PlayerAssets {
                 violetPrimary,
                 violetSecondary,
                 violetDetail,
-                mintTheme);
+                meshes,
+                mintGrooveEmissive,
+                mintSideEmissive,
+                mintMotionBandEmissive,
+                mintRollInvariant,
+                mintGrooveGeometry,
+                mintMotionBandGeometry);
     }
 
-    /**
-     * Only asymmetric/high-contrast rotating details need temporal sampling. Blurring the
-     * mostly rotationally-symmetric carcass would add fill cost while making the silhouette
-     * muddy.
-     */
-    static boolean isSpinBlurMaterial(String materialName) {
-        return "mint_tread".equals(materialName)
-                || "mint_light".equals(materialName)
-                || "violet_energy".equals(materialName)
-                || "violet_glow_primary".equals(materialName)
-                || "violet_glow_secondary".equals(materialName)
-                || "violet_glow_detail".equals(materialName);
+    private static Mesh3DInfill[] compactMeshes(Mesh3DInfill... candidates) {
+        int count = 0;
+        for (Mesh3DInfill candidate : candidates) {
+            if (candidate != null) {
+                count++;
+            }
+        }
+        if (count == 0) {
+            return NO_FILL_MESHES;
+        }
+        Mesh3DInfill[] compact = new Mesh3DInfill[count];
+        int index = 0;
+        for (Mesh3DInfill candidate : candidates) {
+            if (candidate != null) {
+                compact[index++] = candidate;
+            }
+        }
+        return compact;
     }
 
     private static Mesh3DInfill buildPlayerPart(
@@ -434,7 +563,9 @@ public class PlayerAssets {
                         .specular(0.22f)
                         .shininess(34f);
                 break;
-            case "mint_light":
+            case MINT_GROOVE_EMISSIVE_MATERIAL:
+            case MINT_SIDE_EMISSIVE_MATERIAL:
+            case MINT_MOTION_BAND_EMISSIVE_MATERIAL:
                 builder.fillColor(mintThemeColor)
                         .ambient(1f)
                         .diffuse(0f)
@@ -457,7 +588,13 @@ public class PlayerAssets {
         private final Mesh3DInfill violetPrimary;
         private final Mesh3DInfill violetSecondary;
         private final Mesh3DInfill violetDetail;
-        private final Mesh3DInfill mintTheme;
+        private final Mesh3DInfill[] fillMeshes;
+        private final Mesh3DInfill mintGrooveEmissive;
+        private final Mesh3DInfill mintSideEmissive;
+        private final Mesh3DInfill mintMotionBandEmissive;
+        private final Mesh3DInfill[] mintRollInvariantMeshes;
+        private final PreparedModelData mintGrooveTemporalGeometry;
+        private final PreparedModelData mintMotionBandTemporalGeometry;
 
         private BuiltPlayerObject(
                 UnbatchedObject3DWithOutline object,
@@ -465,14 +602,27 @@ public class PlayerAssets {
                 Mesh3DInfill violetPrimary,
                 Mesh3DInfill violetSecondary,
                 Mesh3DInfill violetDetail,
-                Mesh3DInfill mintTheme
+                Mesh3DInfill[] fillMeshes,
+                Mesh3DInfill mintGrooveEmissive,
+                Mesh3DInfill mintSideEmissive,
+                Mesh3DInfill mintMotionBandEmissive,
+                Mesh3DInfill[] mintRollInvariantMeshes,
+                PreparedModelData mintGrooveTemporalGeometry,
+                PreparedModelData mintMotionBandTemporalGeometry
         ) {
             this.object = object;
             this.violetCore = violetCore;
             this.violetPrimary = violetPrimary;
             this.violetSecondary = violetSecondary;
             this.violetDetail = violetDetail;
-            this.mintTheme = mintTheme;
+            this.fillMeshes = fillMeshes;
+            this.mintGrooveEmissive = mintGrooveEmissive;
+            this.mintSideEmissive = mintSideEmissive;
+            this.mintMotionBandEmissive = mintMotionBandEmissive;
+            this.mintRollInvariantMeshes = mintRollInvariantMeshes;
+            this.mintGrooveTemporalGeometry = mintGrooveTemporalGeometry;
+            this.mintMotionBandTemporalGeometry =
+                    mintMotionBandTemporalGeometry;
         }
     }
 }

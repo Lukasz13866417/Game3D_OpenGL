@@ -12,67 +12,104 @@ import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
  */
 public final class UnbatchedObject3DWithOutline extends UnbatchedObject3D {
     private final Mesh3DInfill[] fillMeshes;
-    private final Mesh3DInfill[] spinBlurMeshes;
     private final Mesh3DWireframe edgeMesh;
     private final MVPDrawArgs fillDrawArgs = new MVPDrawArgs(new float[16], new float[16]);
-    private final MVPDrawArgs spinBlurDrawArgs =
-            new MVPDrawArgs(new float[16], new float[16]);
     private final float[] edgeMvp = new float[16];
     private final MVPDrawArgs edgeDrawArgs = new MVPDrawArgs(edgeMvp);
 
     private UnbatchedObject3DWithOutline(
             Mesh3DInfill[] fillMeshes,
-            Mesh3DWireframe edgeMesh,
-            Mesh3DInfill[] spinBlurMeshes
+            Mesh3DWireframe edgeMesh
     ) {
         this.fillMeshes = fillMeshes != null ? fillMeshes.clone() : new Mesh3DInfill[0];
-        this.spinBlurMeshes = spinBlurMeshes != null
-                ? spinBlurMeshes.clone()
-                : new Mesh3DInfill[0];
         this.edgeMesh = edgeMesh;
     }
 
     @Override
     protected void drawUnderlying(float[] model, float[] vp) {
+        drawFillMeshes(model, vp, null, false);
+        drawEdgeMesh(model, vp);
+    }
+
+    /**
+     * Draws this object except for one material mesh. This is used by the wheel exposure path to
+     * establish an emitter-free body/occluder depth before the sharp emissive core is drawn.
+     */
+    public void drawExcludingFillMesh(
+            float[] vp,
+            Mesh3DInfill excludedMesh) {
+        float[] model = currentModelMatrix();
+        drawFillMeshes(model, vp, excludedMesh, false);
+        drawEdgeMesh(model, vp);
+    }
+
+    /**
+     * Draws all material meshes except a stable exclusion group and up to two optional meshes.
+     * Identity comparison keeps this allocation-free for multipart presentation effects.
+     */
+    public void drawExcludingFillMeshes(
+            float[] vp,
+            Mesh3DInfill[] excludedGroup,
+            Mesh3DInfill firstExcludedMesh,
+            Mesh3DInfill secondExcludedMesh) {
+        float[] model = currentModelMatrix();
         fillDrawArgs.model = model;
         fillDrawArgs.vp = vp;
         for (Mesh3DInfill fillMesh : fillMeshes) {
-            if (fillMesh != null) {
+            if (fillMesh != null
+                    && fillMesh != firstExcludedMesh
+                    && fillMesh != secondExcludedMesh
+                    && !containsIdentity(excludedGroup, fillMesh)) {
                 fillMesh.draw(fillDrawArgs);
             }
         }
+        drawEdgeMesh(model, vp);
+    }
+
+    /** Draws one owned material mesh under this object's current transform. */
+    public void drawOnlyFillMesh(float[] vp, Mesh3DInfill includedMesh) {
+        if (includedMesh == null) {
+            return;
+        }
+        float[] model = currentModelMatrix();
+        drawFillMeshes(model, vp, includedMesh, true);
+    }
+
+    private void drawFillMeshes(
+            float[] model,
+            float[] vp,
+            Mesh3DInfill selectedMesh,
+            boolean includeOnlySelected) {
+        fillDrawArgs.model = model;
+        fillDrawArgs.vp = vp;
+        for (Mesh3DInfill fillMesh : fillMeshes) {
+            boolean selected = fillMesh == selectedMesh;
+            if (fillMesh != null
+                    && (includeOnlySelected ? selected : !selected)) {
+                fillMesh.draw(fillDrawArgs);
+            }
+        }
+    }
+
+    private void drawEdgeMesh(float[] model, float[] vp) {
         if (edgeMesh != null) {
             android.opengl.Matrix.multiplyMM(edgeMvp, 0, vp, 0, model, 0);
             edgeMesh.draw(edgeDrawArgs);
         }
     }
 
-    /**
-     * Draws only the rotating high-contrast material groups as instanced trailing samples.
-     * The caller owns blend/depth state and skips this call when fewer than two samples exist.
-     */
-    public void drawSpinBlur(
-            float[] vp,
-            int sampleCount,
-            float angleStartRadians,
-            float angleStepRadians,
-            float opacityMultiplier
-    ) {
-        if (vp == null || sampleCount < 2 || spinBlurMeshes.length == 0
-                || !(opacityMultiplier > 0f)) {
-            return;
+    private static boolean containsIdentity(
+            Mesh3DInfill[] meshes,
+            Mesh3DInfill candidate) {
+        if (meshes == null) {
+            return false;
         }
-        spinBlurDrawArgs.model = currentModelMatrix();
-        spinBlurDrawArgs.vp = vp;
-        spinBlurDrawArgs.instanceCount = sampleCount;
-        spinBlurDrawArgs.spinAngleStartRadians = angleStartRadians;
-        spinBlurDrawArgs.spinAngleStepRadians = angleStepRadians;
-        spinBlurDrawArgs.opacityMultiplier = opacityMultiplier;
-        for (Mesh3DInfill spinBlurMesh : spinBlurMeshes) {
-            if (spinBlurMesh != null) {
-                spinBlurMesh.draw(spinBlurDrawArgs);
+        for (Mesh3DInfill mesh : meshes) {
+            if (mesh == candidate) {
+                return true;
             }
         }
+        return false;
     }
 
     @Override
@@ -94,25 +131,14 @@ public final class UnbatchedObject3DWithOutline extends UnbatchedObject3D {
     public static UnbatchedObject3DWithOutline wrap(Mesh3DInfill fillMesh, Mesh3DWireframe edgeMesh){
         return new UnbatchedObject3DWithOutline(
                 fillMesh == null ? null : new Mesh3DInfill[]{fillMesh},
-                edgeMesh,
-                null);
+                edgeMesh);
     }
 
     public static UnbatchedObject3DWithOutline wrapMultipart(
             Mesh3DInfill[] fillMeshes,
             Mesh3DWireframe edgeMesh
     ) {
-        return new UnbatchedObject3DWithOutline(fillMeshes, edgeMesh, null);
-    }
-
-    /** Creates a multipart object with a material subset eligible for instanced spin blur. */
-    public static UnbatchedObject3DWithOutline wrapMultipart(
-            Mesh3DInfill[] fillMeshes,
-            Mesh3DWireframe edgeMesh,
-            Mesh3DInfill[] spinBlurMeshes
-    ) {
-        return new UnbatchedObject3DWithOutline(
-                fillMeshes, edgeMesh, spinBlurMeshes);
+        return new UnbatchedObject3DWithOutline(fillMeshes, edgeMesh);
     }
 
     /**
@@ -147,7 +173,7 @@ public final class UnbatchedObject3DWithOutline extends UnbatchedObject3D {
             Mesh3DInfill fill = fillBuilder.buildObject();
 
             return new UnbatchedObject3DWithOutline(
-                    new Mesh3DInfill[]{fill}, null, null);
+                    new Mesh3DInfill[]{fill}, null);
         }
     }
 }

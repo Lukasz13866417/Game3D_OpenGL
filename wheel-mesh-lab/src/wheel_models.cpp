@@ -144,6 +144,69 @@ CpuMesh makeTorus(
     return sweepClosedProfile(profile, radialSegments);
 }
 
+CpuMesh makeMintMotionBand() {
+    static_assert(
+            kMintMotionBandRadialSegments % kMintChevronCount == 0,
+            "motion-band tessellation should align with the authored repeat pitch");
+    constexpr float majorRadius = 0.365F;
+    constexpr float radialTubeRadius = 0.128F;
+    constexpr float axialTubeRadius = 0.126F;
+    constexpr int axialSamples = kMintMotionBandAxialSegments + 1;
+
+    // This is intentionally an open, outward-facing tread skin. Closing it at
+    // +/-X would create luminous shoulder/side faces which are not part of the
+    // rolling groove exposure. The 360-way sweep limits the maximum radial
+    // polygon sagitta to <2e-5 authoring units (well below one screen pixel).
+    CpuMesh mesh;
+    mesh.vertices.reserve(static_cast<std::size_t>(
+            kMintMotionBandRadialSegments * axialSamples));
+    mesh.indices.reserve(static_cast<std::size_t>(
+            kMintMotionBandRadialSegments
+                    * kMintMotionBandAxialSegments * 6));
+
+    for (int ring = 0; ring < kMintMotionBandRadialSegments; ++ring) {
+        const float theta = glm::two_pi<float>() * static_cast<float>(ring)
+                / static_cast<float>(kMintMotionBandRadialSegments);
+        const float cosine = std::cos(theta);
+        const float sine = std::sin(theta);
+        for (int axial = 0; axial < axialSamples; ++axial) {
+            const float amount = static_cast<float>(axial)
+                    / static_cast<float>(kMintMotionBandAxialSegments);
+            const float x = -kMintMotionBandTreadHalfSpan
+                    + 2.0F * kMintMotionBandTreadHalfSpan * amount;
+            const float normalizedX = std::clamp(
+                    x / axialTubeRadius, -0.999F, 0.999F);
+            const float radius = majorRadius + radialTubeRadius
+                    * std::sqrt(std::max(
+                            0.0F, 1.0F - normalizedX * normalizedX));
+            const float radialGradient = (radius - majorRadius)
+                    / (radialTubeRadius * radialTubeRadius);
+            glm::vec3 normal(
+                    x / (axialTubeRadius * axialTubeRadius),
+                    radialGradient * cosine,
+                    radialGradient * sine);
+            normal = glm::normalize(normal);
+            const glm::vec3 crownPosition(
+                    x, radius * cosine, radius * sine);
+            mesh.vertices.push_back({
+                    crownPosition + normal * kMintMotionBandSurfaceOffset,
+                    normal});
+        }
+    }
+
+    for (int ring = 0; ring < kMintMotionBandRadialSegments; ++ring) {
+        const int nextRing = (ring + 1) % kMintMotionBandRadialSegments;
+        for (int axial = 0; axial < kMintMotionBandAxialSegments; ++axial) {
+            const auto a = static_cast<std::uint32_t>(ring * axialSamples + axial);
+            const auto b = static_cast<std::uint32_t>(nextRing * axialSamples + axial);
+            const auto c = a + 1U;
+            const auto d = b + 1U;
+            mesh.indices.insert(mesh.indices.end(), {a, b, c, b, d, c});
+        }
+    }
+    return mesh;
+}
+
 CpuMesh makeAnnulus(
         const float x,
         const float innerRadius,
@@ -458,6 +521,54 @@ MeshPart part(std::string name, CpuMesh smoothMesh, Material partMaterial) {
     return result;
 }
 
+bool validateMintMotionBandPart(const MeshPart& meshPart) {
+    constexpr int axialSamples = kMintMotionBandAxialSegments + 1;
+    const CpuMesh& mesh = meshPart.smoothMesh;
+    const std::size_t expectedVertices = static_cast<std::size_t>(
+            kMintMotionBandRadialSegments * axialSamples);
+    const std::size_t expectedIndices = static_cast<std::size_t>(
+            kMintMotionBandRadialSegments
+                    * kMintMotionBandAxialSegments * 6);
+    if (meshPart.material.name != kMintMotionBandMaterialName
+            || !meshPart.material.luminous
+            || mesh.vertices.size() != expectedVertices
+            || mesh.indices.size() != expectedIndices) {
+        return false;
+    }
+
+    float maximumRadius = 0.0F;
+    for (int ring = 0; ring < kMintMotionBandRadialSegments; ++ring) {
+        for (int axial = 0; axial < axialSamples; ++axial) {
+            const Vertex& vertex = mesh.vertices[static_cast<std::size_t>(
+                    ring * axialSamples + axial)];
+            const Vertex& reference = mesh.vertices[static_cast<std::size_t>(axial)];
+            const float radius = std::hypot(vertex.position.y, vertex.position.z);
+            const float referenceRadius = std::hypot(
+                    reference.position.y, reference.position.z);
+            const float normalRadial = std::hypot(vertex.normal.y, vertex.normal.z);
+            const float referenceNormalRadial = std::hypot(
+                    reference.normal.y, reference.normal.z);
+            maximumRadius = std::max(maximumRadius, radius);
+            if (std::abs(vertex.position.x - reference.position.x) > 2.0e-6F
+                    || std::abs(radius - referenceRadius) > 2.0e-6F
+                    || std::abs(vertex.normal.x - reference.normal.x) > 2.0e-6F
+                    || std::abs(normalRadial - referenceNormalRadial) > 2.0e-6F
+                    || std::abs(glm::length(vertex.normal) - 1.0F) > 2.0e-5F
+                    || std::abs(vertex.position.x)
+                            > kMintMotionBandTreadHalfSpan
+                                    + kMintMotionBandSurfaceOffset + 1.0e-5F) {
+                return false;
+            }
+        }
+    }
+
+    const float maximumSagitta = maximumRadius * (
+            1.0F - std::cos(
+                    glm::pi<float>()
+                            / static_cast<float>(kMintMotionBandRadialSegments)));
+    return maximumSagitta <= kMintMotionBandMaximumRadialSagitta;
+}
+
 std::string safeMaterialName(std::string value) {
     for (char& character : value) {
         if (!(std::isalnum(static_cast<unsigned char>(character)) || character == '_')) {
@@ -470,7 +581,7 @@ std::string safeMaterialName(std::string value) {
 }  // namespace
 
 WheelModel makeMintWheel(const int glowingGrooveCount) {
-    constexpr int repeatCount = 18;
+    constexpr int repeatCount = kMintChevronCount;
     if (glowingGrooveCount < 1 || glowingGrooveCount > repeatCount) {
         throw std::invalid_argument(
                 "mint glowing groove count must be between 1 and 18");
@@ -490,8 +601,15 @@ WheelModel makeMintWheel(const int glowingGrooveCount) {
             "mint_tread", {0.025F, 0.030F, 0.032F, 1.0F}, 0.36F, 0.40F, 0.03F, 10.0F);
     const Material hub = material(
             "mint_hub", {0.115F, 0.125F, 0.130F, 1.0F}, 0.34F, 0.58F, 0.22F, 34.0F);
-    const Material mintLight = material(
-            "mint_light", {0.20F, 0.94F, 0.67F, 1.0F}, 1.0F, 0.0F, 0.0F, 1.0F, true);
+    const Material grooveEmission = material(
+            "mint_groove_emissive",
+            {0.20F, 0.94F, 0.67F, 1.0F}, 1.0F, 0.0F, 0.0F, 1.0F, true);
+    const Material motionBandEmission = material(
+            kMintMotionBandMaterialName,
+            {0.20F, 0.94F, 0.67F, 1.0F}, 1.0F, 0.0F, 0.0F, 1.0F, true);
+    const Material sideEmission = material(
+            "mint_side_emissive",
+            {0.20F, 0.94F, 0.67F, 1.0F}, 1.0F, 0.0F, 0.0F, 1.0F, true);
 
     // Axle is +X, matching TireTerrainContactSolver and the post-import gameplay model.
     CpuMesh carcass = makeTorus(0.0F, 0.365F, 0.128F, 0.126F, 48, 14);
@@ -523,7 +641,17 @@ WheelModel makeMintWheel(const int glowingGrooveCount) {
                 "dark chevron grooves", std::move(grooves), tread));
     }
     model.parts.push_back(part(
-            "glowing chevron grooves", std::move(glowingGroove), mintLight));
+            "glowing chevron grooves", std::move(glowingGroove), grooveEmission));
+
+    // Numerical surface integration of one authored chevron top over the
+    // corresponding 20-degree crown strip gives the canonical 0.26164 duty
+    // cycle exposed in wheel_models.hpp. Keep this material at full neon: the
+    // temporal renderer applies dutyCycle*bandBlend to premultiplied RGB and
+    // alpha so sparse-groove energy is neither lost nor multiplied.
+    model.parts.push_back(part(
+            "phase-independent tread motion band",
+            makeMintMotionBand(),
+            motionBandEmission));
 
     CpuMesh hubMesh;
     appendMesh(hubMesh, makeTorus(0.0F, 0.265F, 0.035F, 0.105F, 48, 8));
@@ -543,7 +671,8 @@ WheelModel makeMintWheel(const int glowingGrooveCount) {
             {-0.140F, 0.378F}, {-0.141F, 0.389F}, {-0.135F, 0.400F}};
     appendMesh(glowRings, sweepClosedProfile(leftGlowProfile, 48));
     appendMesh(glowRings, sweepClosedProfile(rightGlowProfile, 48));
-    model.parts.push_back(part("mint side rings", std::move(glowRings), mintLight));
+    model.parts.push_back(part(
+            "mint side rings", std::move(glowRings), sideEmission));
 
     const ValidationReport report = validateModel(model);
     if (!report.valid) {
@@ -672,6 +801,11 @@ ValidationReport validateModel(WheelModel& model) {
     bool indicesValid = true;
 
     for (const auto& meshPart : model.parts) {
+        if (meshPart.material.name == kMintMotionBandMaterialName) {
+            ++report.mintMotionBandParts;
+            report.mintMotionBandValid = report.mintMotionBandValid
+                    && validateMintMotionBandPart(meshPart);
+        }
         const CpuMesh& mesh = meshPart.smoothMesh;
         report.vertices += mesh.vertices.size();
         report.triangles += mesh.indices.size() / 3U;
@@ -706,10 +840,15 @@ ValidationReport validateModel(WheelModel& model) {
     const glm::vec3 size = maximum - minimum;
     const float diameter = std::max(size.y, size.z);
     report.widthToDiameter = diameter > kEpsilon ? size.x / diameter : 0.0F;
+    if (model.slug == "mint-wheel") {
+        report.mintMotionBandValid = report.mintMotionBandValid
+                && report.mintMotionBandParts == 1U;
+    }
     report.valid = finite && indicesValid && report.vertices > 0 && report.triangles > 0
             && report.degenerateTriangles == 0 && report.widthToDiameter > 0.15F
             && report.widthToDiameter < 0.36F
-            && std::abs(size.y - size.z) / std::max(size.y, size.z) < 0.03F;
+            && std::abs(size.y - size.z) / std::max(size.y, size.z) < 0.03F
+            && report.mintMotionBandValid;
 
     std::ostringstream summary;
     summary << model.name << ": " << report.vertices << " authored vertices, "
@@ -723,6 +862,10 @@ ValidationReport validateModel(WheelModel& model) {
     }
     if (!indicesValid) {
         summary << ", invalid indices";
+    }
+    if (!report.mintMotionBandValid) {
+        summary << ", invalid mint motion band (parts="
+                << report.mintMotionBandParts << ')';
     }
     report.summary = summary.str();
     return report;
@@ -745,7 +888,8 @@ void exportObj(const WheelModel& model, const std::filesystem::path& objPath) {
     obj << "mtllib " << mtlPath.filename().string() << "\n";
 
     std::uint32_t vertexBase = 1U;
-    for (const auto& meshPart : model.parts) {
+    for (std::size_t partIndex = 0; partIndex < model.parts.size(); ++partIndex) {
+        const auto& meshPart = model.parts[partIndex];
         const CpuMesh& mesh = meshPart.smoothMesh;
         const std::string materialName = safeMaterialName(meshPart.material.name);
         obj << "\no " << model.slug << "_" << safeMaterialName(meshPart.name) << "\n";
@@ -769,6 +913,9 @@ void exportObj(const WheelModel& model, const std::filesystem::path& objPath) {
         vertexBase += static_cast<std::uint32_t>(mesh.vertices.size());
 
         const Material& value = meshPart.material;
+        if (partIndex > 0) {
+            mtl << '\n';
+        }
         mtl << "newmtl " << materialName << "\n";
         mtl << "Ka " << value.color.r * value.ambient << ' '
                 << value.color.g * value.ambient << ' '
@@ -779,7 +926,7 @@ void exportObj(const WheelModel& model, const std::filesystem::path& objPath) {
         if (value.luminous) {
             mtl << "Ke " << value.color.r << ' ' << value.color.g << ' ' << value.color.b << "\n";
         }
-        mtl << "d " << value.color.a << "\n\n";
+        mtl << "d " << value.color.a << '\n';
     }
 }
 

@@ -6,4 +6,9 @@ public interface RenderTarget extends GPUResourceOwner {
     int getWidth();
     int getHeight();
     int getTextureId();
+
+    /** Sampleable depth texture, or zero for color-only/legacy targets. */
+    default int getDepthTextureId() {
+        return 0;
+    }
 }

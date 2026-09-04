@@ -55,11 +55,6 @@ public class Mesh3DInfill extends AbstractMesh3D<
         fs.cameraY = 0f;
         fs.cameraZ = 0f;
         fs.isDepthPass = 0;
-        fs.opacityMultiplier = args != null ? args.opacityMultiplier : 1f;
-        vs.spinAngleStartRadians =
-                args != null ? args.spinAngleStartRadians : 0f;
-        vs.spinAngleStepRadians =
-                args != null ? args.spinAngleStepRadians : 0f;
 
         if (args.model != null) {
             Matrix.multiplyMM(tmpMvp, 0, args.vp, 0, args.model, 0);

@@ -37,6 +37,7 @@ import com.example.game3d_opengl.game.terrain.presentation.TerrainPresentation;
 import com.example.game3d_opengl.game.terrain.presentation.TerrainRendererRegistry;
 import com.example.game3d_opengl.game.terrain.track_elements.portal.PortalLightingEnvironment;
 import com.example.game3d_opengl.rendering.Camera;
+import com.example.game3d_opengl.rendering.BloomContributor;
 import com.example.game3d_opengl.rendering.util3d.FColor;
 import com.example.game3d_opengl.rendering.util3d.vector.Vector3D;
 import com.example.game3d_opengl.game.player.player_character.Player;
@@ -303,6 +304,14 @@ public class GameplayStage extends Stage {
     private BloomPostProcessor bloomPostProcessor;
     private final RenderContext mainRenderCtx = new RenderContext();
     private final SceneRenderer sceneRenderer = this::renderScene;
+    private final BloomContributor wheelBloomContributor =
+            (destination, sceneSource, width, height) -> {
+                Player currentPlayer = player;
+                if (currentPlayer != null) {
+                    currentPlayer.contributeWheelMotionGlow(
+                            destination, sceneSource, width, height);
+                }
+            };
     private PreparedGameplaySession nextPreparedSession;
     private RunState runState = RunState.ACTIVE;
     private float lostRunWaitMs = 0f;
@@ -336,6 +345,13 @@ public class GameplayStage extends Stage {
         System.out.println("GAMEPLAY STAGE INIT");
 
         bloomPostProcessor = new BloomPostProcessor(screenWidth, screenHeight);
+        if (player != null
+                && bloomPostProcessor.getSceneTarget()
+                .getDepthTextureId() != 0) {
+            player.prepareWheelMotionGlowResources(
+                    bloomPostProcessor.getBloomWidth(),
+                    bloomPostProcessor.getBloomHeight());
+        }
         gameHUD = GameHUD.makeGameHUD(context, screenWidth, screenHeight);
         if (gameHUD != null) {
             gameHUD.setThemeColor(colorTheme);
@@ -405,6 +421,24 @@ public class GameplayStage extends Stage {
         player.enableAuthoritativeSimulation();
         applyCurrentPhaseSpeed();
         applyAuthoritativePlayerSnapshot();
+    }
+
+    @Override
+    public void onSurfaceSizeChanged(int width, int height) {
+        gameplayScreenHeight = Math.max(1, height);
+        if (camera != null) {
+            camera.setProjectionAsScreen();
+        }
+        if (bloomPostProcessor != null) {
+            bloomPostProcessor.resize(width, height);
+            if (player != null
+                    && bloomPostProcessor.getSceneTarget()
+                    .getDepthTextureId() != 0) {
+                player.prepareWheelMotionGlowResources(
+                        bloomPostProcessor.getBloomWidth(),
+                        bloomPostProcessor.getBloomHeight());
+            }
+        }
     }
 
     private AndroidSimulationController.TickListener
@@ -649,6 +683,13 @@ public class GameplayStage extends Stage {
                 dt, frameCpuStartNanos, terrainNanos, collisionNanos,
                 simulationNanos, renderNanos, hudNanos, preparationNanos,
                 collisionRebuilt);
+    }
+
+    @Override
+    public void redrawCurrentFrame(long frameTimeNanos) {
+        // A coalesced/redundant GLSurfaceView draw must still fill the back buffer, but it must not
+        // process touch input, advance terrain scheduling, account wall time or step simulation.
+        drawCurrentFrameWithoutSimulation(isAppTracingEnabled());
     }
 
     private void finishFrameTiming(
@@ -982,6 +1023,16 @@ public class GameplayStage extends Stage {
         }
         float[] vpMatrix = camera.getViewProjectionMatrix();
         if (bloomPostProcessor != null && bloomPostProcessor.getSceneTarget() != null) {
+            if (player != null
+                    && bloomPostProcessor.getSceneTarget()
+                    .getDepthTextureId() != 0) {
+                player.prepareWheelMotionGlow(
+                        vpMatrix,
+                        bloomPostProcessor.getBloomWidth(),
+                        bloomPostProcessor.getBloomHeight());
+            } else if (player != null) {
+                player.disableWheelMotionGlow();
+            }
             mainRenderCtx.vp = vpMatrix;
             mainRenderCtx.target = bloomPostProcessor.getSceneTarget();
             mainRenderCtx.viewportW = mainRenderCtx.target.getWidth();
@@ -996,11 +1047,15 @@ public class GameplayStage extends Stage {
             }
             beginTraceSection(tracing, "G3D:bloom");
             try {
-                bloomPostProcessor.compositeToScreen();
+                bloomPostProcessor.compositeToScreen(
+                        wheelBloomContributor);
             } finally {
                 endTraceSection(tracing);
             }
         } else {
+            if (player != null) {
+                player.disableWheelMotionGlow();
+            }
             mainRenderCtx.vp = vpMatrix;
             mainRenderCtx.target = null;
             mainRenderCtx.viewportW = com.example.game3d_opengl.rendering.ScreenInfo.getScreenW();
@@ -1641,8 +1696,20 @@ public class GameplayStage extends Stage {
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
         }
 
-        if (player != null) {
-            player.draw(ctx.vp);
+        boolean deferredSharpGroove = player != null
+                && player.drawBodyBeforeTerrain(ctx.vp);
+        if (deferredSharpGroove) {
+            if (ctx.target != null && bloomPostProcessor != null) {
+                player.renderPreparedWheelMotionCore(
+                        ctx.target,
+                        bloomPostProcessor.getBloomWidth(),
+                        bloomPostProcessor.getBloomHeight());
+            } else {
+                player.disableWheelMotionGlow();
+            }
+            // Normally a no-op because the temporal core is active. If its resources could not
+            // be prepared, this restores the ordinary sharp mesh before terrain is composited.
+            player.drawDeferredSharpGroove(ctx.vp);
         }
         if (terrainPresentation != null && simulationController != null) {
             terrainPresentation.draw(

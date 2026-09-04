@@ -25,7 +25,6 @@ public final class InfillShaderPair<
 
 
     private int uMVP, uModel, uColor, aPos, aNormal;
-    private int uSpinAngleStart, uSpinAngleStep, uOpacityMultiplier;
     private int uLightPos, uLightColor, uCameraPos, uAmbient, uDiffuse, uSpecular, uShininess;
 
 
@@ -42,22 +41,15 @@ public final class InfillShaderPair<
                 "#version 300 es\n" +
                 "uniform mat4 uMVPMatrix;\n" +
                 "uniform mat4 uModelMatrix;\n" +
-                "uniform float uSpinAngleStart;\n" +
-                "uniform float uSpinAngleStep;\n" +
                 "in vec3 vPosition;\n" +
                 "in vec3 aNormal;\n" +
                 "out vec3 vWorldPos;\n" +
                 "out vec3 vWorldNormal;\n" +
                 "void main(){\n" +
-                "  float spinAngle = uSpinAngleStart + float(gl_InstanceID) * uSpinAngleStep;\n" +
-                "  float spinCos = cos(spinAngle);\n" +
-                "  float spinSin = sin(spinAngle);\n" +
-                "  vec3 localPosition = vec3(vPosition.x, spinCos * vPosition.y - spinSin * vPosition.z, spinSin * vPosition.y + spinCos * vPosition.z);\n" +
-                "  vec3 localNormal = vec3(aNormal.x, spinCos * aNormal.y - spinSin * aNormal.z, spinSin * aNormal.y + spinCos * aNormal.z);\n" +
-                "  vec4 wp = uModelMatrix * vec4(localPosition, 1.0);\n" +
+                "  vec4 wp = uModelMatrix * vec4(vPosition, 1.0);\n" +
                 "  vWorldPos = wp.xyz;\n" +
-                "  vWorldNormal = mat3(uModelMatrix) * localNormal;\n" +
-                "  gl_Position = uMVPMatrix * vec4(localPosition, 1.0);\n" +
+                "  vWorldNormal = mat3(uModelMatrix) * aNormal;\n" +
+                "  gl_Position = uMVPMatrix * vec4(vPosition, 1.0);\n" +
                 "}";
         String fs =
                 "#version 300 es\n" +
@@ -70,7 +62,6 @@ public final class InfillShaderPair<
                 "uniform float uDiffuse;\n" +
                 "uniform float uSpecular;\n" +
                 "uniform float uShininess;\n" +
-                "uniform float uOpacityMultiplier;\n" +
                 "in vec3 vWorldPos;\n" +
                 "in vec3 vWorldNormal;\n" +
                 "out vec4 fragColor;\n" +
@@ -83,7 +74,7 @@ public final class InfillShaderPair<
                 "  float NdotH = max(dot(N, H), 0.0);\n" +
                 "  float spec = pow(NdotH, uShininess);\n" +
                 "  vec3 color = vColor.rgb * (uAmbient + uDiffuse * NdotL) + uLightColor * uSpecular * spec;\n" +
-                "  fragColor = vec4(color, vColor.a * uOpacityMultiplier);\n" +
+                "  fragColor = vec4(color, vColor.a);\n" +
                 "}";
         sharedShader = new Builder().fromSource(vs,fs).build();
     }
@@ -114,9 +105,6 @@ public final class InfillShaderPair<
         this.uDiffuse = GLES20.glGetUniformLocation(p, "uDiffuse");
         this.uSpecular = GLES20.glGetUniformLocation(p, "uSpecular");
         this.uShininess = GLES20.glGetUniformLocation(p, "uShininess");
-        this.uSpinAngleStart = GLES20.glGetUniformLocation(p, "uSpinAngleStart");
-        this.uSpinAngleStep = GLES20.glGetUniformLocation(p, "uSpinAngleStep");
-        this.uOpacityMultiplier = GLES20.glGetUniformLocation(p, "uOpacityMultiplier");
         this.aPos = GLES20.glGetAttribLocation(p, "vPosition");
         this.aNormal = GLES20.glGetAttribLocation(p, "aNormal");
     }
@@ -141,9 +129,6 @@ public final class InfillShaderPair<
         GLES20.glUniform1f(uDiffuse, fragmentArgs.diffuse);
         GLES20.glUniform1f(uSpecular, fragmentArgs.specular);
         GLES20.glUniform1f(uShininess, Math.max(1f, fragmentArgs.shininess));
-        GLES20.glUniform1f(uSpinAngleStart, vertexArgs.spinAngleStartRadians);
-        GLES20.glUniform1f(uSpinAngleStep, vertexArgs.spinAngleStepRadians);
-        GLES20.glUniform1f(uOpacityMultiplier, fragmentArgs.opacityMultiplier);
     }
 
 

@@ -1,7 +1,6 @@
 package com.example.game3d_opengl.rendering.mesh;
 
 import android.opengl.GLES20;
-import android.opengl.GLES30;
 
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.layout.VertexLayout;
@@ -62,21 +61,11 @@ public abstract class AbstractMesh3D<
     final void issueDraw(A args) {
         setVariableArgsValues(args, shader);
         shader.transferUniformArgsToGPU();
-        int instanceCount = args != null ? Math.max(1, args.instanceCount) : 1;
-        if (instanceCount > 1) {
-            GLES30.glDrawElementsInstanced(
-                    GLES20.GL_TRIANGLES,
-                    indexCount,
-                    indexType,
-                    indexByteOffset,
-                    instanceCount);
-        } else {
-            GLES20.glDrawElements(
-                    GLES20.GL_TRIANGLES,
-                    indexCount,
-                    indexType,
-                    indexByteOffset);
-        }
+        GLES20.glDrawElements(
+                GLES20.GL_TRIANGLES,
+                indexCount,
+                indexType,
+                indexByteOffset);
     }
 
     protected static abstract class BaseBuilder<

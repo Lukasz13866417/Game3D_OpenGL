@@ -137,6 +137,11 @@ public abstract class Stage implements GPUResourceOwner {
 
     public abstract void updateThenDraw(float dt);
 
+    /** Called on the GL thread when an already-initialized surface changes dimensions. */
+    public void onSurfaceSizeChanged(int width, int height) {
+        // Most stages derive layout directly from ScreenInfo each frame or are recreated.
+    }
+
     /**
      * Whether the renderer must clear the default framebuffer before this stage draws.
      *
@@ -155,6 +160,16 @@ public abstract class Stage implements GPUResourceOwner {
                                long frameTimeNanos,
                                long rawElapsedNanos) {
         updateThenDraw(presentationDtMillis);
+    }
+
+    /**
+     * Draws a valid current-state frame without advancing presentation time.
+     *
+     * <p>The default is suitable for simple UI/test stages. Simulation stages should override
+     * this when their ordinary zero-delta update still drains input or performs scheduling.</p>
+     */
+    public void redrawCurrentFrame(long frameTimeNanos) {
+        updateThenDraw(0.0f, frameTimeNanos, 0L);
     }
 
     public final void activate(ActivationReason reason) {

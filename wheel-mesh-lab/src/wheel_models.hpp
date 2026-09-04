@@ -52,17 +52,43 @@ struct ValidationReport {
     glm::vec3 boundsMin{0.0F};
     glm::vec3 boundsMax{0.0F};
     float widthToDiameter = 0.0F;
+    std::size_t mintMotionBandParts = 0;
+    bool mintMotionBandValid = true;
     bool valid = false;
     std::string summary;
 };
 
-WheelModel makeMintWheel(int glowingGrooveCount = 4);
+inline constexpr int kMintChevronCount = 18;
+inline constexpr int kDefaultMintGlowCount = kMintChevronCount;
+
+// Renderer contract for the phase-independent high-speed representation.
+// The mesh/material stays at full neon. A renderer must multiply both
+// premultiplied RGB and alpha by dutyCycle * bandBlend; drawing the full shell
+// with weight=bandBlend would create roughly 1/dutyCycle too much energy.
+inline constexpr char kMintMotionBandMaterialName[] =
+        "mint_motion_band_emissive";
+inline constexpr float kMintMotionBandCanonicalDutyCycle = 0.26164F;
+inline constexpr float kMintMotionBandDutyCyclePerGlowingGroove =
+        kMintMotionBandCanonicalDutyCycle / static_cast<float>(kMintChevronCount);
+inline constexpr int kMintMotionBandRadialSegments = 360;
+inline constexpr int kMintMotionBandAxialSegments = 24;
+inline constexpr float kMintMotionBandTreadHalfSpan = 0.1075F;
+inline constexpr float kMintMotionBandSurfaceOffset = 0.0042F;
+inline constexpr float kMintMotionBandMaximumRadialSagitta = 0.000020F;
+
+inline constexpr float mintMotionBandDutyCycle(
+        const int glowingGrooveCount = kDefaultMintGlowCount) noexcept {
+    return kMintMotionBandDutyCyclePerGlowingGroove
+            * static_cast<float>(glowingGrooveCount);
+}
+
+WheelModel makeMintWheel(int glowingGrooveCount = kDefaultMintGlowCount);
 WheelModel makeVioletWheel();
 ValidationReport validateModel(WheelModel& model);
 
-// Writes one OBJ with groups/material assignments plus a sibling MTL. The current
-// Android loader ignores these groups, but keeping them here makes the required
-// future player-material extension explicit.
+// Writes one OBJ with groups/material assignments plus a sibling MTL. Android's
+// multipart loader consumes the material assignments to preserve independently
+// controllable wheel parts.
 void exportObj(const WheelModel& model, const std::filesystem::path& objPath);
 
 }  // namespace wheel_lab

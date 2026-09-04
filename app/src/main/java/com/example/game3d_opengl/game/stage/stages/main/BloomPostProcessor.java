@@ -3,6 +3,8 @@ package com.example.game3d_opengl.game.stage.stages.main;
 import android.opengl.GLES20;
 
 import com.example.game3d_opengl.game.terrain.track_elements.portal.rendering.PortalRenderTarget;
+import com.example.game3d_opengl.rendering.BloomConfig;
+import com.example.game3d_opengl.rendering.BloomContributor;
 import com.example.game3d_opengl.rendering.GPUResourceOwner;
 import com.example.game3d_opengl.rendering.RenderTarget;
 
@@ -14,8 +16,6 @@ import com.example.game3d_opengl.rendering.RenderTarget;
  * 4) Composite scene + blurred bloom to default framebuffer
  */
 final class BloomPostProcessor implements GPUResourceOwner {
-    private static final float BLOOM_THRESHOLD = 0.64f;
-    private static final float BLOOM_INTENSITY = 0.95f;
     private static final int BLUR_ITERATIONS = 2;
     // Quarter-resolution bloom is the mobile-friendly trade-off here: the full-resolution
     // scene and composite stay sharp while the deliberately blurred signal uses 75% fewer
@@ -77,6 +77,14 @@ final class BloomPostProcessor implements GPUResourceOwner {
         return sceneTarget;
     }
 
+    int getBloomWidth() {
+        return bloomW;
+    }
+
+    int getBloomHeight() {
+        return bloomH;
+    }
+
     void resize(int width, int height) {
         int w = Math.max(1, width);
         int h = Math.max(1, height);
@@ -89,6 +97,10 @@ final class BloomPostProcessor implements GPUResourceOwner {
     }
 
     void compositeToScreen() {
+        compositeToScreen(null);
+    }
+
+    void compositeToScreen(BloomContributor contributor) {
         if (sceneTarget == null || bloomTargetA == null || bloomTargetB == null) {
             return;
         }
@@ -109,6 +121,19 @@ final class BloomPostProcessor implements GPUResourceOwner {
                 1f / Math.max(1f, surfaceW),
                 1f / Math.max(1f, surfaceH)
         );
+
+        // A contributor can restore emission energy lost when a normalized temporal exposure
+        // falls below the nonlinear scene threshold. It receives the original scene so it can
+        // subtract the exact ordinary bright-pass result instead of double-counting it.
+        if (contributor != null) {
+            contributor.contribute(
+                    bloomTargetA, sceneTarget, bloomW, bloomH);
+            bloomTargetA.bind();
+            GLES20.glViewport(0, 0, bloomW, bloomH);
+            GLES20.glDisable(GLES20.GL_DEPTH_TEST);
+            GLES20.glDepthMask(false);
+            GLES20.glDisable(GLES20.GL_BLEND);
+        }
 
         // 2) Blur ping-pong
         for (int i = 0; i < BLUR_ITERATIONS; ++i) {
@@ -141,6 +166,13 @@ final class BloomPostProcessor implements GPUResourceOwner {
 
     @Override
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
+        // These names belonged to the destroyed context. Zero them before init helpers run so
+        // their normal same-context cleanup cannot delete unrelated names reused by the driver.
+        vboId = 0;
+        iboId = 0;
+        prefilterProgram = 0;
+        blurProgram = 0;
+        compositeProgram = 0;
         initFullscreenQuadBuffers();
         initPrograms();
         if (sceneTarget != null) {
@@ -182,7 +214,8 @@ final class BloomPostProcessor implements GPUResourceOwner {
 
         bloomW = Math.max(1, Math.round(surfaceW * DOWNSAMPLE));
         bloomH = Math.max(1, Math.round(surfaceH * DOWNSAMPLE));
-        sceneTarget = new PortalRenderTarget(surfaceW, surfaceH, true);
+        sceneTarget = new PortalRenderTarget(
+                surfaceW, surfaceH, true, true);
         bloomTargetA = new PortalRenderTarget(bloomW, bloomH, false);
         bloomTargetB = new PortalRenderTarget(bloomW, bloomH, false);
     }
@@ -224,7 +257,7 @@ final class BloomPostProcessor implements GPUResourceOwner {
         GLES20.glUniform1i(preTex, 0);
         GLES20.glUniform2f(
                 preSceneTexelStep, sourceTexelX, sourceTexelY);
-        GLES20.glUniform1f(preThreshold, BLOOM_THRESHOLD);
+        GLES20.glUniform1f(preThreshold, BloomConfig.BRIGHT_THRESHOLD);
 
         drawQuadElements();
         unbindQuadAttributes(preApos, preAuv);
@@ -256,7 +289,7 @@ final class BloomPostProcessor implements GPUResourceOwner {
         GLES20.glActiveTexture(GLES20.GL_TEXTURE1);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, bloomTex);
         GLES20.glUniform1i(compBloomTex, 1);
-        GLES20.glUniform1f(compIntensity, BLOOM_INTENSITY);
+        GLES20.glUniform1f(compIntensity, BloomConfig.COMPOSITE_INTENSITY);
 
         drawQuadElements();
         unbindQuadAttributes(compApos, compAuv);
@@ -385,7 +418,7 @@ final class BloomPostProcessor implements GPUResourceOwner {
 
     private static final String FS_PREFILTER =
             "#version 300 es\n" +
-            "precision mediump float;\n" +
+            "precision highp float;\n" +
             "uniform sampler2D uSceneTex;\n" +
             "uniform vec2 uSceneTexelStep;\n" +
             "uniform float uThreshold;\n" +

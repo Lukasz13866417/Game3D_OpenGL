@@ -1,6 +1,7 @@
 package com.example.game3d_opengl.game.terrain.track_elements.portal.rendering;
 
 import android.opengl.GLES20;
+import android.opengl.GLES30;
 import android.util.Log;
 
 import com.example.game3d_opengl.rendering.RenderTarget;
@@ -11,19 +12,36 @@ public final class PortalRenderTarget implements RenderTarget {
     private final int width;
     private final int height;
     private final boolean withDepth;
+    private final boolean sampleableDepth;
 
     private int fboId = 0;
     private int textureId = 0;
+    private int depthTextureId = 0;
     private int depthRboId = 0;
+    private boolean framebufferComplete;
 
     public PortalRenderTarget(int width, int height) {
         this(width, height, true);
     }
 
     public PortalRenderTarget(int width, int height, boolean withDepth) {
+        this(width, height, withDepth, false);
+    }
+
+    /**
+     * Creates a color target with either a conventional depth renderbuffer or, when explicitly
+     * requested, a sampleable depth texture. Portal views keep the cheaper renderbuffer path;
+     * only effects which actually read depth pay for a depth texture.
+     */
+    public PortalRenderTarget(
+            int width,
+            int height,
+            boolean withDepth,
+            boolean sampleableDepth) {
         this.width = Math.max(1, width);
         this.height = Math.max(1, height);
         this.withDepth = withDepth;
+        this.sampleableDepth = withDepth && sampleableDepth;
         create();
     }
 
@@ -55,6 +73,15 @@ public final class PortalRenderTarget implements RenderTarget {
         return textureId;
     }
 
+    @Override
+    public int getDepthTextureId() {
+        return depthTextureId;
+    }
+
+    public boolean isFramebufferComplete() {
+        return framebufferComplete;
+    }
+
     private void create() {
         int[] ids = new int[1];
 
@@ -79,9 +106,38 @@ public final class PortalRenderTarget implements RenderTarget {
         );
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
 
-        if (withDepth) {
-            // Only scene targets need depth. Color-only post-processing targets avoid both
-            // the allocation and the depth traffic of a renderbuffer that cannot affect them.
+        if (sampleableDepth) {
+            GLES20.glGenTextures(1, ids, 0);
+            depthTextureId = ids[0];
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, depthTextureId);
+            GLES20.glTexParameteri(
+                    GLES20.GL_TEXTURE_2D,
+                    GLES20.GL_TEXTURE_MIN_FILTER,
+                    GLES20.GL_NEAREST);
+            GLES20.glTexParameteri(
+                    GLES20.GL_TEXTURE_2D,
+                    GLES20.GL_TEXTURE_MAG_FILTER,
+                    GLES20.GL_NEAREST);
+            GLES20.glTexParameteri(
+                    GLES20.GL_TEXTURE_2D,
+                    GLES20.GL_TEXTURE_WRAP_S,
+                    GLES20.GL_CLAMP_TO_EDGE);
+            GLES20.glTexParameteri(
+                    GLES20.GL_TEXTURE_2D,
+                    GLES20.GL_TEXTURE_WRAP_T,
+                    GLES20.GL_CLAMP_TO_EDGE);
+            GLES30.glTexImage2D(
+                    GLES20.GL_TEXTURE_2D,
+                    0,
+                    GLES30.GL_DEPTH_COMPONENT16,
+                    width,
+                    height,
+                    0,
+                    GLES30.GL_DEPTH_COMPONENT,
+                    GLES20.GL_UNSIGNED_SHORT,
+                    null);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+        } else if (withDepth) {
             GLES20.glGenRenderbuffers(1, ids, 0);
             depthRboId = ids[0];
             GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, depthRboId);
@@ -89,8 +145,7 @@ public final class PortalRenderTarget implements RenderTarget {
                     GLES20.GL_RENDERBUFFER,
                     GLES20.GL_DEPTH_COMPONENT16,
                     width,
-                    height
-            );
+                    height);
             GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, 0);
         }
 
@@ -105,15 +160,52 @@ public final class PortalRenderTarget implements RenderTarget {
                 textureId,
                 0
         );
-        if (withDepth) {
+        if (sampleableDepth) {
+            GLES20.glFramebufferTexture2D(
+                    GLES20.GL_FRAMEBUFFER,
+                    GLES20.GL_DEPTH_ATTACHMENT,
+                    GLES20.GL_TEXTURE_2D,
+                    depthTextureId,
+                    0
+            );
+        } else if (withDepth) {
             GLES20.glFramebufferRenderbuffer(
                     GLES20.GL_FRAMEBUFFER,
                     GLES20.GL_DEPTH_ATTACHMENT,
                     GLES20.GL_RENDERBUFFER,
-                    depthRboId
-            );
+                    depthRboId);
         }
         int status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER);
+        if (status != GLES20.GL_FRAMEBUFFER_COMPLETE && sampleableDepth) {
+            // Some otherwise ES 3.x-capable drivers reject a DEPTH_COMPONENT16 texture as an
+            // attachment. Keep the game renderable by falling back to the old renderbuffer; the
+            // temporal effect detects the missing sampleable depth and remains sharp.
+            GLES20.glFramebufferTexture2D(
+                    GLES20.GL_FRAMEBUFFER,
+                    GLES20.GL_DEPTH_ATTACHMENT,
+                    GLES20.GL_TEXTURE_2D,
+                    0,
+                    0);
+            GLES20.glDeleteTextures(1, new int[]{depthTextureId}, 0);
+            depthTextureId = 0;
+            GLES20.glGenRenderbuffers(1, ids, 0);
+            depthRboId = ids[0];
+            GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, depthRboId);
+            GLES20.glRenderbufferStorage(
+                    GLES20.GL_RENDERBUFFER,
+                    GLES20.GL_DEPTH_COMPONENT16,
+                    width,
+                    height);
+            GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, 0);
+            GLES20.glFramebufferRenderbuffer(
+                    GLES20.GL_FRAMEBUFFER,
+                    GLES20.GL_DEPTH_ATTACHMENT,
+                    GLES20.GL_RENDERBUFFER,
+                    depthRboId);
+            status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER);
+            Log.w(TAG, "Sampleable depth unavailable; using renderbuffer fallback");
+        }
+        framebufferComplete = status == GLES20.GL_FRAMEBUFFER_COMPLETE;
         if (status != GLES20.GL_FRAMEBUFFER_COMPLETE) {
             Log.e(TAG, "FBO incomplete: status=" + status);
         }
@@ -121,9 +213,14 @@ public final class PortalRenderTarget implements RenderTarget {
     }
 
     private void cleanup() {
+        framebufferComplete = false;
         if (textureId != 0) {
             GLES20.glDeleteTextures(1, new int[]{textureId}, 0);
             textureId = 0;
+        }
+        if (depthTextureId != 0) {
+            GLES20.glDeleteTextures(1, new int[]{depthTextureId}, 0);
+            depthTextureId = 0;
         }
         if (depthRboId != 0) {
             GLES20.glDeleteRenderbuffers(1, new int[]{depthRboId}, 0);
@@ -137,12 +234,22 @@ public final class PortalRenderTarget implements RenderTarget {
 
     @Override
     public void reloadGPUResourcesRecursivelyOnContextLoss() {
-        cleanup();
+        // The old numeric names belong to the destroyed context. Deleting them in the new
+        // context can accidentally delete unrelated resources which reused those names.
+        abandonContextNames();
         create();
     }
 
     @Override
     public void cleanupGPUResourcesRecursively() {
         cleanup();
+    }
+
+    private void abandonContextNames() {
+        framebufferComplete = false;
+        textureId = 0;
+        depthTextureId = 0;
+        depthRboId = 0;
+        fboId = 0;
     }
 }
