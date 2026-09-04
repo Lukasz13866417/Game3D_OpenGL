@@ -32,6 +32,10 @@ public final class Placement {
     }
 
     public static Placement normalized(String segmentSourceId, double across, double along) {
+        if (!Double.isFinite(across) || !Double.isFinite(along)) {
+            throw new IllegalArgumentException(
+                    "Normalized placement coordinates must be finite");
+        }
         return new Placement(Mode.SEGMENT_NORMALIZED,
                 Objects.requireNonNull(segmentSourceId, "segmentSourceId"), 0, 0, 0, 0,
                 across, along);

@@ -20,8 +20,15 @@ public final class TerrainDocumentStore {
     }
 
     public String save(Path path, TerrainSourceDocument document) throws IOException {
-        String encoded = codec.encode(document);
-        files.writeUtf8(path, encoded);
+        return save(path, document, null);
+    }
+
+    /** Saves after an optional last-moment target-version guard. */
+    public String save(Path path, TerrainSourceDocument document,
+                       AtomicFileStore.BeforeReplace beforeReplace) throws IOException {
+        String encoded = codec.encodeRoundTripped(document);
+        if (beforeReplace == null) files.writeUtf8(path, encoded);
+        else files.writeUtf8(path, encoded, beforeReplace);
         return ContentDigests.sha256(encoded);
     }
 

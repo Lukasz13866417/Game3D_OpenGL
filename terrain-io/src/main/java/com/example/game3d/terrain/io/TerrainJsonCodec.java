@@ -40,7 +40,23 @@ public final class TerrainJsonCodec {
             .create();
 
     public String encode(TerrainSourceDocument document) {
-        return gson.toJson(writeDocument(document)) + "\n";
+        return gson.toJson(writeDocument(document, "$")) + "\n";
+    }
+
+    /** Encodes only when the exact normalized representation can be decoded and re-encoded. */
+    public String encodeRoundTripped(TerrainSourceDocument document) {
+        String encoded = encode(document);
+        try {
+            String reencoded = encode(decode(encoded));
+            if (!encoded.equals(reencoded)) {
+                throw new TerrainEncodingException(
+                        "$: terrain JSON is not deterministically round-trippable");
+            }
+            return encoded;
+        } catch (CodecException invalid) {
+            throw new TerrainEncodingException(
+                    "$: encoded terrain JSON cannot be decoded", invalid);
+        }
     }
 
     public void encode(TerrainSourceDocument document, Writer writer) throws IOException {
@@ -96,51 +112,68 @@ public final class TerrainJsonCodec {
         return (CatalogDocument) value;
     }
 
-    private JsonObject writeDocument(TerrainSourceDocument document) {
-        if (document instanceof StructureDocument) return writeStructure((StructureDocument) document, true);
-        if (document instanceof LevelDocument) return writeLevel((LevelDocument) document, true);
+    private JsonObject writeDocument(TerrainSourceDocument document, String path) {
+        if (document instanceof StructureDocument) {
+            return writeStructure((StructureDocument) document, true, path);
+        }
+        if (document instanceof LevelDocument) {
+            return writeLevel((LevelDocument) document, true, path);
+        }
         if (document instanceof CatalogDocument) return writeCatalog((CatalogDocument) document, true);
         throw new IllegalArgumentException("Unknown document class: " + document.getClass());
     }
 
-    private JsonObject writeStructure(StructureDocument document, boolean includeType) {
+    private JsonObject writeStructure(
+            StructureDocument document, boolean includeType, String path) {
         JsonObject out = new JsonObject();
         if (includeType) out.addProperty("documentType", "structure");
         out.addProperty("formatVersion", document.formatVersion());
         out.addProperty("id", document.id());
         out.addProperty("gridMode", document.gridMode().name());
         JsonArray tiles = new JsonArray();
-        for (TileRecord tile : document.tiles()) {
+        for (int i = 0; i < document.tiles().size(); i++) {
+            TileRecord tile = document.tiles().get(i);
+            String itemPath = path + ".tiles[" + i + "]";
             JsonObject item = new JsonObject();
             item.addProperty("sourceId", tile.sourceId());
             item.addProperty("solid", tile.solid());
-            item.addProperty("turnDeltaDegrees", tile.turnDeltaDegrees());
-            item.addProperty("absoluteSlopeDegrees", tile.absoluteSlopeDegrees());
-            item.addProperty("liftBefore", tile.liftBefore());
+            item.addProperty("turnDeltaDegrees", finite(
+                    tile.turnDeltaDegrees(), itemPath + ".turnDeltaDegrees"));
+            item.addProperty("absoluteSlopeDegrees", finite(
+                    tile.absoluteSlopeDegrees(), itemPath + ".absoluteSlopeDegrees"));
+            item.addProperty("liftBefore", finite(
+                    tile.liftBefore(), itemPath + ".liftBefore"));
             item.addProperty("surfaceKind", tile.surfaceKind());
-            item.addProperty("alpha", tile.alpha());
-            item.addProperty("brightness", tile.brightness());
+            item.addProperty("alpha", finite(tile.alpha(), itemPath + ".alpha"));
+            item.addProperty("brightness", finite(
+                    tile.brightness(), itemPath + ".brightness"));
             if (tile.resolvedTurnDeltaRadians() != null) {
                 item.addProperty("resolvedTurnDeltaRadians",
-                        tile.resolvedTurnDeltaRadians());
+                        finite(tile.resolvedTurnDeltaRadians(),
+                                itemPath + ".resolvedTurnDeltaRadians"));
             }
             if (tile.resolvedAbsoluteSlopeRadians() != null) {
                 item.addProperty("resolvedAbsoluteSlopeRadians",
-                        tile.resolvedAbsoluteSlopeRadians());
+                        finite(tile.resolvedAbsoluteSlopeRadians(),
+                                itemPath + ".resolvedAbsoluteSlopeRadians"));
             }
             tiles.add(item);
         }
         out.add("tiles", tiles);
         JsonArray addons = new JsonArray();
-        for (AddonReservation addon : document.addons()) {
+        for (int i = 0; i < document.addons().size(); i++) {
+            AddonReservation addon = document.addons().get(i);
+            String itemPath = path + ".addons[" + i + "]";
             JsonObject item = new JsonObject();
             item.addProperty("sourceId", addon.sourceId());
             item.addProperty("kind", addon.kind().name());
             if (addon.pairSourceId() != null) item.addProperty("pairSourceId", addon.pairSourceId());
-            item.add("placement", writePlacement(addon.placement()));
+            item.add("placement", writePlacement(
+                    addon.placement(), itemPath + ".placement"));
             JsonObject parameters = new JsonObject();
             for (Map.Entry<String, Double> entry : new TreeMap<>(addon.parameters()).entrySet()) {
-                parameters.addProperty(entry.getKey(), entry.getValue());
+                parameters.addProperty(entry.getKey(), finite(entry.getValue(),
+                        itemPath + ".parameters." + entry.getKey()));
             }
             item.add("parameters", parameters);
             addons.add(item);
@@ -149,7 +182,7 @@ public final class TerrainJsonCodec {
         return out;
     }
 
-    private JsonObject writePlacement(Placement placement) {
+    private JsonObject writePlacement(Placement placement, String path) {
         JsonObject out = new JsonObject();
         out.addProperty("mode", placement.mode().name());
         if (placement.mode() == Placement.Mode.GRID) {
@@ -159,20 +192,22 @@ public final class TerrainJsonCodec {
             out.addProperty("columnEnd", placement.columnEnd());
         } else {
             out.addProperty("segmentSourceId", placement.segmentSourceId());
-            out.addProperty("across", placement.across());
-            out.addProperty("along", placement.along());
+            out.addProperty("across", finite(placement.across(), path + ".across"));
+            out.addProperty("along", finite(placement.along(), path + ".along"));
         }
         return out;
     }
 
-    private JsonObject writeLevel(LevelDocument document, boolean includeType) {
+    private JsonObject writeLevel(LevelDocument document, boolean includeType, String path) {
         JsonObject out = new JsonObject();
         if (includeType) out.addProperty("documentType", "level");
         out.addProperty("formatVersion", document.formatVersion());
         out.addProperty("id", document.id());
         out.addProperty("sessionProfileId", document.sessionProfileId());
         JsonArray entries = new JsonArray();
-        for (LevelEntry entry : document.entries()) {
+        for (int i = 0; i < document.entries().size(); i++) {
+            LevelEntry entry = document.entries().get(i);
+            String itemPath = path + ".entries[" + i + "]";
             JsonObject item = new JsonObject();
             item.addProperty("sourceId", entry.sourceId());
             item.addProperty("kind", entry.kind().name());
@@ -181,7 +216,8 @@ public final class TerrainJsonCodec {
             } else if (entry.kind() == LevelEntry.Kind.LEVEL_REFERENCE) {
                 item.addProperty("levelRef", entry.levelRef());
             } else {
-                item.add("inlineStructure", writeStructure(entry.inlineStructure(), false));
+                item.add("inlineStructure", writeStructure(
+                        entry.inlineStructure(), false, itemPath + ".inlineStructure"));
             }
             entries.add(item);
         }
@@ -366,8 +402,21 @@ public final class TerrainJsonCodec {
     private static double primitiveNumber(JsonElement element, String path) throws CodecException {
         if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isNumber())
             throw new CodecException(path + ": expected number");
-        try { return element.getAsDouble(); }
+        try {
+            double value = element.getAsDouble();
+            if (Double.isNaN(value) || Double.isInfinite(value)) {
+                throw new CodecException(path + ": number must be finite");
+            }
+            return value;
+        }
         catch (RuntimeException error) { throw new CodecException(path + ": invalid number", error); }
+    }
+
+    private static double finite(double value, String path) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            throw new TerrainEncodingException(path + ": number must be finite");
+        }
+        return value;
     }
 
     private static JsonElement required(JsonObject value, String key, String path) throws CodecException {
