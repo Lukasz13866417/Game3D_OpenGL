@@ -1,5 +1,6 @@
 package com.example.game3d.terrain.io.publish;
 
+import com.example.game3d.terrain.io.catalog.GameplayCatalogPolicy;
 import com.example.game3d.terrain.io.model.CatalogDocument;
 import com.example.game3d.terrain.io.model.CatalogEntry;
 import com.example.game3d.terrain.io.model.LevelDocument;
@@ -45,6 +46,11 @@ public final class TerrainPublisher {
         ValidationResult catalogValidation = validator.validate(catalog);
         if (!catalogValidation.isValid()) throw new PublishException("Catalog validation failed",
                 catalogValidation.problems());
+        ValidationResult gameplayPolicy = GameplayCatalogPolicy.validate(catalog, repository);
+        if (!gameplayPolicy.isValid()) {
+            throw new PublishException(
+                    "Gameplay catalog policy validation failed", gameplayPolicy.problems());
+        }
 
         List<CompiledEntry> compiled = new ArrayList<>();
         long customTileCount = 0L;

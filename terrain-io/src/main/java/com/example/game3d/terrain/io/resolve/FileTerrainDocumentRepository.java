@@ -2,6 +2,7 @@ package com.example.game3d.terrain.io.resolve;
 
 import com.example.game3d.terrain.io.CodecException;
 import com.example.game3d.terrain.io.TerrainJsonCodec;
+import com.example.game3d.terrain.io.model.CatalogDocument;
 import com.example.game3d.terrain.io.model.LevelDocument;
 import com.example.game3d.terrain.io.model.StructureDocument;
 import com.example.game3d.terrain.io.model.TerrainSourceDocument;
@@ -21,11 +22,14 @@ import java.util.stream.Stream;
 public final class FileTerrainDocumentRepository implements TerrainDocumentRepository {
     private final Map<String, StructureDocument> structures;
     private final Map<String, LevelDocument> levels;
+    private final TerrainProjectContentIndex contentIndex;
 
     private FileTerrainDocumentRepository(Map<String, StructureDocument> structures,
-                                          Map<String, LevelDocument> levels) {
+                                          Map<String, LevelDocument> levels,
+                                          TerrainProjectContentIndex contentIndex) {
         this.structures = Collections.unmodifiableMap(structures);
         this.levels = Collections.unmodifiableMap(levels);
+        this.contentIndex = contentIndex;
     }
 
     public static FileTerrainDocumentRepository load(Path root, TerrainJsonCodec codec)
@@ -43,6 +47,12 @@ public final class FileTerrainDocumentRepository implements TerrainDocumentRepos
         Collections.sort(paths);
         Map<String, StructureDocument> structures = new LinkedHashMap<String, StructureDocument>();
         Map<String, LevelDocument> levels = new LinkedHashMap<String, LevelDocument>();
+        Map<String, TerrainProjectContentIndex.Entry<StructureDocument>> structureSources =
+                new LinkedHashMap<String, TerrainProjectContentIndex.Entry<StructureDocument>>();
+        Map<String, TerrainProjectContentIndex.Entry<LevelDocument>> levelSources =
+                new LinkedHashMap<String, TerrainProjectContentIndex.Entry<LevelDocument>>();
+        Map<String, TerrainProjectContentIndex.Entry<CatalogDocument>> catalogSources =
+                new LinkedHashMap<String, TerrainProjectContentIndex.Entry<CatalogDocument>>();
         for (Path path : paths) {
             String json = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
             TerrainSourceDocument document = codec.decode(json);
@@ -50,14 +60,19 @@ public final class FileTerrainDocumentRepository implements TerrainDocumentRepos
                 StructureDocument value = (StructureDocument) document;
                 putUnique(structures, document.id(), value, path);
                 putAlias(structures, root, path, value);
+                putSource(structureSources, value, path);
             } else if (document instanceof LevelDocument) {
                 LevelDocument value = (LevelDocument) document;
                 putUnique(levels, document.id(), value, path);
                 putAlias(levels, root, path, value);
+                putSource(levelSources, value, path);
+            } else if (document instanceof CatalogDocument) {
+                putSource(catalogSources, (CatalogDocument) document, path);
             }
-            // Catalog documents may live beside sources but are not references.
         }
-        return new FileTerrainDocumentRepository(structures, levels);
+        return new FileTerrainDocumentRepository(structures, levels,
+                new TerrainProjectContentIndex(
+                        structureSources, levelSources, catalogSources));
     }
 
     @Override public StructureDocument findStructure(String id) {
@@ -66,6 +81,10 @@ public final class FileTerrainDocumentRepository implements TerrainDocumentRepos
 
     @Override public LevelDocument findLevel(String id) {
         return levels.get(id);
+    }
+
+    @Override public TerrainProjectContentIndex contentIndex() {
+        return contentIndex;
     }
 
     private static IOException duplicate(String id, Path path) {
@@ -90,6 +109,17 @@ public final class FileTerrainDocumentRepository implements TerrainDocumentRepos
         putUnique(values, relative, value, path);
         if (relative.endsWith(".json")) {
             putUnique(values, relative.substring(0, relative.length() - 5), value, path);
+        }
+    }
+
+    private static <T extends TerrainSourceDocument> void putSource(
+            Map<String, TerrainProjectContentIndex.Entry<T>> values,
+            T value,
+            Path path) throws IOException {
+        TerrainProjectContentIndex.Entry<T> previous = values.put(
+                value.id(), new TerrainProjectContentIndex.Entry<T>(value, path));
+        if (previous != null) {
+            throw duplicate(value.id(), path);
         }
     }
 }

@@ -45,25 +45,34 @@ public class TerrainPublisherTest {
 
     @Test public void preservesCatalogOrderAndPublishesAtomically() throws Exception {
         Path output = temporary.newFile("runtime.json").toPath();
-        CatalogDocument catalog = new CatalogDocument(1, "main", Arrays.asList(
-                new CatalogEntry("builtin.0", CatalogEntry.Kind.JAVA_PROVIDER, "provider.0", true),
-                new CatalogEntry("disabled", CatalogEntry.Kind.JAVA_PROVIDER, "disabled", false),
-                new CatalogEntry("builtin.1", CatalogEntry.Kind.JAVA_PROVIDER, "provider.1", true)));
+        List<CatalogEntry> entries = builtinCatalogEntries();
+        entries.add(new CatalogEntry("disabled", CatalogEntry.Kind.JSON_LEVEL,
+                "missing-disabled-level", false));
+        CatalogDocument catalog = new CatalogDocument(1, "main", entries);
         TerrainContentCompiler compiler = compiler(false);
+        LevelDocument disabledLevel = new LevelDocument(
+                1,
+                "missing-disabled-level",
+                TrackProfile.GAMEPLAY_PROFILE_ID,
+                Collections.<LevelEntry>emptyList());
+        InMemoryTerrainDocumentRepository repository =
+                new InMemoryTerrainDocumentRepository(
+                        Collections.<StructureDocument>emptyList(),
+                        Collections.singletonList(disabledLevel));
 
-        PublishResult result = publisher(compiler).publish(catalog, emptyRepository(), output);
+        PublishResult result = publisher(compiler).publish(catalog, repository, output);
         String text = new String(Files.readAllBytes(output), StandardCharsets.UTF_8);
 
-        assertEquals(2, result.entryCount());
-        assertTrue(text.indexOf("builtin.0") < text.indexOf("builtin.1"));
+        assertEquals(GameplayLevelCatalog.builtIns().entries().size(), result.entryCount());
+        assertTrue(text.indexOf("stairs_curve_line") < text.indexOf("curve_stairs"));
         assertTrue(!text.contains("disabled\""));
     }
 
     @Test public void compilerFailureLeavesPreviousGoodAssetUntouched() throws Exception {
         Path output = temporary.newFile("runtime.json").toPath();
         Files.write(output, "previous-good".getBytes(StandardCharsets.UTF_8));
-        CatalogDocument catalog = new CatalogDocument(1, "main", Collections.singletonList(
-                new CatalogEntry("builtin", CatalogEntry.Kind.JAVA_PROVIDER, "provider", true)));
+        CatalogDocument catalog = new CatalogDocument(
+                1, "main", builtinCatalogEntries());
 
         try {
             publisher(compiler(true)).publish(catalog, emptyRepository(), output);
@@ -138,9 +147,10 @@ public class TerrainPublisherTest {
                 TrackProfile.GAMEPLAY_PROFILE_ID,
                 Collections.singletonList(LevelEntry.levelReference(
                         "40000000-0000-0000-0000-000000000003", child.id())));
-        CatalogDocument catalog = new CatalogDocument(1, "main",
-                Collections.singletonList(new CatalogEntry("custom",
-                        CatalogEntry.Kind.JSON_LEVEL, root.id(), true)));
+        List<CatalogEntry> entries = builtinCatalogEntries();
+        entries.add(new CatalogEntry("custom",
+                CatalogEntry.Kind.JSON_LEVEL, root.id(), true));
+        CatalogDocument catalog = new CatalogDocument(1, "main", entries);
         InMemoryTerrainDocumentRepository repository =
                 new InMemoryTerrainDocumentRepository(
                         Collections.<StructureDocument>emptyList(), Arrays.asList(root, child));
@@ -222,9 +232,10 @@ public class TerrainPublisherTest {
                 TrackProfile.GAMEPLAY_PROFILE_ID,
                 Collections.singletonList(LevelEntry.levelReference(
                         "50000000-0000-0000-0000-000000000003", child.id())));
-        CatalogDocument catalog = new CatalogDocument(1, "main",
-                Collections.singletonList(new CatalogEntry("custom",
-                        CatalogEntry.Kind.JSON_LEVEL, root.id(), true)));
+        List<CatalogEntry> entries = builtinCatalogEntries();
+        entries.add(new CatalogEntry("custom",
+                CatalogEntry.Kind.JSON_LEVEL, root.id(), true));
+        CatalogDocument catalog = new CatalogDocument(1, "main", entries);
 
         try {
             publisher(new AuthoringTerrainContentCompiler()).publish(catalog,
@@ -253,6 +264,15 @@ public class TerrainPublisherTest {
                 throw new UnsupportedOperationException();
             }
         };
+    }
+
+    private static List<CatalogEntry> builtinCatalogEntries() {
+        List<CatalogEntry> entries = new ArrayList<CatalogEntry>();
+        for (GameplayLevelProvider provider : GameplayLevelCatalog.builtIns().entries()) {
+            entries.add(new CatalogEntry(provider.stableId(),
+                    CatalogEntry.Kind.JAVA_PROVIDER, provider.stableId(), true));
+        }
+        return entries;
     }
 
     private static InMemoryTerrainDocumentRepository emptyRepository() {
